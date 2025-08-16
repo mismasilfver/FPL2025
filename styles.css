@@ -1,0 +1,480 @@
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, #1e5631, #2b7d40);
+    min-height: 100vh;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header */
+header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+header h1 {
+    text-align: center;
+    color: #2d3748;
+    margin-bottom: 15px;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.team-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f7fafc;
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+/* Controls */
+.controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.position-filter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.position-filter label {
+    font-weight: 600;
+    color: #4a5568;
+}
+
+.position-filter select {
+    padding: 8px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    background: white;
+    font-size: 14px;
+}
+
+.have-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.have-filter label {
+    font-weight: 600;
+    color: #4a5568;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.have-filter input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+/* Buttons */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #4299e1, #3182ce);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(66, 153, 225, 0.4);
+}
+
+.btn-secondary {
+    background: #e2e8f0;
+    color: #4a5568;
+}
+
+.btn-secondary:hover {
+    background: #cbd5e0;
+}
+
+.btn-danger {
+    background: #e53e3e;
+    color: white;
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.btn-danger:hover {
+    background: #c53030;
+}
+
+.btn-edit {
+    background: #38a169;
+    color: white;
+    padding: 6px 12px;
+    font-size: 12px;
+    margin-right: 5px;
+}
+
+.btn-edit:hover {
+    background: #2f855a;
+}
+
+/* Captaincy section */
+.captaincy-section {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.captaincy-section h3 {
+    margin-bottom: 10px;
+    color: #2d3748;
+}
+
+.captaincy-info {
+    display: flex;
+    gap: 20px;
+    font-weight: 600;
+}
+
+.captaincy-info span {
+    padding: 8px 12px;
+    background: #f7fafc;
+    border-radius: 6px;
+    border-left: 4px solid #4299e1;
+}
+
+/* Table */
+.players-table-container {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    overflow-x: auto;
+}
+
+#players-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 800px;
+}
+
+#players-table th {
+    background: #ffffff;
+    color: #2d3748;
+    padding: 15px 10px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 14px;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+#players-table td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 14px;
+}
+
+#players-table tbody tr:hover {
+    background: #f7fafc;
+}
+
+/* Notes cell styling */
+.notes-cell {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    max-width: 200px;
+    word-wrap: break-word;
+}
+
+.notes-cell:hover {
+    background: #edf2f7;
+}
+
+.notes-cell.expanded {
+    background: #e6fffa;
+    border-left: 3px solid #38b2ac;
+}
+
+.notes-text {
+    display: block;
+    line-height: 1.4;
+}
+
+/* Have indicator styling */
+.have-indicator {
+    color: #38a169;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* Form help text */
+.form-help {
+    display: block;
+    font-size: 12px;
+    color: #718096;
+    margin-top: 5px;
+}
+
+/* Status indicators - colored circles */
+.status-circle {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: inline-block;
+    margin: 0 auto;
+}
+
+.status-yellow {
+    background: #fbbf24;
+    border: 2px solid #f59e0b;
+}
+
+.status-green {
+    background: #10b981;
+    border: 2px solid #059669;
+}
+
+.status-red {
+    background: #ef4444;
+    border: 2px solid #dc2626;
+}
+
+.status-none {
+    /* No circle for empty status */
+    display: none;
+}
+
+/* Captain indicators */
+.captain-badge, .vice-captain-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.captain-badge {
+    background: #ffd700;
+    color: #744210;
+}
+
+.vice-captain-badge {
+    background: #c0c0c0;
+    color: #2d3748;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background: white;
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 15px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #e2e8f0;
+    background: linear-gradient(135deg, #4299e1, #3182ce);
+    color: white;
+    border-radius: 15px 15px 0 0;
+}
+
+.modal-header h2 {
+    margin: 0;
+}
+
+.close {
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    color: white;
+    opacity: 0.8;
+}
+
+.close:hover {
+    opacity: 1;
+}
+
+/* Form */
+#player-form {
+    padding: 20px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #4299e1;
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 30px;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.empty-state p {
+    font-size: 18px;
+    color: #718096;
+    font-weight: 500;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+    
+    header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .team-summary {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .controls {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+    
+    .position-filter {
+        justify-content: center;
+    }
+    
+    .captaincy-info {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .players-table-container {
+        margin: 0 -10px;
+        border-radius: 0;
+    }
+    
+    #players-table th,
+    #players-table td {
+        padding: 8px 5px;
+        font-size: 12px;
+    }
+    
+    .modal-content {
+        margin: 10% auto;
+        width: 95%;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .btn {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    #players-table th:nth-child(8),
+    #players-table td:nth-child(8) {
+        display: none;
+    }
+    
+    .captaincy-section {
+        display: none;
+    }
+}
