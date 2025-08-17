@@ -39,6 +39,37 @@ To run this project on your local machine:
 
 Alternatively, you can simply open the `index.html` file directly in your web browser.
 
+## Testing
+
+This project includes a comprehensive test suite to ensure functionality works correctly.
+
+### Prerequisites
+
+- **Node.js** (version 14 or higher) must be installed on your system
+- You can download Node.js from [nodejs.org](https://nodejs.org/)
+
+### Running Tests
+
+1. **Install dependencies** (first time only):
+   ```bash
+   npm install
+   ```
+
+2. **Run the test suite**:
+   ```bash
+   npm test
+   ```
+
+### Test Coverage
+
+The test suite includes:
+- **Player Management Tests**: Adding, editing, and deleting players
+- **Form Validation Tests**: Required field validation and error handling
+- **Captaincy Tests**: Setting and switching captain/vice-captain roles
+- **UI Interaction Tests**: Button clicks and form submissions
+
+All tests use Jest with JSDOM for DOM simulation and comprehensive coverage of user interactions.
+
 ## Deployment to GitHub Pages
 
 1. Create a new repository on GitHub
@@ -53,6 +84,10 @@ Alternatively, you can simply open the `index.html` file directly in your web br
 - `styles.css` - Responsive CSS styling
 - `script.js` - JavaScript functionality and data management
 - `README.md` - This documentation
+- `__tests__/` - Test files for Jest
+- `test-utils.js` - Testing utilities and helpers
+- `package.json` - Node.js dependencies and scripts
+- `babel.config.js` - Babel configuration for testing
 
 ## Browser Compatibility
 

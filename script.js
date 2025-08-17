@@ -111,6 +111,12 @@ class FPLTeamManager {
     handleFormSubmit(e) {
         e.preventDefault();
         
+        // Check form validity first
+        if (!this.playerForm.checkValidity()) {
+            this.playerForm.reportValidity();
+            return;
+        }
+        
         const playerData = {
             name: this.playerName.value.trim(),
             position: this.playerPosition.value,
