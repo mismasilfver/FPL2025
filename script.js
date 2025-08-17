@@ -14,12 +14,12 @@ class FPLTeamManager {
     
     initializeElements() {
         // Main elements
-        this.addPlayerBtn = document.getElementById('add-player-btn');
+        this.addPlayerBtn = document.querySelector('[data-testid="add-player-button"]');
         this.playersTable = document.getElementById('players-table');
         this.playersTbody = document.getElementById('players-tbody');
         this.emptyState = document.getElementById('empty-state');
-        this.positionFilter = document.getElementById('position-filter');
-        this.haveFilter = document.getElementById('have-filter');
+        this.positionFilter = document.querySelector('[data-testid="position-filter-select"]');
+        this.haveFilter = document.querySelector('[data-testid="have-filter-checkbox"]');
         
         // Summary elements
         this.teamCount = document.getElementById('team-count');
@@ -32,37 +32,37 @@ class FPLTeamManager {
         this.modalTitle = document.getElementById('modal-title');
         this.playerForm = document.getElementById('player-form');
         this.closeBtn = document.querySelector('.close');
-        this.cancelBtn = document.getElementById('cancel-btn');
+        this.cancelBtn = document.querySelector('[data-testid="cancel-button"]');
         
-        // Form elements
-        this.playerName = document.getElementById('player-name');
-        this.playerPosition = document.getElementById('player-position');
-        this.playerTeam = document.getElementById('player-team');
-        this.playerPrice = document.getElementById('player-price');
-        this.playerStatus = document.getElementById('player-status');
-        this.playerHave = document.getElementById('player-have');
-        this.playerNotes = document.getElementById('player-notes');
+        // Form elements using data-testid
+        this.playerName = document.querySelector('[data-testid="player-name-input"]');
+        this.playerPosition = document.querySelector('[data-testid="player-position-select"]');
+        this.playerTeam = document.querySelector('[data-testid="player-team-input"]');
+        this.playerPrice = document.querySelector('[data-testid="player-price-input"]');
+        this.playerStatus = document.querySelector('[data-testid="player-status-select"]');
+        this.playerHave = document.querySelector('[data-testid="player-have-checkbox"]');
+        this.playerNotes = document.querySelector('[data-testid="player-notes-textarea"]');
     }
     
     bindEvents() {
         // Add player button
-        this.addPlayerBtn.addEventListener('click', () => this.openModal());
+        this.addPlayerBtn?.addEventListener('click', () => this.openModal());
         
         // Modal close events
-        this.closeBtn.addEventListener('click', () => this.closeModal());
-        this.cancelBtn.addEventListener('click', () => this.closeModal());
-        this.modal.addEventListener('click', (e) => {
+        this.closeBtn?.addEventListener('click', () => this.closeModal());
+        this.cancelBtn?.addEventListener('click', () => this.closeModal());
+        this.modal?.addEventListener('click', (e) => {
             if (e.target === this.modal) this.closeModal();
         });
         
         // Form submission
-        this.playerForm.addEventListener('submit', (e) => this.handleFormSubmit(e));
+        this.playerForm?.addEventListener('submit', (e) => this.handleFormSubmit(e));
         
         // Position filter
-        this.positionFilter.addEventListener('change', () => this.updateDisplay());
+        this.positionFilter?.addEventListener('change', () => this.updateDisplay());
         
         // Have filter
-        this.haveFilter.addEventListener('change', () => this.updateDisplay());
+        this.haveFilter?.addEventListener('change', () => this.updateDisplay());
         
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
@@ -292,24 +292,49 @@ class FPLTeamManager {
             <td>${player.team}</td>
             <td>£${player.price.toFixed(1)}m</td>
             <td style="text-align: center;">${player.status ? `<div class="status-circle status-${player.status}" title="${this.getStatusText(player.status)}"></div>` : ''}</td>
-            <td style="text-align: center;">
-                ${player.have ? `<span class="have-indicator" onclick="fplManager.toggleHave('${player.id}')" style="cursor: pointer;" title="Click to remove from team">✓</span>` : 
-                  `<button class="btn btn-secondary" onclick="fplManager.toggleHave('${player.id}')" style="font-size: 10px; padding: 2px 6px;" title="Add to team">+</button>`}
+            <td style="text-align: center;" data-testid="have-cell-${player.id}">
+                ${player.have ? 
+                  `<span class="have-indicator" 
+                        onclick="fplManager.toggleHave('${player.id}')" 
+                        style="cursor: pointer;" 
+                        title="Click to remove from team"
+                        data-testid="remove-from-team-${player.id}">✓</span>` : 
+                  `<button class="btn btn-secondary" 
+                          onclick="fplManager.toggleHave('${player.id}')" 
+                          style="font-size: 10px; padding: 2px 6px;" 
+                          title="Add to team"
+                          data-testid="add-to-team-${player.id}">+</button>`}
             </td>
-            <td>
-                ${isCaptain ? '<span class="captain-badge">C</span>' : 
-                  `<button class="btn btn-secondary" onclick="fplManager.setCaptain('${player.id}')" style="font-size: 10px; padding: 2px 6px;">C</button>`}
+            <td data-testid="captain-cell-${player.id}">
+                ${isCaptain ? 
+                  `<span class="captain-badge" data-testid="captain-badge-${player.id}">C</span>` : 
+                  `<button class="btn btn-secondary" 
+                          onclick="fplManager.setCaptain('${player.id}')" 
+                          style="font-size: 10px; padding: 2px 6px;"
+                          data-testid="make-captain-${player.id}">C</button>`}
             </td>
-            <td>
-                ${isViceCaptain ? '<span class="vice-captain-badge">VC</span>' : 
-                  `<button class="btn btn-secondary" onclick="fplManager.setViceCaptain('${player.id}')" style="font-size: 10px; padding: 2px 6px;">VC</button>`}
+            <td data-testid="vice-captain-cell-${player.id}">
+                ${isViceCaptain ? 
+                  `<span class="vice-captain-badge" data-testid="vice-captain-badge-${player.id}">VC</span>` : 
+                  `<button class="btn btn-secondary" 
+                          onclick="fplManager.setViceCaptain('${player.id}')" 
+                          style="font-size: 10px; padding: 2px 6px;"
+                          data-testid="make-vice-captain-${player.id}">VC</button>`}
             </td>
-            <td class="notes-cell" data-player-id="${player.id}" data-full-notes="${player.notes || ''}" title="Click to expand notes">
+            <td class="notes-cell" 
+                data-player-id="${player.id}" 
+                data-full-notes="${player.notes || ''}" 
+                title="Click to expand notes"
+                data-testid="notes-cell-${player.id}">
                 <span class="notes-text">${this.truncateText(player.notes || '', 20)}</span>
             </td>
-            <td>
-                <button class="btn btn-edit" onclick="fplManager.openModal('${player.id}')">Edit</button>
-                <button class="btn btn-danger" onclick="fplManager.deletePlayer('${player.id}')">Delete</button>
+            <td data-testid="actions-cell-${player.id}">
+                <button class="btn btn-edit" 
+                        onclick="fplManager.openModal('${player.id}')"
+                        data-testid="edit-player-${player.id}">Edit</button>
+                <button class="btn btn-danger" 
+                        onclick="fplManager.deletePlayer('${player.id}')"
+                        data-testid="delete-player-${player.id}">Delete</button>
             </td>
         `;
         

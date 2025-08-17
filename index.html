@@ -16,11 +16,13 @@
             </div>
         </header>
 
-        <div class="controls">
-            <button id="add-player-btn" class="btn btn-primary">+ Add Player</button>
-            <div class="position-filter">
-                <label>Filter by Position:</label>
-                <select id="position-filter">
+        <div class="controls" data-testid="controls-container">
+            <button id="add-player-btn" 
+                    class="btn btn-primary"
+                    data-testid="add-player-button">+ Add Player</button>
+            <div class="position-filter" data-testid="position-filter-container">
+                <label for="position-filter">Filter by Position:</label>
+                <select id="position-filter" data-testid="position-filter-select">
                     <option value="all">All Positions</option>
                     <option value="goalkeeper">Goalkeeper</option>
                     <option value="defence">Defence</option>
@@ -28,9 +30,11 @@
                     <option value="forward">Forward</option>
                 </select>
             </div>
-            <div class="have-filter">
-                <label>
-                    <input type="checkbox" id="have-filter"> Show "Have" only
+            <div class="have-filter" data-testid="have-filter-container">
+                <label data-testid="have-filter-label">
+                    <input type="checkbox" 
+                           id="have-filter" 
+                           data-testid="have-filter-checkbox"> Show "Have" only
                 </label>
             </div>
         </div>
@@ -78,14 +82,14 @@
                 <span class="close">&times;</span>
             </div>
             <form id="player-form">
-                <div class="form-group">
+                <div class="form-group" id="form-group-name">
                     <label for="player-name">Player Name *</label>
-                    <input type="text" id="player-name" required>
+                    <input type="text" id="player-name" name="player-name" required data-testid="player-name-input">
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group" id="form-group-position">
                     <label for="player-position">Position *</label>
-                    <select id="player-position" required>
+                    <select id="player-position" name="player-position" required data-testid="player-position-select">
                         <option value="">Select Position</option>
                         <option value="goalkeeper">Goalkeeper</option>
                         <option value="defence">Defence</option>
@@ -94,19 +98,21 @@
                     </select>
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group" id="form-group-team">
                     <label for="player-team">Team *</label>
-                    <input type="text" id="player-team" required placeholder="e.g., Arsenal, Liverpool">
+                    <input type="text" id="player-team" name="player-team" required 
+                           placeholder="e.g., Arsenal, Liverpool" data-testid="player-team-input">
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group" id="form-group-price">
                     <label for="player-price">Price (£m) *</label>
-                    <input type="number" id="player-price" step="0.1" min="0" required>
+                    <input type="number" id="player-price" name="player-price" 
+                           step="0.1" min="0" required data-testid="player-price-input">
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group" id="form-group-status">
                     <label for="player-status">Status</label>
-                    <select id="player-status">
+                    <select id="player-status" name="player-status" data-testid="player-status-select">
                         <option value="">No Status</option>
                         <option value="yellow">Maybe Good (Yellow)</option>
                         <option value="green">Very Good (Green)</option>
@@ -114,21 +120,26 @@
                     </select>
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group" id="form-group-have">
                     <label for="player-have">
-                        <input type="checkbox" id="player-have"> In My Team
+                        <input type="checkbox" id="player-have" name="player-have" 
+                               data-testid="player-have-checkbox"> In My Team
                     </label>
                     <small class="form-help">Maximum 15 players can be in your team</small>
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group" id="form-group-notes">
                     <label for="player-notes">Notes</label>
-                    <textarea id="player-notes" rows="3" placeholder="Optional notes about this player..."></textarea>
+                    <textarea id="player-notes" name="player-notes" rows="3" 
+                              placeholder="Optional notes about this player..." 
+                              data-testid="player-notes-textarea"></textarea>
                 </div>
                 
                 <div class="form-actions">
-                    <button type="button" id="cancel-btn" class="btn btn-secondary">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Player</button>
+                    <button type="button" id="cancel-btn" class="btn btn-secondary" 
+                            data-testid="cancel-button">Cancel</button>
+                    <button type="submit" class="btn btn-primary" 
+                            data-testid="save-player-button">Save Player</button>
                 </div>
             </form>
         </div>
