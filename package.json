@@ -1,0 +1,29 @@
+{
+  "name": "fpl-team-manager",
+  "version": "1.0.0",
+  "description": "Fantasy Premier League Team Manager",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/core": "^7.23.5",
+    "@babel/preset-env": "^7.23.5",
+    "@testing-library/dom": "^9.3.1",
+    "@testing-library/jest-dom": "^6.4.2",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "setupFilesAfterEnv": ["@testing-library/jest-dom"],
+    "transform": {
+      "^.+\\.js$": "babel-jest"
+    }
+  }
+}
