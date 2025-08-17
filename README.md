@@ -66,9 +66,12 @@ Works on all modern browsers including:
 All data is stored locally in your browser using localStorage. No external database required.
 
 ## Future roadmap ideas
--proper database to allow multidevice usage
--authentication to protect data to myself only
--create interface for mobile / better responsiveness as it doesn't currently work nicely on a phone 
+- proper database to allow multidevice usage
+- authentication to protect data to myself only
+
+## Potential implementation of database and authentication
+- use firebase for database
+- use firebase authentication for authentication
 
 ---
 

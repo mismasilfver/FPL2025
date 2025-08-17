@@ -453,6 +453,24 @@ header h1 {
         font-size: 12px;
     }
     
+    #players-table th:nth-child(5), /* Status */
+    #players-table td:nth-child(5),
+    #players-table th:nth-child(7), /* Captain */
+    #players-table td:nth-child(7),
+    #players-table th:nth-child(8), /* Vice */
+    #players-table td:nth-child(8),
+    #players-table th:nth-child(9), /* Notes */
+    #players-table td:nth-child(9) {
+        display: none;
+    }
+
+    #players-table th:nth-child(1),
+    #players-table td:nth-child(1) {
+        max-width: 120px; /* Adjust as needed */
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    
     .modal-content {
         margin: 10% auto;
         width: 95%;
@@ -469,11 +487,6 @@ header h1 {
 }
 
 @media (max-width: 480px) {
-    #players-table th:nth-child(8),
-    #players-table td:nth-child(8) {
-        display: none;
-    }
-    
     .captaincy-section {
         display: none;
     }
