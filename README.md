@@ -107,6 +107,7 @@ All data is stored locally in your browser using localStorage. No external datab
 ## Potential implementation of database and authentication
 - use firebase for database
 - use firebase authentication for authentication
+- added two readme files on the topic and options
 
 ---
 
