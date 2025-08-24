@@ -29,6 +29,7 @@ class FPLTeamManager {
         this.prevWeekBtn = document.getElementById('prev-week-btn');
         this.nextWeekBtn = document.getElementById('next-week-btn');
         this.createWeekBtn = document.getElementById('create-week-btn');
+        this.exportWeekBtn = document.getElementById('export-week-btn');
         
         // Summary elements
         this.teamCount = document.getElementById('team-count');
@@ -82,6 +83,7 @@ class FPLTeamManager {
         this.prevWeekBtn?.addEventListener('click', () => this.prevWeek());
         this.nextWeekBtn?.addEventListener('click', () => this.nextWeek());
         this.createWeekBtn?.addEventListener('click', () => this.createNewWeek());
+        this.exportWeekBtn?.addEventListener('click', () => this.exportWeekData());
     }
     
     openModal(playerId = null) {
@@ -140,7 +142,7 @@ class FPLTeamManager {
             position: this.playerPosition.value,
             team: this.playerTeam.value.trim(),
             price: parseFloat(this.playerPrice.value),
-            status: this.playerStatus.value,
+            status: this.playerStatus.value || '', // Save empty string if no status selected
             have: this.playerHave.checked,
             notes: this.playerNotes.value.trim()
         };
@@ -177,7 +179,8 @@ class FPLTeamManager {
         }
         const player = {
             id: Date.now().toString(),
-            ...playerData
+            ...playerData,
+            status: playerData.status || ''
         };
         
         this.players.push(player);
@@ -547,6 +550,27 @@ class FPLTeamManager {
             }
         }
     }
+
+    exportWeekData() {
+        const dataToExport = {
+            week: this.currentWeek,
+            players: this.players,
+            captain: this.captain,
+            viceCaptain: this.viceCaptain,
+        };
+
+        const jsonString = JSON.stringify(dataToExport, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `fpl_week_${this.currentWeek}_data.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
 }
 
 // Initialize the app when DOM is loaded
@@ -558,6 +582,11 @@ document.addEventListener('DOMContentLoaded', () => {
     window.fplManagerNextWeek = () => window.fplManager.nextWeek();
     window.fplManagerPrevWeek = () => window.fplManager.prevWeek();
 });
+
+// Conditionally export for testing purposes
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { FPLTeamManager };
+}
 
 // Load CSV data as initial players
 document.addEventListener('DOMContentLoaded', () => {
