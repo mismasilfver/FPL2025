@@ -138,7 +138,7 @@ All data is stored locally in your browser using localStorage. No external datab
 - enable local server accessible from internet 
 - utilize online hosted database to allow multidevice usage
 - authentication to protect data to myself only
-- managing week history
+
 
 ## Potential implementation of database and authentication (online)
 - use firebase or supabase for database
