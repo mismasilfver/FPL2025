@@ -45,8 +45,8 @@ describe('Read-only mode for previous weeks', () => {
     userEvent.click(prevBtn, window);
 
     // Read-only should be set on previous week
-    const root = window.fplManager._getRootData();
-    expect(root.weeks['1'] && root.weeks['1'].isReadOnly).toBe(true);
+    const isRO = window.fplManager.isWeekReadOnly(1);
+    expect(isRO).toBe(true);
 
     // Badge should reflect read-only (inline style not 'none')
     const roBadge = document.getElementById('week-readonly-badge');

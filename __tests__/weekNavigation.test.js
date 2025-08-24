@@ -110,9 +110,8 @@ describe('Week Navigation Controls', () => {
     const removeSpan = document.querySelector(`[data-testid="remove-from-team-${player.id}"]`);
     if (removeSpan) userEvent.click(removeSpan, window);
 
-    const root = window.fplManager._getRootData();
-    const w1 = root.weeks['1'];
-    const w2 = root.weeks['2'];
+    const w1 = window.fplManager.getWeekSnapshot(1);
+    const w2 = window.fplManager.getWeekSnapshot(2);
 
     // Week 1 still has the player in teamMembers
     expect(w1.teamMembers.map(m => m.playerId)).toContain(player.id);
@@ -141,9 +140,8 @@ describe('Week Navigation Controls', () => {
     const addToTeamBtn = document.querySelector(`[data-testid="add-to-team-${player.id}"]`);
     if (addToTeamBtn) userEvent.click(addToTeamBtn, window);
 
-    const root = window.fplManager._getRootData();
-    const w1 = root.weeks['1'];
-    const w2 = root.weeks['2'];
+    const w1 = window.fplManager.getWeekSnapshot(1);
+    const w2 = window.fplManager.getWeekSnapshot(2);
 
     // Week 1 remains without the player in teamMembers
     expect(w1.teamMembers.map(m => m.playerId)).not.toContain(player.id);
@@ -179,11 +177,10 @@ describe('Week Navigation Controls', () => {
     userEvent.type(teamInput, 'NEW', window);
     userEvent.submit(document.querySelector('#player-form'), window);
 
-    const root = window.fplManager._getRootData();
-    const w1 = root.weeks['1'];
-    const w2 = root.weeks['2'];
-    const w1Player = (w1.players || []).find(p => p.id === player.id);
-    const w2Player = (w2.players || []).find(p => p.id === player.id);
+    const w1 = window.fplManager.getWeekSnapshot(1);
+    const w2 = window.fplManager.getWeekSnapshot(2);
+    const w1Player = window.fplManager.getPlayerSnapshot(1, player.id);
+    const w2Player = window.fplManager.getPlayerSnapshot(2, player.id);
 
     // Week 1 retains original fields
     expect(w1Player.position).toBe('defence');
@@ -218,9 +215,8 @@ describe('Week Navigation Controls', () => {
     const delBtn = document.querySelector(`[data-testid="delete-player-${player.id}"]`);
     if (delBtn) userEvent.click(delBtn, window);
 
-    const root = window.fplManager._getRootData();
-    const w1 = root.weeks['1'];
-    const w2 = root.weeks['2'];
+    const w1 = window.fplManager.getWeekSnapshot(1);
+    const w2 = window.fplManager.getWeekSnapshot(2);
 
     // Week 1 still has the player in players and teamMembers
     expect((w1.players || []).some(p => p.id === player.id)).toBe(true);
@@ -258,12 +254,11 @@ describe('Week Navigation Controls', () => {
     userEvent.type(notesInput, 'bench updated', window);
     userEvent.submit(document.querySelector('#player-form'), window);
 
-    const root = window.fplManager._getRootData();
-    const w1 = root.weeks['1'];
-    const w2 = root.weeks['2'];
+    const w1 = window.fplManager.getWeekSnapshot(1);
+    const w2 = window.fplManager.getWeekSnapshot(2);
 
-    const w1Player = (w1.players || []).find(p => p.id === player.id);
-    const w2Player = (w2.players || []).find(p => p.id === player.id);
+    const w1Player = window.fplManager.getPlayerSnapshot(1, player.id);
+    const w2Player = window.fplManager.getPlayerSnapshot(2, player.id);
 
     // Week 1 player data unchanged and not in teamMembers
     expect(w1Player.price).toBe(4.5);
@@ -305,12 +300,11 @@ describe('Week Navigation Controls', () => {
     userEvent.type(notesInput, 'changed', window);
     userEvent.submit(document.querySelector('#player-form'), window);
 
-    const root = window.fplManager._getRootData();
-    const w1 = root.weeks['1'];
-    const w2 = root.weeks['2'];
+    const w1 = window.fplManager.getWeekSnapshot(1);
+    const w2 = window.fplManager.getWeekSnapshot(2);
 
-    const w1Player = (w1.players || []).find(p => p.id === player.id);
-    const w2Player = (w2.players || []).find(p => p.id === player.id);
+    const w1Player = window.fplManager.getPlayerSnapshot(1, player.id);
+    const w2Player = window.fplManager.getPlayerSnapshot(2, player.id);
 
     // Week 1 retains original price and notes
     expect(w1Player.price).toBe(6);
@@ -349,9 +343,8 @@ describe('Week Navigation Controls', () => {
       userEvent.click(removeSpan, window);
     }
 
-    const root = window.fplManager._getRootData();
-    const w1 = root.weeks['1'];
-    const w2 = root.weeks['2'];
+    const w1 = window.fplManager.getWeekSnapshot(1);
+    const w2 = window.fplManager.getWeekSnapshot(2);
 
     // Week 1 teamMembers remains with the player
     expect(w1.teamMembers.map(m => m.playerId)).toContain(player.id);
@@ -397,9 +390,8 @@ describe('Week Navigation Controls', () => {
 
     // Navigate back to week 1 and verify captain unchanged
     userEvent.click(document.getElementById('prev-week-btn'), window);
-    const root = window.fplManager._getRootData();
-    expect(root.weeks['1'].captain).toBe(p1.id);
-    expect(root.weeks['2'].captain).toBe(p2.id);
+    expect(window.fplManager.getWeekSnapshot(1).captain).toBe(p1.id);
+    expect(window.fplManager.getWeekSnapshot(2).captain).toBe(p2.id);
   });
 
   test('Changing vice-captain in week 2 does not change week 1 (historical integrity)', async () => {
@@ -440,9 +432,8 @@ describe('Week Navigation Controls', () => {
 
     // Navigate back to week 1 and verify vice unchanged
     userEvent.click(document.getElementById('prev-week-btn'), window);
-    const root = window.fplManager._getRootData();
-    expect(root.weeks['1'].viceCaptain).toBe(p1.id);
-    expect(root.weeks['2'].viceCaptain).toBe(p2.id);
+    expect(window.fplManager.getWeekSnapshot(1).viceCaptain).toBe(p1.id);
+    expect(window.fplManager.getWeekSnapshot(2).viceCaptain).toBe(p2.id);
   });
 
   test('should render initial week label as Week 1', async () => {
@@ -549,13 +540,12 @@ describe('Week Navigation Controls', () => {
     // Create new week
     userEvent.click(document.getElementById('create-week-btn'), window);
 
-    const root = window.fplManager._getRootData();
-    const w1 = root.weeks['1'];
-    const w2 = root.weeks['2'];
+    const w1 = window.fplManager.getWeekSnapshot(1);
+    const w2 = window.fplManager.getWeekSnapshot(2);
 
     // Week 1 should be read-only after creating week 2
-    expect(w1.isReadOnly).toBe(true);
-    expect(w2.isReadOnly).toBe(false);
+    expect(window.fplManager.isWeekReadOnly(1)).toBe(true);
+    expect(window.fplManager.isWeekReadOnly(2)).toBe(false);
 
     // teamMembers only include have=true players
     expect(Array.isArray(w1.teamMembers)).toBe(true);
