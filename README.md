@@ -25,6 +25,39 @@ A simple, responsive web application to manage your Fantasy Premier League team.
 5. **Filter**: Use the position dropdown to filter by player position
 6. **Delete**: Click "Delete" to remove players from your team
 
+## Weekly Management
+
+Manage your team week-by-week with built-in navigation and read-only safeguards.
+
+- **Controls**: `Prev`, `Next`, and `Create New Week` in the header with a `Week N` label.
+- **Read-only Mode**: Past weeks are read-only. Editing controls are disabled and the "Read-only" badge appears.
+- **Editing**: Only the current week is editable. Add/Edit/Delete, Captain/VC, and team membership toggles are disabled in read-only weeks.
+- **Navigation**: `Prev` is disabled on week 1. `Next` is disabled on the last available week.
+- **Create New Week**: Clones players from the current week (including captain/vice) and snapshots the team into the new week. Previous weeks are marked read-only.
+  - Note: Captain and Vice-Captain selections are copied to the new week. Changing them in a later week does not alter previous weeks (historical integrity).
+
+Data is stored in `localStorage` under `fpl-team-data` using a weekly schema:
+
+```json
+{
+  "version": "2.0",
+  "currentWeek": 2,
+  "weeks": {
+    "1": {
+      "players": [],
+      "captain": null,
+      "viceCaptain": null,
+      "teamMembers": [],
+      "teamStats": { "totalValue": 0, "playerCount": 0, "createdDate": "..." },
+      "isReadOnly": true
+    },
+    "2": { "players": [...], "captain": "...", "viceCaptain": "...", "teamMembers": [...], "teamStats": { ... }, "isReadOnly": false }
+  }
+}
+```
+
+Related tests: `__tests__/weekNavigation.test.js`, `__tests__/readonlyMode.test.js`.
+
 ## Running Locally
 
 To run this project on your local machine:
@@ -101,13 +134,15 @@ Works on all modern browsers including:
 All data is stored locally in your browser using localStorage. No external database required.
 
 ## Future roadmap ideas
-- proper database to allow multidevice usage
+- proper database to allow at minimum local persistent storage
+- enable local server accessible from internet 
+- utilize online hosted database to allow multidevice usage
 - authentication to protect data to myself only
 - managing week history
 
-## Potential implementation of database and authentication
-- use firebase for database
-- use firebase authentication for authentication
+## Potential implementation of database and authentication (online)
+- use firebase or supabase for database
+- use firebase or supabase authentication for authentication
 - added two readme files on the topic and options
 
 ---
