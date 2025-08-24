@@ -5,8 +5,11 @@ class FPLTeamManager {
         this.currentEditingId = null;
         this.captain = null;
         this.viceCaptain = null;
+        this.currentWeek = 1; // phase 2: track current week in memory
         
         this.initializeElements();
+        // Phase 1: migrate storage (if needed) before loading
+        this.migrateStorageIfNeeded();
         this.loadFromStorage();
         this.bindEvents();
         this.updateDisplay();
@@ -20,6 +23,12 @@ class FPLTeamManager {
         this.emptyState = document.getElementById('empty-state');
         this.positionFilter = document.querySelector('[data-testid="position-filter-select"]');
         this.haveFilter = document.querySelector('[data-testid="have-filter-checkbox"]');
+        // Week controls
+        this.weekLabel = document.getElementById('week-label');
+        this.weekReadonlyBadge = document.getElementById('week-readonly-badge');
+        this.prevWeekBtn = document.getElementById('prev-week-btn');
+        this.nextWeekBtn = document.getElementById('next-week-btn');
+        this.createWeekBtn = document.getElementById('create-week-btn');
         
         // Summary elements
         this.teamCount = document.getElementById('team-count');
@@ -68,9 +77,18 @@ class FPLTeamManager {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') this.closeModal();
         });
+
+        // Week controls
+        this.prevWeekBtn?.addEventListener('click', () => this.prevWeek());
+        this.nextWeekBtn?.addEventListener('click', () => this.nextWeek());
+        this.createWeekBtn?.addEventListener('click', () => this.createNewWeek());
     }
     
     openModal(playerId = null) {
+        if (this._isReadOnlyCurrentWeek()) {
+            alert('This week is read-only. Create a new week to make changes.');
+            return;
+        }
         this.currentEditingId = playerId;
         
         if (playerId) {
@@ -153,6 +171,10 @@ class FPLTeamManager {
     }
     
     addPlayer(playerData) {
+        if (this._isReadOnlyCurrentWeek()) {
+            alert('This week is read-only. Create a new week to add players.');
+            return;
+        }
         const player = {
             id: Date.now().toString(),
             ...playerData
@@ -164,6 +186,10 @@ class FPLTeamManager {
     }
     
     updatePlayer(playerId, playerData) {
+        if (this._isReadOnlyCurrentWeek()) {
+            alert('This week is read-only. Create a new week to edit players.');
+            return;
+        }
         const playerIndex = this.players.findIndex(p => p.id === playerId);
         if (playerIndex !== -1) {
             this.players[playerIndex] = { ...this.players[playerIndex], ...playerData };
@@ -173,6 +199,10 @@ class FPLTeamManager {
     }
     
     deletePlayer(playerId) {
+        if (this._isReadOnlyCurrentWeek()) {
+            alert('This week is read-only. Create a new week to delete players.');
+            return;
+        }
         if (confirm('Are you sure you want to delete this player?')) {
             // Remove from captain/vice captain if applicable
             if (this.captain === playerId) this.captain = null;
@@ -185,6 +215,10 @@ class FPLTeamManager {
     }
     
     setCaptain(playerId) {
+        if (this._isReadOnlyCurrentWeek()) {
+            alert('This week is read-only. Create a new week to change captain.');
+            return;
+        }
         // If already captain, remove captaincy
         if (this.captain === playerId) {
             this.captain = null;
@@ -201,6 +235,10 @@ class FPLTeamManager {
     }
     
     setViceCaptain(playerId) {
+        if (this._isReadOnlyCurrentWeek()) {
+            alert('This week is read-only. Create a new week to change vice captain.');
+            return;
+        }
         // If already vice captain, remove vice captaincy
         if (this.viceCaptain === playerId) {
             this.viceCaptain = null;
@@ -217,6 +255,10 @@ class FPLTeamManager {
     }
     
     toggleHave(playerId) {
+        if (this._isReadOnlyCurrentWeek()) {
+            alert('This week is read-only. Create a new week to change team membership.');
+            return;
+        }
         const player = this.players.find(p => p.id === playerId);
         if (!player) return;
         
@@ -257,13 +299,24 @@ class FPLTeamManager {
     
     updateDisplay() {
         const filteredPlayers = this.getFilteredPlayers();
-        
+
         // Update summary
         this.updateSummary();
-        
+
         // Update captaincy info
         this.updateCaptaincyInfo();
-        
+
+        // Update week indicator and controls
+        const isReadOnly = this._isReadOnlyCurrentWeek();
+        if (this.weekLabel) this.weekLabel.textContent = `Week ${this.currentWeek}`;
+        if (this.weekReadonlyBadge) this.weekReadonlyBadge.style.display = isReadOnly ? 'inline-block' : 'none';
+        // Disable add button in read-only weeks
+        if (this.addPlayerBtn) this.addPlayerBtn.disabled = !!isReadOnly;
+        // Prev/Next enablement
+        const totalWeeks = this.getWeekCount();
+        if (this.prevWeekBtn) this.prevWeekBtn.disabled = this.currentWeek <= 1;
+        if (this.nextWeekBtn) this.nextWeekBtn.disabled = this.currentWeek >= totalWeeks;
+
         // Show/hide empty state
         if (this.players.length === 0) {
             this.emptyState.style.display = 'block';
@@ -291,6 +344,7 @@ class FPLTeamManager {
         
         const isCaptain = this.captain === player.id;
         const isViceCaptain = this.viceCaptain === player.id;
+        const isReadOnly = this._isReadOnlyCurrentWeek();
         
         row.innerHTML = `
             <td><strong>${player.name}</strong></td>
@@ -301,21 +355,23 @@ class FPLTeamManager {
             <td style="text-align: center;" data-testid="have-cell-${player.id}">
                 ${player.have ? 
                   `<span class="have-indicator" 
-                        onclick="fplManager.toggleHave('${player.id}')" 
-                        style="cursor: pointer;" 
-                        title="Click to remove from team"
+                        ${isReadOnly ? '' : `onclick="fplManager.toggleHave('${player.id}')"`} 
+                        style="${isReadOnly ? '' : 'cursor: pointer;'}" 
+                        title="${isReadOnly ? 'Read-only week' : 'Click to remove from team'}"
                         data-testid="remove-from-team-${player.id}">✓</span>` : 
                   `<button class="btn btn-secondary" 
-                          onclick="fplManager.toggleHave('${player.id}')" 
+                          ${isReadOnly ? 'disabled' : ''}
+                          ${isReadOnly ? '' : `onclick="fplManager.toggleHave('${player.id}')"`} 
                           style="font-size: 10px; padding: 2px 6px;" 
-                          title="Add to team"
+                          title="${isReadOnly ? 'Read-only week' : 'Add to team'}"
                           data-testid="add-to-team-${player.id}">+</button>`}
             </td>
             <td data-testid="captain-cell-${player.id}">
                 ${isCaptain ? 
                   `<span class="captain-badge" data-testid="captain-badge-${player.id}">C</span>` : 
                   `<button class="btn btn-secondary" 
-                          onclick="fplManager.setCaptain('${player.id}')" 
+                          ${isReadOnly ? 'disabled' : ''}
+                          ${isReadOnly ? '' : `onclick=\"fplManager.setCaptain('${player.id}')\"`} 
                           style="font-size: 10px; padding: 2px 6px;"
                           data-testid="make-captain-${player.id}">C</button>`}
             </td>
@@ -323,7 +379,8 @@ class FPLTeamManager {
                 ${isViceCaptain ? 
                   `<span class="vice-captain-badge" data-testid="vice-captain-badge-${player.id}">VC</span>` : 
                   `<button class="btn btn-secondary" 
-                          onclick="fplManager.setViceCaptain('${player.id}')" 
+                          ${isReadOnly ? 'disabled' : ''}
+                          ${isReadOnly ? '' : `onclick=\"fplManager.setViceCaptain('${player.id}')\"`} 
                           style="font-size: 10px; padding: 2px 6px;"
                           data-testid="make-vice-captain-${player.id}">VC</button>`}
             </td>
@@ -336,14 +393,16 @@ class FPLTeamManager {
             </td>
             <td data-testid="actions-cell-${player.id}">
                 <button class="btn btn-edit" 
-                        onclick="fplManager.openModal('${player.id}')"
+                        ${isReadOnly ? 'disabled' : ''}
+                        ${isReadOnly ? '' : `onclick=\"fplManager.openModal('${player.id}')\"`}
                         data-testid="edit-player-${player.id}">Edit</button>
                 <button class="btn btn-danger" 
-                        onclick="fplManager.deletePlayer('${player.id}')"
+                        ${isReadOnly ? 'disabled' : ''}
+                        ${isReadOnly ? '' : `onclick=\"fplManager.deletePlayer('${player.id}')\"`}
                         data-testid="delete-player-${player.id}">Delete</button>
             </td>
         `;
-        
+
         return row;
     }
     
@@ -386,12 +445,53 @@ class FPLTeamManager {
     }
     
     saveToStorage() {
-        const data = {
-            players: this.players,
-            captain: this.captain,
-            viceCaptain: this.viceCaptain
-        };
-        localStorage.setItem('fpl-team-data', JSON.stringify(data));
+        // Phase 1: Save using weekly schema while remaining backward compatible
+        const existingRaw = localStorage.getItem('fpl-team-data');
+        let root = null;
+        if (existingRaw) {
+            try {
+                root = JSON.parse(existingRaw);
+            } catch (e) {
+                root = null;
+            }
+        }
+
+        // Determine schema
+        if (root && root.weeks) {
+            const currentWeek = this.currentWeek || root.currentWeek || 1;
+            // Update only current week data
+            root.weeks[currentWeek] = root.weeks[currentWeek] || {};
+            root.weeks[currentWeek].players = this.players;
+            root.weeks[currentWeek].captain = this.captain;
+            root.weeks[currentWeek].viceCaptain = this.viceCaptain;
+
+            // Update team snapshot and stats for the week
+            const teamMembers = this.players.filter(p => p.have).map(p => ({
+                playerId: p.id,
+                name: p.name,
+                position: p.position,
+                team: p.team,
+                price: p.price,
+            }));
+            root.weeks[currentWeek].teamMembers = teamMembers;
+            root.weeks[currentWeek].teamStats = {
+                totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
+                playerCount: teamMembers.length,
+                updatedDate: new Date().toISOString()
+            };
+
+            root.version = root.version || '2.0';
+            root.currentWeek = currentWeek;
+            localStorage.setItem('fpl-team-data', JSON.stringify(root));
+        } else {
+            // Old schema fallback (kept for backward compatibility)
+            const data = {
+                players: this.players,
+                captain: this.captain,
+                viceCaptain: this.viceCaptain
+            };
+            localStorage.setItem('fpl-team-data', JSON.stringify(data));
+        }
     }
     
     addNotesClickHandlers() {
@@ -426,9 +526,19 @@ class FPLTeamManager {
         if (savedData) {
             try {
                 const data = JSON.parse(savedData);
-                this.players = data.players || [];
-                this.captain = data.captain || null;
-                this.viceCaptain = data.viceCaptain || null;
+                if (data && data.weeks) {
+                    const currentWeek = data.currentWeek || 1;
+                    this.currentWeek = currentWeek;
+                    const week = data.weeks[currentWeek] || {};
+                    this.players = week.players || [];
+                    this.captain = week.captain || null;
+                    this.viceCaptain = week.viceCaptain || null;
+                } else {
+                    // Old schema
+                    this.players = data.players || [];
+                    this.captain = data.captain || null;
+                    this.viceCaptain = data.viceCaptain || null;
+                }
             } catch (error) {
                 console.error('Error loading data from storage:', error);
                 this.players = [];
@@ -442,19 +552,21 @@ class FPLTeamManager {
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.fplManager = new FPLTeamManager();
+    // Expose week navigation helpers for Phase 2 (UI will come in Phase 3)
+    window.fplManagerCreateNewWeek = () => window.fplManager.createNewWeek();
+    window.fplManagerGoToWeek = (n) => window.fplManager.goToWeek(n);
+    window.fplManagerNextWeek = () => window.fplManager.nextWeek();
+    window.fplManagerPrevWeek = () => window.fplManager.prevWeek();
 });
 
 // Load CSV data as initial players
 document.addEventListener('DOMContentLoaded', () => {
-    // Clear any existing data and load CSV data
+    // Seed CSV data ONLY if there is no existing data
     setTimeout(() => {
         if (window.fplManager) {
-            // Clear existing data
-            localStorage.removeItem('fpl-team-data');
-            window.fplManager.players = [];
-            window.fplManager.captain = null;
-            window.fplManager.viceCaptain = null;
-            
+            const existing = localStorage.getItem('fpl-team-data');
+            if (existing) return; // Do not overwrite user data
+
             // CSV data parsed from 2025-Table 1.csv
             const csvPlayers = [
                 {name: 'Areola', position: 'goalkeeper', team: 'WHU', price: 4.5, have: true, notes: ''},
@@ -537,29 +649,313 @@ document.addEventListener('DOMContentLoaded', () => {
                 {name: 'Ekitike', position: 'forward', team: 'LIV', price: 8.5, have: false, notes: ''},
                 {name: 'Gyokeres', position: 'forward', team: 'ARS', price: 9, have: false, notes: 'Gyokeres is the one to monitor most as he could be on penalties for the Gunners.'}
             ];
-            
-            // Set captain based on CSV data
+
+            // Build week 1 with CSV players
+            const players = [];
             let captainPlayerId = null;
-            
             csvPlayers.forEach((playerData, index) => {
-                const player = {
-                    id: `csv_${Date.now()}_${index}`,
-                    ...playerData
-                };
-                
-                // Check if this player is the captain (Salah's in the CSV)
-                if (playerData.name === 'Salah\'s') {
-                    captainPlayerId = player.id;
-                }
-                
-                window.fplManager.players.push(player);
+                const player = { id: `csv_${Date.now()}_${index}`, ...playerData };
+                if (playerData.name === 'Salah\'s') captainPlayerId = player.id;
+                players.push(player);
             });
-            
-            // Set captain
-            window.fplManager.captain = captainPlayerId;
-            
-            window.fplManager.saveToStorage();
+
+            const teamMembers = players.filter(p => p.have).map(p => ({
+                playerId: p.id,
+                name: p.name,
+                position: p.position,
+                team: p.team,
+                price: p.price,
+            }));
+
+            const root = {
+                version: '2.0',
+                currentWeek: 1,
+                weeks: {
+                    1: {
+                        players,
+                        captain: captainPlayerId,
+                        viceCaptain: null,
+                        teamMembers,
+                        teamStats: {
+                            totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
+                            playerCount: teamMembers.length,
+                            createdDate: new Date().toISOString()
+                        },
+                        isReadOnly: false
+                    }
+                }
+            };
+
+            localStorage.setItem('fpl-team-data', JSON.stringify(root));
+
+            // Load into manager instance
+            window.fplManager.loadFromStorage();
             window.fplManager.updateDisplay();
         }
     }, 100);
 });
+
+// Phase 1: Migration helper methods
+FPLTeamManager.prototype.migrateStorageIfNeeded = function() {
+    const raw = localStorage.getItem('fpl-team-data');
+    if (!raw) return; // nothing to migrate
+    let data = null;
+    try { data = JSON.parse(raw); } catch (e) { return; }
+
+    // If already in new schema, ensure version and exit
+    if (data && data.weeks) {
+        if (!data.version) {
+            data.version = '2.0';
+            localStorage.setItem('fpl-team-data', JSON.stringify(data));
+        }
+        return;
+    }
+
+    // Old schema -> migrate to week-based schema
+    const players = Array.isArray(data.players) ? data.players : [];
+    const captain = data.captain || null;
+    const viceCaptain = data.viceCaptain || null;
+
+    const teamMembers = players.filter(p => p.have).map(p => ({
+        playerId: p.id,
+        name: p.name,
+        position: p.position,
+        team: p.team,
+        price: p.price,
+    }));
+
+    const migrated = {
+        version: '2.0',
+        currentWeek: 1,
+        weeks: {
+            1: {
+                players,
+                captain,
+                viceCaptain,
+                teamMembers,
+                teamStats: {
+                    totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
+                    playerCount: teamMembers.length,
+                    createdDate: new Date().toISOString()
+                },
+                isReadOnly: false
+            }
+        }
+    };
+
+    localStorage.setItem('fpl-team-data', JSON.stringify(migrated));
+};
+
+// Phase 2: Week management helpers
+FPLTeamManager.prototype._getRootData = function() {
+    const defaultWeek = () => ({
+        players: [],
+        captain: null,
+        viceCaptain: null,
+        teamMembers: [],
+        teamStats: { totalValue: 0, playerCount: 0, createdDate: new Date().toISOString() },
+        isReadOnly: false
+    });
+    const defaultRoot = () => ({ version: '2.0', currentWeek: 1, weeks: { 1: defaultWeek() } });
+
+    const raw = localStorage.getItem('fpl-team-data');
+    if (!raw) {
+        const root = defaultRoot();
+        localStorage.setItem('fpl-team-data', JSON.stringify(root));
+        return root;
+    }
+    let data = null;
+    try { data = JSON.parse(raw); } catch (e) { data = null; }
+
+    if (!data || typeof data !== 'object') {
+        const root = defaultRoot();
+        localStorage.setItem('fpl-team-data', JSON.stringify(root));
+        return root;
+    }
+
+    // If already weekly schema and valid, ensure version and return
+    if (data.weeks && typeof data.weeks === 'object') {
+        data.version = data.version || '2.0';
+        // Ensure currentWeek and a valid week exist
+        const cw = Number(data.currentWeek || 1);
+        data.currentWeek = cw >= 1 ? cw : 1;
+        if (!data.weeks[data.currentWeek]) {
+            data.weeks[data.currentWeek] = defaultWeek();
+        }
+        localStorage.setItem('fpl-team-data', JSON.stringify(data));
+        return data;
+    }
+
+    // Old schema -> migrate to weekly on the fly
+    const players = Array.isArray(data.players) ? data.players : [];
+    const captain = data.captain || null;
+    const viceCaptain = data.viceCaptain || null;
+    const teamMembers = players.filter(p => p.have).map(p => ({
+        playerId: p.id,
+        name: p.name,
+        position: p.position,
+        team: p.team,
+        price: p.price,
+    }));
+    const migrated = {
+        version: '2.0',
+        currentWeek: 1,
+        weeks: {
+            1: {
+                players,
+                captain,
+                viceCaptain,
+                teamMembers,
+                teamStats: {
+                    totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
+                    playerCount: teamMembers.length,
+                    createdDate: new Date().toISOString()
+                },
+                isReadOnly: false
+            }
+        }
+    };
+    localStorage.setItem('fpl-team-data', JSON.stringify(migrated));
+    return migrated;
+};
+
+FPLTeamManager.prototype._saveRootData = function(root) {
+    root.version = root.version || '2.0';
+    localStorage.setItem('fpl-team-data', JSON.stringify(root));
+};
+
+FPLTeamManager.prototype._computeTeamSnapshot = function(players) {
+    const teamMembers = (players || []).filter(p => p.have).map(p => ({
+        playerId: p.id,
+        name: p.name,
+        position: p.position,
+        team: p.team,
+        price: p.price,
+    }));
+    return {
+        teamMembers,
+        teamStats: {
+            totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
+            playerCount: teamMembers.length,
+            updatedDate: new Date().toISOString()
+        }
+    };
+};
+
+FPLTeamManager.prototype.createNewWeek = function() {
+    const root = this._getRootData();
+    const currentWeek = this.currentWeek || root.currentWeek || 1;
+    const source = root.weeks[currentWeek] || { players: [], captain: null, viceCaptain: null };
+
+    // Mark all existing weeks read-only
+    Object.keys(root.weeks).forEach(w => { if (root.weeks[w]) root.weeks[w].isReadOnly = true; });
+
+    const newWeekNumber = Math.max(...Object.keys(root.weeks).map(n => Number(n))) + 1;
+    const clonedPlayers = (source.players || []).map(p => ({ ...p }));
+    const { teamMembers, teamStats } = this._computeTeamSnapshot(clonedPlayers);
+
+    root.weeks[newWeekNumber] = {
+        players: clonedPlayers,
+        captain: source.captain || null,
+        viceCaptain: source.viceCaptain || null,
+        teamMembers,
+        teamStats,
+        isReadOnly: false
+    };
+
+    root.currentWeek = newWeekNumber;
+    this.currentWeek = newWeekNumber;
+
+    // Load into memory
+    this.players = clonedPlayers;
+    this.captain = source.captain || null;
+    this.viceCaptain = source.viceCaptain || null;
+
+    this._saveRootData(root);
+    this.updateDisplay();
+};
+
+FPLTeamManager.prototype.goToWeek = function(weekNumber) {
+    const root = this._getRootData();
+    const week = root.weeks[weekNumber];
+    if (!week) return;
+    this.currentWeek = Number(weekNumber);
+    root.currentWeek = this.currentWeek;
+    this.players = week.players || [];
+    this.captain = week.captain || null;
+    this.viceCaptain = week.viceCaptain || null;
+    this._saveRootData(root);
+    this.updateDisplay();
+};
+
+FPLTeamManager.prototype.nextWeek = function() {
+    const root = this._getRootData();
+    const maxWeek = Math.max(...Object.keys(root.weeks).map(n => Number(n)));
+    const target = Math.min(this.currentWeek + 1, maxWeek);
+    this.goToWeek(target);
+};
+
+FPLTeamManager.prototype.prevWeek = function() {
+    const target = Math.max(1, this.currentWeek - 1);
+    this.goToWeek(target);
+};
+
+FPLTeamManager.prototype.getWeekCount = function() {
+    const root = this._getRootData();
+    if (!root || !root.weeks || typeof root.weeks !== 'object') return 1;
+    return Object.keys(root.weeks).length || 1;
+};
+
+FPLTeamManager.prototype.getCurrentWeekNumber = function() {
+    return this.currentWeek || 1;
+};
+
+// Public read-only helpers for testing and migration
+FPLTeamManager.prototype.getWeekSnapshot = function(weekNumber) {
+    const root = this._getRootData();
+    const wn = String(weekNumber || this.currentWeek || root.currentWeek || 1);
+    const wk = root.weeks[wn] || {};
+    // Return a deep-cloned snapshot to avoid accidental mutations in tests
+    return JSON.parse(JSON.stringify({
+        players: wk.players || [],
+        captain: wk.captain || null,
+        viceCaptain: wk.viceCaptain || null,
+        teamMembers: wk.teamMembers || [],
+        teamStats: wk.teamStats || { totalValue: 0, playerCount: 0 }
+    }));
+};
+
+FPLTeamManager.prototype.getPlayerSnapshot = function(weekNumber, playerId) {
+    const week = this.getWeekSnapshot(weekNumber);
+    return (week.players || []).find(p => p.id === playerId) || null;
+};
+
+FPLTeamManager.prototype.isPlayerInTeam = function(playerId, weekNumber) {
+    const week = this.getWeekSnapshot(weekNumber);
+    return (week.teamMembers || []).some(m => m.playerId === playerId);
+};
+
+FPLTeamManager.prototype.isWeekReadOnly = function(weekNumber) {
+    const root = this._getRootData();
+    const wn = String(weekNumber || this.currentWeek || root.currentWeek || 1);
+    const wk = root.weeks[wn] || {};
+    return !!wk.isReadOnly;
+};
+
+FPLTeamManager.prototype.getCurrentWeekNumber = function() {
+    return this.currentWeek || 1;
+};
+
+FPLTeamManager.prototype.isCurrentWeekReadOnly = function() {
+    return this._isReadOnlyCurrentWeek();
+};
+
+// Phase 3: read-only helper to separate Week Navigation Tests from implementation
+FPLTeamManager.prototype._isReadOnlyCurrentWeek = function() {
+    const root = this._getRootData();
+    if (!root || !root.weeks || typeof root.weeks !== 'object') return false;
+    const currentWeek = this.currentWeek || root.currentWeek || 1;
+    const week = root.weeks[currentWeek];
+    if (!week) return false;
+    return week.isReadOnly === true;
+};
