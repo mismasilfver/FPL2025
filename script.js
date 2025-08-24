@@ -910,7 +910,47 @@ FPLTeamManager.prototype.getCurrentWeekNumber = function() {
     return this.currentWeek || 1;
 };
 
-// Phase 3: read-only helper
+// Public read-only helpers for testing and migration
+FPLTeamManager.prototype.getWeekSnapshot = function(weekNumber) {
+    const root = this._getRootData();
+    const wn = String(weekNumber || this.currentWeek || root.currentWeek || 1);
+    const wk = root.weeks[wn] || {};
+    // Return a deep-cloned snapshot to avoid accidental mutations in tests
+    return JSON.parse(JSON.stringify({
+        players: wk.players || [],
+        captain: wk.captain || null,
+        viceCaptain: wk.viceCaptain || null,
+        teamMembers: wk.teamMembers || [],
+        teamStats: wk.teamStats || { totalValue: 0, playerCount: 0 }
+    }));
+};
+
+FPLTeamManager.prototype.getPlayerSnapshot = function(weekNumber, playerId) {
+    const week = this.getWeekSnapshot(weekNumber);
+    return (week.players || []).find(p => p.id === playerId) || null;
+};
+
+FPLTeamManager.prototype.isPlayerInTeam = function(playerId, weekNumber) {
+    const week = this.getWeekSnapshot(weekNumber);
+    return (week.teamMembers || []).some(m => m.playerId === playerId);
+};
+
+FPLTeamManager.prototype.isWeekReadOnly = function(weekNumber) {
+    const root = this._getRootData();
+    const wn = String(weekNumber || this.currentWeek || root.currentWeek || 1);
+    const wk = root.weeks[wn] || {};
+    return !!wk.isReadOnly;
+};
+
+FPLTeamManager.prototype.getCurrentWeekNumber = function() {
+    return this.currentWeek || 1;
+};
+
+FPLTeamManager.prototype.isCurrentWeekReadOnly = function() {
+    return this._isReadOnlyCurrentWeek();
+};
+
+// Phase 3: read-only helper to separate Week Navigation Tests from implementation
 FPLTeamManager.prototype._isReadOnlyCurrentWeek = function() {
     const root = this._getRootData();
     if (!root || !root.weeks || typeof root.weeks !== 'object') return false;
