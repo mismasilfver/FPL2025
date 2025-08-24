@@ -145,6 +145,12 @@ All data is stored locally in your browser using localStorage. No external datab
 - use firebase or supabase authentication for authentication
 - added two readme files on the topic and options
 
+## Lessons learned about using agentic AI (Windsurf)
+- good tests are important (duh)
+- refactoring is important (duh)
+- but what is more important as the driver of the AI is to know good test coverage before refactoring is important
+- due to undeterministic nature of these models (Claude 4, Gemini 2.5 Pro, GPT-5 low reasoning), even with "knowing" what model is good for what kind of issue, it is not possible to predict the outcome.
+
 ---
 
 **Note**: This is an MVP (Minimum Viable Product) version. All player and team data must be entered manually.
