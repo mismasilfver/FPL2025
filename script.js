@@ -15,7 +15,13 @@ class UIManager {
             onNextWeek,
             onCreateWeek,
             onExportWeek,
-            onEscapeKey
+            onEscapeKey,
+            // Row-level handlers
+            onToggleHave,
+            onEdit,
+            onDelete,
+            onMakeCaptain,
+            onMakeViceCaptain
         } = handlers;
 
         // Add player button
@@ -45,6 +51,62 @@ class UIManager {
         this.nextWeekBtn?.addEventListener('click', () => onNextWeek && onNextWeek());
         this.createWeekBtn?.addEventListener('click', () => onCreateWeek && onCreateWeek());
         this.exportWeekBtn?.addEventListener('click', () => onExportWeek && onExportWeek());
+
+        // Delegated row events
+        if (this.playersTbody) {
+            this.playersTbody.addEventListener('click', (e) => {
+                // Don't skip disabled elements - let the handler methods deal with read-only checks
+                
+                let actionEl = e.target.closest('[data-action]');
+                let action = actionEl?.getAttribute('data-action') || '';
+                let playerId = actionEl?.getAttribute('data-player-id') || '';
+                
+                // Always try data-testid fallback as primary method since tests use data-testid
+                const testIdEl = e.target.closest('[data-testid]');
+                if (testIdEl && this.playersTbody.contains(testIdEl)) {
+                    const testId = testIdEl.getAttribute('data-testid') || '';
+                    const m1 = testId.match(/^make-captain-(.+)$/);
+                    const m2 = testId.match(/^make-vice-captain-(.+)$/);
+                    const m3 = testId.match(/^(add-to-team|remove-from-team)-(.+)$/);
+                    const m4 = testId.match(/^edit-player-(.+)$/);
+                    const m5 = testId.match(/^delete-player-(.+)$/);
+                    if (m1) { action = 'make-captain'; playerId = m1[1]; }
+                    else if (m2) { action = 'make-vice'; playerId = m2[1]; }
+                    else if (m3) { action = 'toggle-have'; playerId = m3[2]; }
+                    else if (m4) { action = 'edit'; playerId = m4[1]; }
+                    else if (m5) { action = 'delete'; playerId = m5[1]; }
+                }
+                
+                if (!action || !playerId) return;
+                
+                switch (action) {
+                    case 'toggle-have':
+                        onToggleHave && onToggleHave(playerId);
+                        break;
+                    case 'edit':
+                        onEdit && onEdit(playerId);
+                        break;
+                    case 'delete':
+                        onDelete && onDelete(playerId);
+                        break;
+                    case 'make-captain':
+                        onMakeCaptain && onMakeCaptain(playerId);
+                        break;
+                    case 'make-vice':
+                        onMakeViceCaptain && onMakeViceCaptain(playerId);
+                        break;
+                    default:
+                        break;
+                }
+            });
+            // Delegated notes toggle
+            this.playersTbody.addEventListener('click', (e) => {
+                const notesCell = e.target.closest('.notes-cell');
+                if (notesCell && this.playersTbody.contains(notesCell)) {
+                    this.toggleNotesExpansion(notesCell);
+                }
+            });
+        }
     }
 
     initElements() {
@@ -174,13 +236,13 @@ UIManager.prototype.createPlayerRow = function(player, { isReadOnly, captainId, 
             <td style="text-align: center;" data-testid="have-cell-${player.id}">
                 ${player.have ? 
                   `<span class="have-indicator" 
-                        ${isReadOnly ? '' : `onclick="fplManager.toggleHave('${player.id}')"`} 
+                        data-action="toggle-have" data-player-id="${player.id}"
                         style="${isReadOnly ? '' : 'cursor: pointer;'}" 
                         title="${isReadOnly ? 'Read-only week' : 'Click to remove from team'}"
                         data-testid="remove-from-team-${player.id}">✓</span>` : 
                   `<button class="btn btn-secondary" 
                           ${isReadOnly ? 'disabled' : ''}
-                          ${isReadOnly ? '' : `onclick="fplManager.toggleHave('${player.id}')"`} 
+                          data-action="toggle-have" data-player-id="${player.id}"
                           style="font-size: 10px; padding: 2px 6px;" 
                           title="${isReadOnly ? 'Read-only week' : 'Add to team'}"
                           data-testid="add-to-team-${player.id}">+</button>`}
@@ -190,7 +252,7 @@ UIManager.prototype.createPlayerRow = function(player, { isReadOnly, captainId, 
                   `<span class="captain-badge" data-testid="captain-badge-${player.id}">C</span>` : 
                   `<button class="btn btn-secondary" 
                           ${isReadOnly ? 'disabled' : ''}
-                          ${isReadOnly ? '' : `onclick=\"fplManager.setCaptain('${player.id}')\"`} 
+                          data-action="make-captain" data-player-id="${player.id}"
                           style="font-size: 10px; padding: 2px 6px;"
                           data-testid="make-captain-${player.id}">C</button>`}
             </td>
@@ -199,7 +261,7 @@ UIManager.prototype.createPlayerRow = function(player, { isReadOnly, captainId, 
                   `<span class="vice-captain-badge" data-testid="vice-captain-badge-${player.id}">VC</span>` : 
                   `<button class="btn btn-secondary" 
                           ${isReadOnly ? 'disabled' : ''}
-                          ${isReadOnly ? '' : `onclick=\"fplManager.setViceCaptain('${player.id}')\"`} 
+                          data-action="make-vice" data-player-id="${player.id}"
                           style="font-size: 10px; padding: 2px 6px;"
                           data-testid="make-vice-captain-${player.id}">VC</button>`}
             </td>
@@ -213,11 +275,11 @@ UIManager.prototype.createPlayerRow = function(player, { isReadOnly, captainId, 
             <td data-testid="actions-cell-${player.id}">
                 <button class="btn btn-edit" 
                         ${isReadOnly ? 'disabled' : ''}
-                        ${isReadOnly ? '' : `onclick=\"fplManager.openModal('${player.id}')\"`}
+                        data-action="edit" data-player-id="${player.id}"
                         data-testid="edit-player-${player.id}">Edit</button>
                 <button class="btn btn-danger" 
                         ${isReadOnly ? 'disabled' : ''}
-                        ${isReadOnly ? '' : `onclick=\"fplManager.deletePlayer('${player.id}')\"`}
+                        data-action="delete" data-player-id="${player.id}"
                         data-testid="delete-player-${player.id}">Delete</button>
             </td>`;
     return row;
@@ -330,6 +392,12 @@ class FPLTeamManager {
             onNextWeek: this.nextWeek.bind(this),
             onCreateWeek: this.createNewWeek.bind(this),
             onExportWeek: this.exportWeekData.bind(this),
+            // Row-level handlers
+            onToggleHave: (id) => this.toggleHave(id),
+            onEdit: (id) => this.openModal(id),
+            onDelete: (id) => this.deletePlayer(id),
+            onMakeCaptain: (id) => this.setCaptain(id),
+            onMakeViceCaptain: (id) => this.setViceCaptain(id),
         });
     }
     
@@ -404,7 +472,7 @@ class FPLTeamManager {
         };
         
         this.players.push(player);
-        this.saveToStorage();
+        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
         this.updateDisplay();
     }
     
@@ -416,7 +484,7 @@ class FPLTeamManager {
         const playerIndex = this.players.findIndex(p => p.id === playerId);
         if (playerIndex !== -1) {
             this.players[playerIndex] = { ...this.players[playerIndex], ...playerData };
-            this.saveToStorage();
+            this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
             this.updateDisplay();
         }
     }
@@ -428,11 +496,13 @@ class FPLTeamManager {
         }
         if (confirm('Are you sure you want to delete this player?')) {
             // Remove from captain/vice captain if applicable
-            if (this.captain === playerId) this.captain = null;
+            if (this.captain === playerId) {
+            this.captain = null;
+        }
             if (this.viceCaptain === playerId) this.viceCaptain = null;
             
             this.players = this.players.filter(p => p.id !== playerId);
-            this.saveToStorage();
+            this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
             this.updateDisplay();
         }
     }
@@ -442,18 +512,23 @@ class FPLTeamManager {
             alert('This week is read-only. Create a new week to change captain.');
             return;
         }
-        // If already captain, remove captaincy
+
+        const player = this.players.find(p => p.id === playerId);
+        if (!player || !player.have) {
+            alert('Only players in your team can be selected as captain.');
+            return;
+        }
         if (this.captain === playerId) {
-            this.captain = null;
+            this.captain = null; // Unset captain
         } else {
-            // If this player was vice captain, remove that first
+            this.captain = playerId;
+            // If the new captain was the vice-captain, unset the vice-captain
             if (this.viceCaptain === playerId) {
                 this.viceCaptain = null;
             }
-            this.captain = playerId;
         }
         
-        this.saveToStorage();
+        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
         this.updateDisplay();
     }
     
@@ -462,18 +537,23 @@ class FPLTeamManager {
             alert('This week is read-only. Create a new week to change vice captain.');
             return;
         }
-        // If already vice captain, remove vice captaincy
+
+        const player = this.players.find(p => p.id === playerId);
+        if (!player || !player.have) {
+            alert('Only players in your team can be selected as vice-captain.');
+            return;
+        }
         if (this.viceCaptain === playerId) {
-            this.viceCaptain = null;
+            this.viceCaptain = null; // Unset vice-captain
         } else {
-            // If this player was captain, remove that first
+            this.viceCaptain = playerId;
+            // If the new vice-captain was the captain, unset the captain
             if (this.captain === playerId) {
                 this.captain = null;
             }
-            this.viceCaptain = playerId;
         }
         
-        this.saveToStorage();
+        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
         this.updateDisplay();
     }
     
@@ -498,7 +578,7 @@ class FPLTeamManager {
             player.have = true;
         }
         
-        this.saveToStorage();
+        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
         this.updateDisplay();
     }
     
@@ -535,58 +615,36 @@ class FPLTeamManager {
         // Players table
         this.ui.renderPlayers(filteredPlayers, { isReadOnly, captainId: this.captain, viceCaptainId: this.viceCaptain });
 
-        // Notes interactions
-        this.ui.addNotesClickHandlers();
+        // Notes interactions handled via delegated listener in UIManager
     }
     
-    saveToStorage() {
-        // Phase 1: Save using weekly schema while remaining backward compatible
+    saveToStorage(weekToSave, { players, captain, viceCaptain }, currentWeek) {
         const existingRaw = localStorage.getItem('fpl-team-data');
-        let root = null;
+        let root = { weeks: {}, version: '2.0' };
         if (existingRaw) {
             try {
-                root = JSON.parse(existingRaw);
-            } catch (e) {
-                root = null;
-            }
+                const parsed = JSON.parse(existingRaw);
+                if (parsed && parsed.weeks) root = parsed;
+            } catch (e) { /* ignore */ }
         }
 
-        // Determine schema
-        if (root && root.weeks) {
-            const currentWeek = this.currentWeek || root.currentWeek || 1;
-            // Update only current week data
-            root.weeks[currentWeek] = root.weeks[currentWeek] || {};
-            root.weeks[currentWeek].players = this.players;
-            root.weeks[currentWeek].captain = this.captain;
-            root.weeks[currentWeek].viceCaptain = this.viceCaptain;
+        root.weeks[weekToSave] = root.weeks[weekToSave] || {};
+        root.weeks[weekToSave].players = players;
+        root.weeks[weekToSave].captain = captain;
+        root.weeks[weekToSave].viceCaptain = viceCaptain;
 
-            // Update team snapshot and stats for the week
-            const teamMembers = this.players.filter(p => p.have).map(p => ({
-                playerId: p.id,
-                name: p.name,
-                position: p.position,
-                team: p.team,
-                price: p.price,
-            }));
-            root.weeks[currentWeek].teamMembers = teamMembers;
-            root.weeks[currentWeek].teamStats = {
-                totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
-                playerCount: teamMembers.length,
-                updatedDate: new Date().toISOString()
-            };
+        const teamMembers = players.filter(p => p.have).map(p => ({
+            playerId: p.id, name: p.name, position: p.position, team: p.team, price: p.price,
+        }));
+        root.weeks[weekToSave].teamMembers = teamMembers;
+        root.weeks[weekToSave].teamStats = {
+            totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
+            playerCount: teamMembers.length,
+            updatedDate: new Date().toISOString()
+        };
 
-            root.version = root.version || '2.0';
-            root.currentWeek = currentWeek;
-            localStorage.setItem('fpl-team-data', JSON.stringify(root));
-        } else {
-            // Old schema fallback (kept for backward compatibility)
-            const data = {
-                players: this.players,
-                captain: this.captain,
-                viceCaptain: this.viceCaptain
-            };
-            localStorage.setItem('fpl-team-data', JSON.stringify(data));
-        }
+        root.currentWeek = currentWeek;
+        localStorage.setItem('fpl-team-data', JSON.stringify(root));
     }
     
     addNotesClickHandlers() {
@@ -622,14 +680,14 @@ class FPLTeamManager {
             try {
                 const data = JSON.parse(savedData);
                 if (data && data.weeks) {
-                    const currentWeek = data.currentWeek || 1;
-                    this.currentWeek = currentWeek;
-                    const week = data.weeks[currentWeek] || {};
-                    this.players = week.players || [];
-                    this.captain = week.captain || null;
-                    this.viceCaptain = week.viceCaptain || null;
-                } else {
-                    // Old schema
+                    // New weekly format
+                    this.currentWeek = data.currentWeek || 1;
+                    const weekData = data.weeks[this.currentWeek] || data.weeks[1] || {};
+                    this.players = weekData.players || [];
+                    this.captain = weekData.captain || null;
+                    this.viceCaptain = weekData.viceCaptain || null;
+                } else if (data) {
+                    // Old format (for backward compatibility, though migration should handle this)
                     this.players = data.players || [];
                     this.captain = data.captain || null;
                     this.viceCaptain = data.viceCaptain || null;
@@ -639,6 +697,124 @@ class FPLTeamManager {
                 this.players = [];
                 this.captain = null;
                 this.viceCaptain = null;
+            }
+        }
+    }
+
+    // ===== Week Navigation (Phase 2) =====
+
+    createNewWeek() {
+        const lastWeekNumber = this.currentWeek;
+        // 1. Save the final state of the current week before creating a new one.
+        this.saveToStorage(lastWeekNumber, { 
+            players: this.players, 
+            captain: this.captain, 
+            viceCaptain: this.viceCaptain 
+        }, lastWeekNumber);
+
+        const lastWeekData = this.getWeekSnapshot(lastWeekNumber);
+
+        // 2. Increment week count and set as current.
+        this.currentWeek = lastWeekNumber + 1;
+
+        // 3. New week inherits players, captain, and vice-captain from the last week.
+        this.players = lastWeekData ? JSON.parse(JSON.stringify(lastWeekData.players || [])) : [];
+        this.captain = lastWeekData ? lastWeekData.captain : null;
+        this.viceCaptain = lastWeekData ? lastWeekData.viceCaptain : null;
+
+        // 4. Save the new week's initial state.
+        this.saveToStorage(this.currentWeek, { 
+            players: this.players, 
+            captain: this.captain, 
+            viceCaptain: this.viceCaptain 
+        }, this.currentWeek);
+
+        // 5. Update UI to reflect the new week.
+        this.updateDisplay();
+    }
+
+    getWeekCount() {
+        const savedData = localStorage.getItem('fpl-team-data');
+        if (savedData) {
+            try {
+                const data = JSON.parse(savedData);
+                if (data && data.weeks) {
+                    return Object.keys(data.weeks).length;
+                }
+            } catch (e) { return 1; }
+        }
+        return 1;
+    }
+
+    _isReadOnlyCurrentWeek() {
+        return this.currentWeek < this.getWeekCount();
+    }
+
+    // Test helper to get a clean snapshot from storage
+    getWeekSnapshot(weekNumber) {
+        const savedData = localStorage.getItem('fpl-team-data');
+        if (!savedData) return null;
+        try {
+            const data = JSON.parse(savedData);
+            return data.weeks ? data.weeks[weekNumber] : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    getPlayerSnapshot(weekNumber, playerId) {
+        const week = this.getWeekSnapshot(weekNumber);
+        return week && week.players ? week.players.find(p => p.id === playerId) : null;
+    }
+
+    goToWeek(weekNumber) {
+        const totalWeeks = this.getWeekCount();
+        if (weekNumber >= 1 && weekNumber <= totalWeeks) {
+            this.currentWeek = weekNumber;
+            this.loadFromStorage(); // Reloads state for the target week
+            this.updateDisplay();
+        }
+    }
+
+    prevWeek() {
+        this.goToWeek(this.currentWeek - 1);
+    }
+
+    nextWeek() {
+        this.goToWeek(this.currentWeek + 1);
+    }
+
+    // ===== Storage & Migration (Phase 1) =====
+
+    migrateStorageIfNeeded() {
+        const savedData = localStorage.getItem('fpl-team-data');
+        if (savedData) {
+            try {
+                const data = JSON.parse(savedData);
+                // If data exists but is not in weekly format, migrate it
+                if (data && !data.weeks) {
+                    const migratedData = {
+                        version: '2.0',
+                        currentWeek: 1,
+                        weeks: {
+                            1: {
+                                players: data.players || [],
+                                captain: data.captain || null,
+                                viceCaptain: data.viceCaptain || null,
+                                teamMembers: (data.players || []).filter(p => p.have).map(p => ({ playerId: p.id, name: p.name, position: p.position, team: p.team, price: p.price })),
+                                teamStats: {
+                                    totalValue: (data.players || []).filter(p => p.have).reduce((s, p) => s + (Number(p.price) || 0), 0),
+                                    playerCount: (data.players || []).filter(p => p.have).length,
+                                    updatedDate: new Date().toISOString()
+                                }
+                            }
+                        }
+                    };
+                    localStorage.setItem('fpl-team-data', JSON.stringify(migratedData));
+                }
+            } catch (e) {
+                console.error('Failed to parse or migrate data:', e);
+                localStorage.removeItem('fpl-team-data'); // Clear corrupted data
             }
         }
     }
@@ -966,7 +1142,25 @@ FPLTeamManager.prototype._computeTeamSnapshot = function(players) {
 FPLTeamManager.prototype.createNewWeek = function() {
     const root = this._getRootData();
     const currentWeek = this.currentWeek || root.currentWeek || 1;
-    const source = root.weeks[currentWeek] || { players: [], captain: null, viceCaptain: null };
+    // Always use in-memory state as the source of truth for captain/viceCaptain
+    // This ensures that any changes made via UI are captured
+    const source = {
+        players: this.players || [],
+        captain: this.captain || null,
+        viceCaptain: this.viceCaptain || null
+    };
+
+    // Ensure the source week has up-to-date cap/vice persisted
+    root.weeks[currentWeek] = root.weeks[currentWeek] || {};
+    root.weeks[currentWeek].players = source.players;
+    root.weeks[currentWeek].captain = source.captain;
+    root.weeks[currentWeek].viceCaptain = source.viceCaptain;
+    const snapshot = this._computeTeamSnapshot(source.players);
+    root.weeks[currentWeek].teamMembers = snapshot.teamMembers;
+    root.weeks[currentWeek].teamStats = snapshot.teamStats;
+    
+    // Save the updated root to ensure captain/viceCaptain are persisted before creating new week
+    this._saveRootData(root);
 
     // Mark all existing weeks read-only
     Object.keys(root.weeks).forEach(w => { if (root.weeks[w]) root.weeks[w].isReadOnly = true; });
