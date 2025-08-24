@@ -1,3 +1,84 @@
+// UI Manager to handle direct DOM interactions for the modal and form
+class UIManager {
+    constructor() {
+        // Intentionally empty; call initElements() after DOM is ready
+    }
+
+    initElements() {
+        // Main elements
+        this.addPlayerBtn = document.querySelector('[data-testid="add-player-button"]');
+        this.playersTable = document.getElementById('players-table');
+        this.playersTbody = document.getElementById('players-tbody');
+        this.emptyState = document.getElementById('empty-state');
+        this.positionFilter = document.querySelector('[data-testid="position-filter-select"]');
+        this.haveFilter = document.querySelector('[data-testid="have-filter-checkbox"]');
+
+        // Week controls
+        this.weekLabel = document.getElementById('week-label');
+        this.weekReadonlyBadge = document.getElementById('week-readonly-badge');
+        this.prevWeekBtn = document.getElementById('prev-week-btn');
+        this.nextWeekBtn = document.getElementById('next-week-btn');
+        this.createWeekBtn = document.getElementById('create-week-btn');
+        this.exportWeekBtn = document.getElementById('export-week-btn');
+
+        // Summary elements
+        this.teamCount = document.getElementById('team-count');
+        this.totalValue = document.getElementById('total-value');
+        this.captainInfo = document.getElementById('captain-info');
+        this.viceCaptainInfo = document.getElementById('vice-captain-info');
+
+        // Modal elements
+        this.modal = document.getElementById('player-modal');
+        this.modalTitle = document.getElementById('modal-title');
+        this.playerForm = document.getElementById('player-form');
+        this.closeBtn = document.querySelector('.close');
+        this.cancelBtn = document.querySelector('[data-testid="cancel-button"]');
+
+        // Form elements using data-testid
+        this.playerName = document.querySelector('[data-testid="player-name-input"]');
+        this.playerPosition = document.querySelector('[data-testid="player-position-select"]');
+        this.playerTeam = document.querySelector('[data-testid="player-team-input"]');
+        this.playerPrice = document.querySelector('[data-testid="player-price-input"]');
+        this.playerStatus = document.querySelector('[data-testid="player-status-select"]');
+        this.playerHave = document.querySelector('[data-testid="player-have-checkbox"]');
+        this.playerNotes = document.querySelector('[data-testid="player-notes-textarea"]');
+    }
+
+    openModal(player = null) {
+        if (player) {
+            this.modalTitle.textContent = 'Edit Player';
+            this.populateForm(player);
+        } else {
+            this.modalTitle.textContent = 'Add Player';
+            this.clearForm();
+        }
+
+        this.modal.style.display = 'block';
+        this.playerName?.focus();
+    }
+
+    closeModal() {
+        this.modal.style.display = 'none';
+        this.clearForm();
+    }
+
+    populateForm(player) {
+        this.playerName.value = player.name;
+        this.playerPosition.value = player.position;
+        this.playerTeam.value = player.team;
+        this.playerPrice.value = player.price;
+        this.playerStatus.value = player.status;
+        this.playerHave.checked = player.have || false;
+        this.playerNotes.value = player.notes || '';
+    }
+
+    clearForm() {
+        this.playerForm.reset();
+        this.playerStatus.value = '';
+        this.playerHave.checked = false;
+    }
+}
+
 // Fantasy Premier League Team Manager
 class FPLTeamManager {
     constructor() {
@@ -6,6 +87,7 @@ class FPLTeamManager {
         this.captain = null;
         this.viceCaptain = null;
         this.currentWeek = 1; // phase 2: track current week in memory
+        this.ui = new UIManager();
         
         this.initializeElements();
         // Phase 1: migrate storage (if needed) before loading
@@ -16,42 +98,37 @@ class FPLTeamManager {
     }
     
     initializeElements() {
-        // Main elements
-        this.addPlayerBtn = document.querySelector('[data-testid="add-player-button"]');
-        this.playersTable = document.getElementById('players-table');
-        this.playersTbody = document.getElementById('players-tbody');
-        this.emptyState = document.getElementById('empty-state');
-        this.positionFilter = document.querySelector('[data-testid="position-filter-select"]');
-        this.haveFilter = document.querySelector('[data-testid="have-filter-checkbox"]');
-        // Week controls
-        this.weekLabel = document.getElementById('week-label');
-        this.weekReadonlyBadge = document.getElementById('week-readonly-badge');
-        this.prevWeekBtn = document.getElementById('prev-week-btn');
-        this.nextWeekBtn = document.getElementById('next-week-btn');
-        this.createWeekBtn = document.getElementById('create-week-btn');
-        this.exportWeekBtn = document.getElementById('export-week-btn');
-        
-        // Summary elements
-        this.teamCount = document.getElementById('team-count');
-        this.totalValue = document.getElementById('total-value');
-        this.captainInfo = document.getElementById('captain-info');
-        this.viceCaptainInfo = document.getElementById('vice-captain-info');
-        
-        // Modal elements
-        this.modal = document.getElementById('player-modal');
-        this.modalTitle = document.getElementById('modal-title');
-        this.playerForm = document.getElementById('player-form');
-        this.closeBtn = document.querySelector('.close');
-        this.cancelBtn = document.querySelector('[data-testid="cancel-button"]');
-        
-        // Form elements using data-testid
-        this.playerName = document.querySelector('[data-testid="player-name-input"]');
-        this.playerPosition = document.querySelector('[data-testid="player-position-select"]');
-        this.playerTeam = document.querySelector('[data-testid="player-team-input"]');
-        this.playerPrice = document.querySelector('[data-testid="player-price-input"]');
-        this.playerStatus = document.querySelector('[data-testid="player-status-select"]');
-        this.playerHave = document.querySelector('[data-testid="player-have-checkbox"]');
-        this.playerNotes = document.querySelector('[data-testid="player-notes-textarea"]');
+        // Delegate to UI layer
+        this.ui.initElements();
+        // Maintain backward references for minimal change (will be removed later)
+        this.addPlayerBtn = this.ui.addPlayerBtn;
+        this.playersTable = this.ui.playersTable;
+        this.playersTbody = this.ui.playersTbody;
+        this.emptyState = this.ui.emptyState;
+        this.positionFilter = this.ui.positionFilter;
+        this.haveFilter = this.ui.haveFilter;
+        this.weekLabel = this.ui.weekLabel;
+        this.weekReadonlyBadge = this.ui.weekReadonlyBadge;
+        this.prevWeekBtn = this.ui.prevWeekBtn;
+        this.nextWeekBtn = this.ui.nextWeekBtn;
+        this.createWeekBtn = this.ui.createWeekBtn;
+        this.exportWeekBtn = this.ui.exportWeekBtn;
+        this.teamCount = this.ui.teamCount;
+        this.totalValue = this.ui.totalValue;
+        this.captainInfo = this.ui.captainInfo;
+        this.viceCaptainInfo = this.ui.viceCaptainInfo;
+        this.modal = this.ui.modal;
+        this.modalTitle = this.ui.modalTitle;
+        this.playerForm = this.ui.playerForm;
+        this.closeBtn = this.ui.closeBtn;
+        this.cancelBtn = this.ui.cancelBtn;
+        this.playerName = this.ui.playerName;
+        this.playerPosition = this.ui.playerPosition;
+        this.playerTeam = this.ui.playerTeam;
+        this.playerPrice = this.ui.playerPrice;
+        this.playerStatus = this.ui.playerStatus;
+        this.playerHave = this.ui.playerHave;
+        this.playerNotes = this.ui.playerNotes;
     }
     
     bindEvents() {
@@ -59,14 +136,14 @@ class FPLTeamManager {
         this.addPlayerBtn?.addEventListener('click', () => this.openModal());
         
         // Modal close events
-        this.closeBtn?.addEventListener('click', () => this.closeModal());
-        this.cancelBtn?.addEventListener('click', () => this.closeModal());
-        this.modal?.addEventListener('click', (e) => {
-            if (e.target === this.modal) this.closeModal();
+        this.ui.closeBtn?.addEventListener('click', () => this.closeModal());
+        this.ui.cancelBtn?.addEventListener('click', () => this.closeModal());
+        this.ui.modal?.addEventListener('click', (e) => {
+            if (e.target === this.ui.modal) this.closeModal();
         });
         
         // Form submission
-        this.playerForm?.addEventListener('submit', (e) => this.handleFormSubmit(e));
+        this.ui.playerForm?.addEventListener('submit', (e) => this.handleFormSubmit(e));
         
         // Position filter
         this.positionFilter?.addEventListener('change', () => this.updateDisplay());
@@ -92,59 +169,32 @@ class FPLTeamManager {
             return;
         }
         this.currentEditingId = playerId;
-        
-        if (playerId) {
-            const player = this.players.find(p => p.id === playerId);
-            this.modalTitle.textContent = 'Edit Player';
-            this.populateForm(player);
-        } else {
-            this.modalTitle.textContent = 'Add Player';
-            this.clearForm();
-        }
-        
-        this.modal.style.display = 'block';
-        this.playerName.focus();
+        const player = playerId ? this.players.find(p => p.id === playerId) : null;
+        this.ui.openModal(player || null);
     }
     
     closeModal() {
-        this.modal.style.display = 'none';
         this.currentEditingId = null;
-        this.clearForm();
-    }
-    
-    populateForm(player) {
-        this.playerName.value = player.name;
-        this.playerPosition.value = player.position;
-        this.playerTeam.value = player.team;
-        this.playerPrice.value = player.price;
-        this.playerStatus.value = player.status;
-        this.playerHave.checked = player.have || false;
-        this.playerNotes.value = player.notes || '';
-    }
-    
-    clearForm() {
-        this.playerForm.reset();
-        this.playerStatus.value = ''; // Default to no status
-        this.playerHave.checked = false; // Default to not in team
+        this.ui.closeModal();
     }
     
     handleFormSubmit(e) {
         e.preventDefault();
         
         // Check form validity first
-        if (!this.playerForm.checkValidity()) {
-            this.playerForm.reportValidity();
+        if (!this.ui.playerForm.checkValidity()) {
+            this.ui.playerForm.reportValidity();
             return;
         }
         
         const playerData = {
-            name: this.playerName.value.trim(),
-            position: this.playerPosition.value,
-            team: this.playerTeam.value.trim(),
-            price: parseFloat(this.playerPrice.value),
-            status: this.playerStatus.value || '', // Save empty string if no status selected
-            have: this.playerHave.checked,
-            notes: this.playerNotes.value.trim()
+            name: this.ui.playerName.value.trim(),
+            position: this.ui.playerPosition.value,
+            team: this.ui.playerTeam.value.trim(),
+            price: parseFloat(this.ui.playerPrice.value),
+            status: this.ui.playerStatus.value || '', // Save empty string if no status selected
+            have: this.ui.playerHave.checked,
+            notes: this.ui.playerNotes.value.trim()
         };
         
         // Check 15 player limit for 'have' status
