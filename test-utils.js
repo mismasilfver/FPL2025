@@ -53,11 +53,20 @@ const createDOM = () => {
         };
       })();
 
-      // Assign mocks to global
+      // Stub browser dialogs on this jsdom window to prevent noisy "Not implemented: window.alert" logs
+      // Tests may trigger read-only guards and delete confirmations.
+      // We stub per-window because each createDOM() creates a fresh jsdom instance.
+      dom.window.alert = jest.fn();
+      dom.window.confirm = jest.fn(() => true);
+
+      // Assign window, document, and storage mocks to globals so app code under test uses them
       global.window = dom.window;
       global.document = dom.window.document;
       global.localStorage = localStorageMock;
       global.Node = dom.window.Node;
+      // Keep global alert/confirm pointing at the stubbed window versions
+      global.alert = dom.window.alert;
+      global.confirm = dom.window.confirm;
 
       resolve({
         window: dom.window,
