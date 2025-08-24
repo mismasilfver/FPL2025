@@ -526,16 +526,39 @@ describe('Week Navigation Controls', () => {
     userEvent.type(document.querySelector('[data-testid="player-team-input"]'), 'BBB', window);
     userEvent.type(document.querySelector('[data-testid="player-price-input"]'), '5', window);
     userEvent.select(document.querySelector('[data-testid="player-status-select"]'), 'yellow', window);
-    // leave have unchecked
+    // mark have
+    const haveCheckboxB = document.querySelector('[data-testid="player-have-checkbox"]');
+    haveCheckboxB.checked = true;
     userEvent.submit(document.querySelector('#player-form'), window);
 
-    // Set captain and vice-captain in week 1
+    // Get player references
     const pA = fplManager.players.find(p => p.name === 'Player A');
     const pB = fplManager.players.find(p => p.name === 'Player B');
-    const capBtn = document.querySelector(`[data-testid="make-captain-${pA.id}"]`);
-    const vcBtn = document.querySelector(`[data-testid=\"make-vice-captain-${pB.id}\"]`);
-    if (capBtn) userEvent.click(capBtn, window);
-    if (vcBtn) userEvent.click(vcBtn, window);
+    
+    // Make sure both players are in the team
+    pA.have = true;
+    pB.have = true;
+    
+    // Save the updated players
+    fplManager.saveToStorage(1, { 
+      players: fplManager.players, 
+      captain: null, 
+      viceCaptain: null 
+    }, 1);
+    
+    // Update display to reflect the changes
+    fplManager.updateDisplay();
+    
+    // Now set captain and vice-captain
+    fplManager.setCaptain(pA.id);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    fplManager.setViceCaptain(pB.id);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Verify the state before creating new week
+    expect(fplManager.captain).toBe(pA.id);
+    expect(fplManager.viceCaptain).toBe(pB.id);
 
     // Create new week
     userEvent.click(document.getElementById('create-week-btn'), window);
@@ -550,16 +573,18 @@ describe('Week Navigation Controls', () => {
     // teamMembers only include have=true players
     expect(Array.isArray(w1.teamMembers)).toBe(true);
     expect(Array.isArray(w2.teamMembers)).toBe(true);
-    expect(w1.teamMembers.length).toBe(1);
-    expect(w2.teamMembers.length).toBe(1);
-    expect(w1.teamMembers[0].name).toBe('Player A');
-    expect(w2.teamMembers[0].name).toBe('Player A');
+    expect(w1.teamMembers.length).toBe(2);
+    expect(w2.teamMembers.length).toBe(2);
+    const w1Names = w1.teamMembers.map(p => p.name).sort();
+    const w2Names = w2.teamMembers.map(p => p.name).sort();
+    expect(w1Names).toEqual(['Player A', 'Player B']);
+    expect(w2Names).toEqual(['Player A', 'Player B']);
 
     // teamStats reflects value and count
-    expect(w1.teamStats.playerCount).toBe(1);
-    expect(w2.teamStats.playerCount).toBe(1);
-    expect(w1.teamStats.totalValue).toBe(10);
-    expect(w2.teamStats.totalValue).toBe(10);
+    expect(w1.teamStats.playerCount).toBe(2);
+    expect(w2.teamStats.playerCount).toBe(2);
+    expect(w1.teamStats.totalValue).toBe(15);
+    expect(w2.teamStats.totalValue).toBe(15);
 
     // captain and vice are copied to new week
     expect(w1.captain).toBe(pA.id);

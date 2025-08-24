@@ -1,3 +1,333 @@
+// UI Manager to handle direct DOM interactions for the modal and form
+class UIManager {
+    constructor() {
+        // Intentionally empty; call initElements() after DOM is ready
+    }
+
+    bindEvents(handlers = {}) {
+        const {
+            onAddPlayer,
+            onModalClose,
+            onFormSubmit,
+            onPositionFilterChange,
+            onHaveFilterChange,
+            onPrevWeek,
+            onNextWeek,
+            onCreateWeek,
+            onExportWeek,
+            onEscapeKey,
+            // Row-level handlers
+            onToggleHave,
+            onEdit,
+            onDelete,
+            onMakeCaptain,
+            onMakeViceCaptain
+        } = handlers;
+
+        // Add player button
+        this.addPlayerBtn?.addEventListener('click', () => onAddPlayer && onAddPlayer());
+
+        // Modal close events
+        this.closeBtn?.addEventListener('click', () => onModalClose && onModalClose());
+        this.cancelBtn?.addEventListener('click', () => onModalClose && onModalClose());
+        this.modal?.addEventListener('click', (e) => {
+            if (e.target === this.modal && onModalClose) onModalClose();
+        });
+
+        // Form submission
+        this.playerForm?.addEventListener('submit', (e) => onFormSubmit && onFormSubmit(e));
+
+        // Filters
+        this.positionFilter?.addEventListener('change', () => onPositionFilterChange && onPositionFilterChange());
+        this.haveFilter?.addEventListener('change', () => onHaveFilterChange && onHaveFilterChange());
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && onEscapeKey) onEscapeKey(e);
+        });
+
+        // Week controls
+        this.prevWeekBtn?.addEventListener('click', () => onPrevWeek && onPrevWeek());
+        this.nextWeekBtn?.addEventListener('click', () => onNextWeek && onNextWeek());
+        this.createWeekBtn?.addEventListener('click', () => onCreateWeek && onCreateWeek());
+        this.exportWeekBtn?.addEventListener('click', () => onExportWeek && onExportWeek());
+
+        // Delegated row events
+        if (this.playersTbody) {
+            this.playersTbody.addEventListener('click', (e) => {
+                // Don't skip disabled elements - let the handler methods deal with read-only checks
+                
+                let actionEl = e.target.closest('[data-action]');
+                let action = actionEl?.getAttribute('data-action') || '';
+                let playerId = actionEl?.getAttribute('data-player-id') || '';
+                
+                // Always try data-testid fallback as primary method since tests use data-testid
+                const testIdEl = e.target.closest('[data-testid]');
+                if (testIdEl && this.playersTbody.contains(testIdEl)) {
+                    const testId = testIdEl.getAttribute('data-testid') || '';
+                    const m1 = testId.match(/^make-captain-(.+)$/);
+                    const m2 = testId.match(/^make-vice-captain-(.+)$/);
+                    const m3 = testId.match(/^(add-to-team|remove-from-team)-(.+)$/);
+                    const m4 = testId.match(/^edit-player-(.+)$/);
+                    const m5 = testId.match(/^delete-player-(.+)$/);
+                    if (m1) { action = 'make-captain'; playerId = m1[1]; }
+                    else if (m2) { action = 'make-vice'; playerId = m2[1]; }
+                    else if (m3) { action = 'toggle-have'; playerId = m3[2]; }
+                    else if (m4) { action = 'edit'; playerId = m4[1]; }
+                    else if (m5) { action = 'delete'; playerId = m5[1]; }
+                }
+                
+                if (!action || !playerId) return;
+                
+                switch (action) {
+                    case 'toggle-have':
+                        onToggleHave && onToggleHave(playerId);
+                        break;
+                    case 'edit':
+                        onEdit && onEdit(playerId);
+                        break;
+                    case 'delete':
+                        onDelete && onDelete(playerId);
+                        break;
+                    case 'make-captain':
+                        onMakeCaptain && onMakeCaptain(playerId);
+                        break;
+                    case 'make-vice':
+                        onMakeViceCaptain && onMakeViceCaptain(playerId);
+                        break;
+                    default:
+                        break;
+                }
+            });
+            // Delegated notes toggle
+            this.playersTbody.addEventListener('click', (e) => {
+                const notesCell = e.target.closest('.notes-cell');
+                if (notesCell && this.playersTbody.contains(notesCell)) {
+                    this.toggleNotesExpansion(notesCell);
+                }
+            });
+        }
+    }
+
+    initElements() {
+        // Main elements
+        this.addPlayerBtn = document.querySelector('[data-testid="add-player-button"]');
+        this.playersTable = document.getElementById('players-table');
+        this.playersTbody = document.getElementById('players-tbody');
+        this.emptyState = document.getElementById('empty-state');
+        this.positionFilter = document.querySelector('[data-testid="position-filter-select"]');
+        this.haveFilter = document.querySelector('[data-testid="have-filter-checkbox"]');
+
+        // Week controls
+        this.weekLabel = document.getElementById('week-label');
+        this.weekReadonlyBadge = document.getElementById('week-readonly-badge');
+        this.prevWeekBtn = document.getElementById('prev-week-btn');
+        this.nextWeekBtn = document.getElementById('next-week-btn');
+        this.createWeekBtn = document.getElementById('create-week-btn');
+        this.exportWeekBtn = document.getElementById('export-week-btn');
+
+        // Summary elements
+        this.teamCount = document.getElementById('team-count');
+        this.totalValue = document.getElementById('total-value');
+        this.captainInfo = document.getElementById('captain-info');
+        this.viceCaptainInfo = document.getElementById('vice-captain-info');
+
+        // Modal elements
+        this.modal = document.getElementById('player-modal');
+        this.modalTitle = document.getElementById('modal-title');
+        this.playerForm = document.getElementById('player-form');
+        this.closeBtn = document.querySelector('.close');
+        this.cancelBtn = document.querySelector('[data-testid="cancel-button"]');
+
+        // Form elements using data-testid
+        this.playerName = document.querySelector('[data-testid="player-name-input"]');
+        this.playerPosition = document.querySelector('[data-testid="player-position-select"]');
+        this.playerTeam = document.querySelector('[data-testid="player-team-input"]');
+        this.playerPrice = document.querySelector('[data-testid="player-price-input"]');
+        this.playerStatus = document.querySelector('[data-testid="player-status-select"]');
+        this.playerHave = document.querySelector('[data-testid="player-have-checkbox"]');
+        this.playerNotes = document.querySelector('[data-testid="player-notes-textarea"]');
+    }
+
+    openModal(player = null) {
+        if (player) {
+            this.modalTitle.textContent = 'Edit Player';
+            this.populateForm(player);
+        } else {
+            this.modalTitle.textContent = 'Add Player';
+            this.clearForm();
+        }
+
+        this.modal.style.display = 'block';
+        this.playerName?.focus();
+    }
+
+    closeModal() {
+        this.modal.style.display = 'none';
+        this.clearForm();
+    }
+
+    populateForm(player) {
+        this.playerName.value = player.name;
+        this.playerPosition.value = player.position;
+        this.playerTeam.value = player.team;
+        this.playerPrice.value = player.price;
+        this.playerStatus.value = player.status;
+        this.playerHave.checked = player.have || false;
+        this.playerNotes.value = player.notes || '';
+    }
+
+    clearForm() {
+        this.playerForm.reset();
+        this.playerStatus.value = '';
+        this.playerHave.checked = false;
+    }
+}
+
+// ===== UI rendering helpers (moved into UIManager) =====
+UIManager.prototype.getStatusText = function(status) {
+    const statusMap = { yellow: 'Maybe Good', green: 'Very Good', red: "Sell/Don't Buy" };
+    return statusMap[status] || status;
+};
+
+UIManager.prototype.capitalizeFirst = function(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
+UIManager.prototype.truncateText = function(text, maxLength) {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+};
+
+UIManager.prototype.renderSummary = function(players) {
+    const teamPlayers = (players || []).filter(p => p.have);
+    const teamCount = teamPlayers.length;
+    const totalValue = teamPlayers.reduce((sum, player) => sum + (Number(player.price) || 0), 0);
+    if (this.teamCount) this.teamCount.textContent = `In Team: ${teamCount}/15`;
+    if (this.totalValue) this.totalValue.textContent = `Total Value: £${totalValue.toFixed(1)}m`;
+};
+
+UIManager.prototype.renderCaptaincyInfo = function(players, captainId, viceCaptainId) {
+    const captainPlayer = (players || []).find(p => p.id === captainId);
+    const viceCaptainPlayer = (players || []).find(p => p.id === viceCaptainId);
+    if (this.captainInfo) this.captainInfo.textContent = captainPlayer ? `Captain: ${captainPlayer.name}` : 'Captain: None selected';
+    if (this.viceCaptainInfo) this.viceCaptainInfo.textContent = viceCaptainPlayer ? `Vice Captain: ${viceCaptainPlayer.name}` : 'Vice Captain: None selected';
+};
+
+UIManager.prototype.renderWeekControls = function({ currentWeek, totalWeeks, isReadOnly }) {
+    if (this.weekLabel) this.weekLabel.textContent = `Week ${currentWeek}`;
+    if (this.weekReadonlyBadge) this.weekReadonlyBadge.style.display = isReadOnly ? 'inline-block' : 'none';
+    if (this.addPlayerBtn) this.addPlayerBtn.disabled = !!isReadOnly;
+    if (this.prevWeekBtn) this.prevWeekBtn.disabled = currentWeek <= 1;
+    if (this.nextWeekBtn) this.nextWeekBtn.disabled = currentWeek >= totalWeeks;
+};
+
+UIManager.prototype.createPlayerRow = function(player, { isReadOnly, captainId, viceCaptainId }) {
+    const row = document.createElement('tr');
+    const isCaptain = captainId === player.id;
+    const isViceCaptain = viceCaptainId === player.id;
+    row.innerHTML = `
+            <td><strong>${player.name}</strong></td>
+            <td>${this.capitalizeFirst(player.position)}</td>
+            <td>${player.team}</td>
+            <td>£${Number(player.price).toFixed(1)}m</td>
+            <td style="text-align: center;">${player.status ? `<div class="status-circle status-${player.status}" title="${this.getStatusText(player.status)}"></div>` : ''}</td>
+            <td style="text-align: center;" data-testid="have-cell-${player.id}">
+                ${player.have ? 
+                  `<span class="have-indicator" 
+                        data-action="toggle-have" data-player-id="${player.id}"
+                        style="${isReadOnly ? '' : 'cursor: pointer;'}" 
+                        title="${isReadOnly ? 'Read-only week' : 'Click to remove from team'}"
+                        data-testid="remove-from-team-${player.id}">✓</span>` : 
+                  `<button class="btn btn-secondary" 
+                          ${isReadOnly ? 'disabled' : ''}
+                          data-action="toggle-have" data-player-id="${player.id}"
+                          style="font-size: 10px; padding: 2px 6px;" 
+                          title="${isReadOnly ? 'Read-only week' : 'Add to team'}"
+                          data-testid="add-to-team-${player.id}">+</button>`}
+            </td>
+            <td data-testid="captain-cell-${player.id}">
+                ${isCaptain ? 
+                  `<span class="captain-badge" data-testid="captain-badge-${player.id}">C</span>` : 
+                  `<button class="btn btn-secondary" 
+                          ${isReadOnly ? 'disabled' : ''}
+                          data-action="make-captain" data-player-id="${player.id}"
+                          style="font-size: 10px; padding: 2px 6px;"
+                          data-testid="make-captain-${player.id}">C</button>`}
+            </td>
+            <td data-testid="vice-captain-cell-${player.id}">
+                ${isViceCaptain ? 
+                  `<span class="vice-captain-badge" data-testid="vice-captain-badge-${player.id}">VC</span>` : 
+                  `<button class="btn btn-secondary" 
+                          ${isReadOnly ? 'disabled' : ''}
+                          data-action="make-vice" data-player-id="${player.id}"
+                          style="font-size: 10px; padding: 2px 6px;"
+                          data-testid="make-vice-captain-${player.id}">VC</button>`}
+            </td>
+            <td class="notes-cell" 
+                data-player-id="${player.id}" 
+                data-full-notes="${player.notes || ''}" 
+                title="Click to expand notes"
+                data-testid="notes-cell-${player.id}">
+                <span class="notes-text">${this.truncateText(player.notes || '', 20)}</span>
+            </td>
+            <td data-testid="actions-cell-${player.id}">
+                <button class="btn btn-edit" 
+                        ${isReadOnly ? 'disabled' : ''}
+                        data-action="edit" data-player-id="${player.id}"
+                        data-testid="edit-player-${player.id}">Edit</button>
+                <button class="btn btn-danger" 
+                        ${isReadOnly ? 'disabled' : ''}
+                        data-action="delete" data-player-id="${player.id}"
+                        data-testid="delete-player-${player.id}">Delete</button>
+            </td>`;
+    return row;
+};
+
+UIManager.prototype.renderPlayers = function(players, { isReadOnly, captainId, viceCaptainId }) {
+    if (!players || players.length === 0) {
+        if (this.emptyState) this.emptyState.style.display = 'block';
+        if (this.playersTable?.parentElement) this.playersTable.parentElement.style.display = 'none';
+        if (this.playersTbody) this.playersTbody.innerHTML = '';
+        return;
+    } else {
+        if (this.emptyState) this.emptyState.style.display = 'none';
+        if (this.playersTable?.parentElement) this.playersTable.parentElement.style.display = 'block';
+    }
+    if (this.playersTbody) this.playersTbody.innerHTML = '';
+    (players || []).forEach(player => {
+        const row = this.createPlayerRow(player, { isReadOnly, captainId, viceCaptainId });
+        this.playersTbody.appendChild(row);
+    });
+};
+
+UIManager.prototype.addNotesClickHandlers = function() {
+    const notesCells = document.querySelectorAll('.notes-cell');
+    notesCells.forEach(cell => {
+        cell.addEventListener('click', (e) => {
+            this.toggleNotesExpansion(e.target.closest('.notes-cell'));
+        });
+    });
+};
+
+UIManager.prototype.toggleNotesExpansion = function(cell) {
+    if (!cell) return;
+    const notesText = cell.querySelector('.notes-text');
+    const fullNotes = cell.getAttribute('data-full-notes');
+    const isExpanded = cell.classList.contains('expanded');
+    if (!notesText) return;
+    if (isExpanded) {
+        notesText.textContent = this.truncateText(fullNotes || '', 20);
+        cell.classList.remove('expanded');
+        cell.title = 'Click to expand notes';
+    } else {
+        notesText.textContent = fullNotes || 'No notes';
+        cell.classList.add('expanded');
+        cell.title = 'Click to collapse notes';
+    }
+};
+
 // Fantasy Premier League Team Manager
 class FPLTeamManager {
     constructor() {
@@ -6,6 +336,7 @@ class FPLTeamManager {
         this.captain = null;
         this.viceCaptain = null;
         this.currentWeek = 1; // phase 2: track current week in memory
+        this.ui = new UIManager();
         
         this.initializeElements();
         // Phase 1: migrate storage (if needed) before loading
@@ -16,74 +347,58 @@ class FPLTeamManager {
     }
     
     initializeElements() {
-        // Main elements
-        this.addPlayerBtn = document.querySelector('[data-testid="add-player-button"]');
-        this.playersTable = document.getElementById('players-table');
-        this.playersTbody = document.getElementById('players-tbody');
-        this.emptyState = document.getElementById('empty-state');
-        this.positionFilter = document.querySelector('[data-testid="position-filter-select"]');
-        this.haveFilter = document.querySelector('[data-testid="have-filter-checkbox"]');
-        // Week controls
-        this.weekLabel = document.getElementById('week-label');
-        this.weekReadonlyBadge = document.getElementById('week-readonly-badge');
-        this.prevWeekBtn = document.getElementById('prev-week-btn');
-        this.nextWeekBtn = document.getElementById('next-week-btn');
-        this.createWeekBtn = document.getElementById('create-week-btn');
-        this.exportWeekBtn = document.getElementById('export-week-btn');
-        
-        // Summary elements
-        this.teamCount = document.getElementById('team-count');
-        this.totalValue = document.getElementById('total-value');
-        this.captainInfo = document.getElementById('captain-info');
-        this.viceCaptainInfo = document.getElementById('vice-captain-info');
-        
-        // Modal elements
-        this.modal = document.getElementById('player-modal');
-        this.modalTitle = document.getElementById('modal-title');
-        this.playerForm = document.getElementById('player-form');
-        this.closeBtn = document.querySelector('.close');
-        this.cancelBtn = document.querySelector('[data-testid="cancel-button"]');
-        
-        // Form elements using data-testid
-        this.playerName = document.querySelector('[data-testid="player-name-input"]');
-        this.playerPosition = document.querySelector('[data-testid="player-position-select"]');
-        this.playerTeam = document.querySelector('[data-testid="player-team-input"]');
-        this.playerPrice = document.querySelector('[data-testid="player-price-input"]');
-        this.playerStatus = document.querySelector('[data-testid="player-status-select"]');
-        this.playerHave = document.querySelector('[data-testid="player-have-checkbox"]');
-        this.playerNotes = document.querySelector('[data-testid="player-notes-textarea"]');
+        // Delegate to UI layer
+        this.ui.initElements();
+        // Maintain backward references for minimal change (will be removed later)
+        this.addPlayerBtn = this.ui.addPlayerBtn;
+        this.playersTable = this.ui.playersTable;
+        this.playersTbody = this.ui.playersTbody;
+        this.emptyState = this.ui.emptyState;
+        this.positionFilter = this.ui.positionFilter;
+        this.haveFilter = this.ui.haveFilter;
+        this.weekLabel = this.ui.weekLabel;
+        this.weekReadonlyBadge = this.ui.weekReadonlyBadge;
+        this.prevWeekBtn = this.ui.prevWeekBtn;
+        this.nextWeekBtn = this.ui.nextWeekBtn;
+        this.createWeekBtn = this.ui.createWeekBtn;
+        this.exportWeekBtn = this.ui.exportWeekBtn;
+        this.teamCount = this.ui.teamCount;
+        this.totalValue = this.ui.totalValue;
+        this.captainInfo = this.ui.captainInfo;
+        this.viceCaptainInfo = this.ui.viceCaptainInfo;
+        this.modal = this.ui.modal;
+        this.modalTitle = this.ui.modalTitle;
+        this.playerForm = this.ui.playerForm;
+        this.closeBtn = this.ui.closeBtn;
+        this.cancelBtn = this.ui.cancelBtn;
+        this.playerName = this.ui.playerName;
+        this.playerPosition = this.ui.playerPosition;
+        this.playerTeam = this.ui.playerTeam;
+        this.playerPrice = this.ui.playerPrice;
+        this.playerStatus = this.ui.playerStatus;
+        this.playerHave = this.ui.playerHave;
+        this.playerNotes = this.ui.playerNotes;
     }
     
     bindEvents() {
-        // Add player button
-        this.addPlayerBtn?.addEventListener('click', () => this.openModal());
-        
-        // Modal close events
-        this.closeBtn?.addEventListener('click', () => this.closeModal());
-        this.cancelBtn?.addEventListener('click', () => this.closeModal());
-        this.modal?.addEventListener('click', (e) => {
-            if (e.target === this.modal) this.closeModal();
+        this.ui.bindEvents({
+            onAddPlayer: this.openModal.bind(this),
+            onModalClose: this.closeModal.bind(this),
+            onFormSubmit: this.handleFormSubmit.bind(this),
+            onPositionFilterChange: this.updateDisplay.bind(this),
+            onHaveFilterChange: this.updateDisplay.bind(this),
+            onEscapeKey: () => this.closeModal(),
+            onPrevWeek: this.prevWeek.bind(this),
+            onNextWeek: this.nextWeek.bind(this),
+            onCreateWeek: this.createNewWeek.bind(this),
+            onExportWeek: this.exportWeekData.bind(this),
+            // Row-level handlers
+            onToggleHave: (id) => this.toggleHave(id),
+            onEdit: (id) => this.openModal(id),
+            onDelete: (id) => this.deletePlayer(id),
+            onMakeCaptain: (id) => this.setCaptain(id),
+            onMakeViceCaptain: (id) => this.setViceCaptain(id),
         });
-        
-        // Form submission
-        this.playerForm?.addEventListener('submit', (e) => this.handleFormSubmit(e));
-        
-        // Position filter
-        this.positionFilter?.addEventListener('change', () => this.updateDisplay());
-        
-        // Have filter
-        this.haveFilter?.addEventListener('change', () => this.updateDisplay());
-        
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') this.closeModal();
-        });
-
-        // Week controls
-        this.prevWeekBtn?.addEventListener('click', () => this.prevWeek());
-        this.nextWeekBtn?.addEventListener('click', () => this.nextWeek());
-        this.createWeekBtn?.addEventListener('click', () => this.createNewWeek());
-        this.exportWeekBtn?.addEventListener('click', () => this.exportWeekData());
     }
     
     openModal(playerId = null) {
@@ -92,59 +407,32 @@ class FPLTeamManager {
             return;
         }
         this.currentEditingId = playerId;
-        
-        if (playerId) {
-            const player = this.players.find(p => p.id === playerId);
-            this.modalTitle.textContent = 'Edit Player';
-            this.populateForm(player);
-        } else {
-            this.modalTitle.textContent = 'Add Player';
-            this.clearForm();
-        }
-        
-        this.modal.style.display = 'block';
-        this.playerName.focus();
+        const player = playerId ? this.players.find(p => p.id === playerId) : null;
+        this.ui.openModal(player || null);
     }
     
     closeModal() {
-        this.modal.style.display = 'none';
         this.currentEditingId = null;
-        this.clearForm();
-    }
-    
-    populateForm(player) {
-        this.playerName.value = player.name;
-        this.playerPosition.value = player.position;
-        this.playerTeam.value = player.team;
-        this.playerPrice.value = player.price;
-        this.playerStatus.value = player.status;
-        this.playerHave.checked = player.have || false;
-        this.playerNotes.value = player.notes || '';
-    }
-    
-    clearForm() {
-        this.playerForm.reset();
-        this.playerStatus.value = ''; // Default to no status
-        this.playerHave.checked = false; // Default to not in team
+        this.ui.closeModal();
     }
     
     handleFormSubmit(e) {
         e.preventDefault();
         
         // Check form validity first
-        if (!this.playerForm.checkValidity()) {
-            this.playerForm.reportValidity();
+        if (!this.ui.playerForm.checkValidity()) {
+            this.ui.playerForm.reportValidity();
             return;
         }
         
         const playerData = {
-            name: this.playerName.value.trim(),
-            position: this.playerPosition.value,
-            team: this.playerTeam.value.trim(),
-            price: parseFloat(this.playerPrice.value),
-            status: this.playerStatus.value || '', // Save empty string if no status selected
-            have: this.playerHave.checked,
-            notes: this.playerNotes.value.trim()
+            name: this.ui.playerName.value.trim(),
+            position: this.ui.playerPosition.value,
+            team: this.ui.playerTeam.value.trim(),
+            price: parseFloat(this.ui.playerPrice.value),
+            status: this.ui.playerStatus.value || '', // Save empty string if no status selected
+            have: this.ui.playerHave.checked,
+            notes: this.ui.playerNotes.value.trim()
         };
         
         // Check 15 player limit for 'have' status
@@ -184,7 +472,7 @@ class FPLTeamManager {
         };
         
         this.players.push(player);
-        this.saveToStorage();
+        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
         this.updateDisplay();
     }
     
@@ -196,7 +484,7 @@ class FPLTeamManager {
         const playerIndex = this.players.findIndex(p => p.id === playerId);
         if (playerIndex !== -1) {
             this.players[playerIndex] = { ...this.players[playerIndex], ...playerData };
-            this.saveToStorage();
+            this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
             this.updateDisplay();
         }
     }
@@ -208,11 +496,13 @@ class FPLTeamManager {
         }
         if (confirm('Are you sure you want to delete this player?')) {
             // Remove from captain/vice captain if applicable
-            if (this.captain === playerId) this.captain = null;
+            if (this.captain === playerId) {
+            this.captain = null;
+        }
             if (this.viceCaptain === playerId) this.viceCaptain = null;
             
             this.players = this.players.filter(p => p.id !== playerId);
-            this.saveToStorage();
+            this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
             this.updateDisplay();
         }
     }
@@ -222,18 +512,23 @@ class FPLTeamManager {
             alert('This week is read-only. Create a new week to change captain.');
             return;
         }
-        // If already captain, remove captaincy
+
+        const player = this.players.find(p => p.id === playerId);
+        if (!player || !player.have) {
+            alert('Only players in your team can be selected as captain.');
+            return;
+        }
         if (this.captain === playerId) {
-            this.captain = null;
+            this.captain = null; // Unset captain
         } else {
-            // If this player was vice captain, remove that first
+            this.captain = playerId;
+            // If the new captain was the vice-captain, unset the vice-captain
             if (this.viceCaptain === playerId) {
                 this.viceCaptain = null;
             }
-            this.captain = playerId;
         }
         
-        this.saveToStorage();
+        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
         this.updateDisplay();
     }
     
@@ -242,18 +537,23 @@ class FPLTeamManager {
             alert('This week is read-only. Create a new week to change vice captain.');
             return;
         }
-        // If already vice captain, remove vice captaincy
+
+        const player = this.players.find(p => p.id === playerId);
+        if (!player || !player.have) {
+            alert('Only players in your team can be selected as vice-captain.');
+            return;
+        }
         if (this.viceCaptain === playerId) {
-            this.viceCaptain = null;
+            this.viceCaptain = null; // Unset vice-captain
         } else {
-            // If this player was captain, remove that first
+            this.viceCaptain = playerId;
+            // If the new vice-captain was the captain, unset the captain
             if (this.captain === playerId) {
                 this.captain = null;
             }
-            this.viceCaptain = playerId;
         }
         
-        this.saveToStorage();
+        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
         this.updateDisplay();
     }
     
@@ -278,7 +578,7 @@ class FPLTeamManager {
             player.have = true;
         }
         
-        this.saveToStorage();
+        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
         this.updateDisplay();
     }
     
@@ -302,199 +602,49 @@ class FPLTeamManager {
     
     updateDisplay() {
         const filteredPlayers = this.getFilteredPlayers();
-
-        // Update summary
-        this.updateSummary();
-
-        // Update captaincy info
-        this.updateCaptaincyInfo();
-
-        // Update week indicator and controls
         const isReadOnly = this._isReadOnlyCurrentWeek();
-        if (this.weekLabel) this.weekLabel.textContent = `Week ${this.currentWeek}`;
-        if (this.weekReadonlyBadge) this.weekReadonlyBadge.style.display = isReadOnly ? 'inline-block' : 'none';
-        // Disable add button in read-only weeks
-        if (this.addPlayerBtn) this.addPlayerBtn.disabled = !!isReadOnly;
-        // Prev/Next enablement
         const totalWeeks = this.getWeekCount();
-        if (this.prevWeekBtn) this.prevWeekBtn.disabled = this.currentWeek <= 1;
-        if (this.nextWeekBtn) this.nextWeekBtn.disabled = this.currentWeek >= totalWeeks;
 
-        // Show/hide empty state
-        if (this.players.length === 0) {
-            this.emptyState.style.display = 'block';
-            this.playersTable.parentElement.style.display = 'none';
-            return;
-        } else {
-            this.emptyState.style.display = 'none';
-            this.playersTable.parentElement.style.display = 'block';
-        }
-        
-        // Update table
-        this.playersTbody.innerHTML = '';
-        
-        filteredPlayers.forEach(player => {
-            const row = this.createPlayerRow(player);
-            this.playersTbody.appendChild(row);
-        });
-        
-        // Add click handlers for notes expansion
-        this.addNotesClickHandlers();
-    }
-    
-    createPlayerRow(player) {
-        const row = document.createElement('tr');
-        
-        const isCaptain = this.captain === player.id;
-        const isViceCaptain = this.viceCaptain === player.id;
-        const isReadOnly = this._isReadOnlyCurrentWeek();
-        
-        row.innerHTML = `
-            <td><strong>${player.name}</strong></td>
-            <td>${this.capitalizeFirst(player.position)}</td>
-            <td>${player.team}</td>
-            <td>£${player.price.toFixed(1)}m</td>
-            <td style="text-align: center;">${player.status ? `<div class="status-circle status-${player.status}" title="${this.getStatusText(player.status)}"></div>` : ''}</td>
-            <td style="text-align: center;" data-testid="have-cell-${player.id}">
-                ${player.have ? 
-                  `<span class="have-indicator" 
-                        ${isReadOnly ? '' : `onclick="fplManager.toggleHave('${player.id}')"`} 
-                        style="${isReadOnly ? '' : 'cursor: pointer;'}" 
-                        title="${isReadOnly ? 'Read-only week' : 'Click to remove from team'}"
-                        data-testid="remove-from-team-${player.id}">✓</span>` : 
-                  `<button class="btn btn-secondary" 
-                          ${isReadOnly ? 'disabled' : ''}
-                          ${isReadOnly ? '' : `onclick="fplManager.toggleHave('${player.id}')"`} 
-                          style="font-size: 10px; padding: 2px 6px;" 
-                          title="${isReadOnly ? 'Read-only week' : 'Add to team'}"
-                          data-testid="add-to-team-${player.id}">+</button>`}
-            </td>
-            <td data-testid="captain-cell-${player.id}">
-                ${isCaptain ? 
-                  `<span class="captain-badge" data-testid="captain-badge-${player.id}">C</span>` : 
-                  `<button class="btn btn-secondary" 
-                          ${isReadOnly ? 'disabled' : ''}
-                          ${isReadOnly ? '' : `onclick=\"fplManager.setCaptain('${player.id}')\"`} 
-                          style="font-size: 10px; padding: 2px 6px;"
-                          data-testid="make-captain-${player.id}">C</button>`}
-            </td>
-            <td data-testid="vice-captain-cell-${player.id}">
-                ${isViceCaptain ? 
-                  `<span class="vice-captain-badge" data-testid="vice-captain-badge-${player.id}">VC</span>` : 
-                  `<button class="btn btn-secondary" 
-                          ${isReadOnly ? 'disabled' : ''}
-                          ${isReadOnly ? '' : `onclick=\"fplManager.setViceCaptain('${player.id}')\"`} 
-                          style="font-size: 10px; padding: 2px 6px;"
-                          data-testid="make-vice-captain-${player.id}">VC</button>`}
-            </td>
-            <td class="notes-cell" 
-                data-player-id="${player.id}" 
-                data-full-notes="${player.notes || ''}" 
-                title="Click to expand notes"
-                data-testid="notes-cell-${player.id}">
-                <span class="notes-text">${this.truncateText(player.notes || '', 20)}</span>
-            </td>
-            <td data-testid="actions-cell-${player.id}">
-                <button class="btn btn-edit" 
-                        ${isReadOnly ? 'disabled' : ''}
-                        ${isReadOnly ? '' : `onclick=\"fplManager.openModal('${player.id}')\"`}
-                        data-testid="edit-player-${player.id}">Edit</button>
-                <button class="btn btn-danger" 
-                        ${isReadOnly ? 'disabled' : ''}
-                        ${isReadOnly ? '' : `onclick=\"fplManager.deletePlayer('${player.id}')\"`}
-                        data-testid="delete-player-${player.id}">Delete</button>
-            </td>
-        `;
+        // Summary and captaincy
+        this.ui.renderSummary(this.players);
+        this.ui.renderCaptaincyInfo(this.players, this.captain, this.viceCaptain);
 
-        return row;
+        // Week controls
+        this.ui.renderWeekControls({ currentWeek: this.currentWeek, totalWeeks, isReadOnly });
+
+        // Players table
+        this.ui.renderPlayers(filteredPlayers, { isReadOnly, captainId: this.captain, viceCaptainId: this.viceCaptain });
+
+        // Notes interactions handled via delegated listener in UIManager
     }
     
-    updateSummary() {
-        const teamPlayers = this.players.filter(p => p.have);
-        const teamCount = teamPlayers.length;
-        const totalValue = teamPlayers.reduce((sum, player) => sum + player.price, 0);
-        
-        this.teamCount.textContent = `In Team: ${teamCount}/15`;
-        this.totalValue.textContent = `Total Value: £${totalValue.toFixed(1)}m`;
-    }
-    
-    updateCaptaincyInfo() {
-        const captainPlayer = this.players.find(p => p.id === this.captain);
-        const viceCaptainPlayer = this.players.find(p => p.id === this.viceCaptain);
-        
-        this.captainInfo.textContent = captainPlayer ? 
-            `Captain: ${captainPlayer.name}` : 'Captain: None selected';
-        
-        this.viceCaptainInfo.textContent = viceCaptainPlayer ? 
-            `Vice Captain: ${viceCaptainPlayer.name}` : 'Vice Captain: None selected';
-    }
-    
-    getStatusText(status) {
-        const statusMap = {
-            'yellow': 'Maybe Good',
-            'green': 'Very Good',
-            'red': 'Sell/Don\'t Buy'
-        };
-        return statusMap[status] || status;
-    }
-    
-    capitalizeFirst(str) {
-        return str.charAt(0).toUpperCase() + str.slice(1);
-    }
-    
-    truncateText(text, maxLength) {
-        if (text.length <= maxLength) return text;
-        return text.substring(0, maxLength) + '...';
-    }
-    
-    saveToStorage() {
-        // Phase 1: Save using weekly schema while remaining backward compatible
+    saveToStorage(weekToSave, { players, captain, viceCaptain }, currentWeek) {
         const existingRaw = localStorage.getItem('fpl-team-data');
-        let root = null;
+        let root = { weeks: {}, version: '2.0' };
         if (existingRaw) {
             try {
-                root = JSON.parse(existingRaw);
-            } catch (e) {
-                root = null;
-            }
+                const parsed = JSON.parse(existingRaw);
+                if (parsed && parsed.weeks) root = parsed;
+            } catch (e) { /* ignore */ }
         }
 
-        // Determine schema
-        if (root && root.weeks) {
-            const currentWeek = this.currentWeek || root.currentWeek || 1;
-            // Update only current week data
-            root.weeks[currentWeek] = root.weeks[currentWeek] || {};
-            root.weeks[currentWeek].players = this.players;
-            root.weeks[currentWeek].captain = this.captain;
-            root.weeks[currentWeek].viceCaptain = this.viceCaptain;
+        root.weeks[weekToSave] = root.weeks[weekToSave] || {};
+        root.weeks[weekToSave].players = players;
+        root.weeks[weekToSave].captain = captain;
+        root.weeks[weekToSave].viceCaptain = viceCaptain;
 
-            // Update team snapshot and stats for the week
-            const teamMembers = this.players.filter(p => p.have).map(p => ({
-                playerId: p.id,
-                name: p.name,
-                position: p.position,
-                team: p.team,
-                price: p.price,
-            }));
-            root.weeks[currentWeek].teamMembers = teamMembers;
-            root.weeks[currentWeek].teamStats = {
-                totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
-                playerCount: teamMembers.length,
-                updatedDate: new Date().toISOString()
-            };
+        const teamMembers = players.filter(p => p.have).map(p => ({
+            playerId: p.id, name: p.name, position: p.position, team: p.team, price: p.price,
+        }));
+        root.weeks[weekToSave].teamMembers = teamMembers;
+        root.weeks[weekToSave].teamStats = {
+            totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
+            playerCount: teamMembers.length,
+            updatedDate: new Date().toISOString()
+        };
 
-            root.version = root.version || '2.0';
-            root.currentWeek = currentWeek;
-            localStorage.setItem('fpl-team-data', JSON.stringify(root));
-        } else {
-            // Old schema fallback (kept for backward compatibility)
-            const data = {
-                players: this.players,
-                captain: this.captain,
-                viceCaptain: this.viceCaptain
-            };
-            localStorage.setItem('fpl-team-data', JSON.stringify(data));
-        }
+        root.currentWeek = currentWeek;
+        localStorage.setItem('fpl-team-data', JSON.stringify(root));
     }
     
     addNotesClickHandlers() {
@@ -530,14 +680,14 @@ class FPLTeamManager {
             try {
                 const data = JSON.parse(savedData);
                 if (data && data.weeks) {
-                    const currentWeek = data.currentWeek || 1;
-                    this.currentWeek = currentWeek;
-                    const week = data.weeks[currentWeek] || {};
-                    this.players = week.players || [];
-                    this.captain = week.captain || null;
-                    this.viceCaptain = week.viceCaptain || null;
-                } else {
-                    // Old schema
+                    // New weekly format
+                    this.currentWeek = data.currentWeek || 1;
+                    const weekData = data.weeks[this.currentWeek] || data.weeks[1] || {};
+                    this.players = weekData.players || [];
+                    this.captain = weekData.captain || null;
+                    this.viceCaptain = weekData.viceCaptain || null;
+                } else if (data) {
+                    // Old format (for backward compatibility, though migration should handle this)
                     this.players = data.players || [];
                     this.captain = data.captain || null;
                     this.viceCaptain = data.viceCaptain || null;
@@ -547,6 +697,124 @@ class FPLTeamManager {
                 this.players = [];
                 this.captain = null;
                 this.viceCaptain = null;
+            }
+        }
+    }
+
+    // ===== Week Navigation (Phase 2) =====
+
+    createNewWeek() {
+        const lastWeekNumber = this.currentWeek;
+        // 1. Save the final state of the current week before creating a new one.
+        this.saveToStorage(lastWeekNumber, { 
+            players: this.players, 
+            captain: this.captain, 
+            viceCaptain: this.viceCaptain 
+        }, lastWeekNumber);
+
+        const lastWeekData = this.getWeekSnapshot(lastWeekNumber);
+
+        // 2. Increment week count and set as current.
+        this.currentWeek = lastWeekNumber + 1;
+
+        // 3. New week inherits players, captain, and vice-captain from the last week.
+        this.players = lastWeekData ? JSON.parse(JSON.stringify(lastWeekData.players || [])) : [];
+        this.captain = lastWeekData ? lastWeekData.captain : null;
+        this.viceCaptain = lastWeekData ? lastWeekData.viceCaptain : null;
+
+        // 4. Save the new week's initial state.
+        this.saveToStorage(this.currentWeek, { 
+            players: this.players, 
+            captain: this.captain, 
+            viceCaptain: this.viceCaptain 
+        }, this.currentWeek);
+
+        // 5. Update UI to reflect the new week.
+        this.updateDisplay();
+    }
+
+    getWeekCount() {
+        const savedData = localStorage.getItem('fpl-team-data');
+        if (savedData) {
+            try {
+                const data = JSON.parse(savedData);
+                if (data && data.weeks) {
+                    return Object.keys(data.weeks).length;
+                }
+            } catch (e) { return 1; }
+        }
+        return 1;
+    }
+
+    _isReadOnlyCurrentWeek() {
+        return this.currentWeek < this.getWeekCount();
+    }
+
+    // Test helper to get a clean snapshot from storage
+    getWeekSnapshot(weekNumber) {
+        const savedData = localStorage.getItem('fpl-team-data');
+        if (!savedData) return null;
+        try {
+            const data = JSON.parse(savedData);
+            return data.weeks ? data.weeks[weekNumber] : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    getPlayerSnapshot(weekNumber, playerId) {
+        const week = this.getWeekSnapshot(weekNumber);
+        return week && week.players ? week.players.find(p => p.id === playerId) : null;
+    }
+
+    goToWeek(weekNumber) {
+        const totalWeeks = this.getWeekCount();
+        if (weekNumber >= 1 && weekNumber <= totalWeeks) {
+            this.currentWeek = weekNumber;
+            this.loadFromStorage(); // Reloads state for the target week
+            this.updateDisplay();
+        }
+    }
+
+    prevWeek() {
+        this.goToWeek(this.currentWeek - 1);
+    }
+
+    nextWeek() {
+        this.goToWeek(this.currentWeek + 1);
+    }
+
+    // ===== Storage & Migration (Phase 1) =====
+
+    migrateStorageIfNeeded() {
+        const savedData = localStorage.getItem('fpl-team-data');
+        if (savedData) {
+            try {
+                const data = JSON.parse(savedData);
+                // If data exists but is not in weekly format, migrate it
+                if (data && !data.weeks) {
+                    const migratedData = {
+                        version: '2.0',
+                        currentWeek: 1,
+                        weeks: {
+                            1: {
+                                players: data.players || [],
+                                captain: data.captain || null,
+                                viceCaptain: data.viceCaptain || null,
+                                teamMembers: (data.players || []).filter(p => p.have).map(p => ({ playerId: p.id, name: p.name, position: p.position, team: p.team, price: p.price })),
+                                teamStats: {
+                                    totalValue: (data.players || []).filter(p => p.have).reduce((s, p) => s + (Number(p.price) || 0), 0),
+                                    playerCount: (data.players || []).filter(p => p.have).length,
+                                    updatedDate: new Date().toISOString()
+                                }
+                            }
+                        }
+                    };
+                    localStorage.setItem('fpl-team-data', JSON.stringify(migratedData));
+                }
+            } catch (e) {
+                console.error('Failed to parse or migrate data:', e);
+                localStorage.removeItem('fpl-team-data'); // Clear corrupted data
             }
         }
     }
@@ -874,7 +1142,25 @@ FPLTeamManager.prototype._computeTeamSnapshot = function(players) {
 FPLTeamManager.prototype.createNewWeek = function() {
     const root = this._getRootData();
     const currentWeek = this.currentWeek || root.currentWeek || 1;
-    const source = root.weeks[currentWeek] || { players: [], captain: null, viceCaptain: null };
+    // Always use in-memory state as the source of truth for captain/viceCaptain
+    // This ensures that any changes made via UI are captured
+    const source = {
+        players: this.players || [],
+        captain: this.captain || null,
+        viceCaptain: this.viceCaptain || null
+    };
+
+    // Ensure the source week has up-to-date cap/vice persisted
+    root.weeks[currentWeek] = root.weeks[currentWeek] || {};
+    root.weeks[currentWeek].players = source.players;
+    root.weeks[currentWeek].captain = source.captain;
+    root.weeks[currentWeek].viceCaptain = source.viceCaptain;
+    const snapshot = this._computeTeamSnapshot(source.players);
+    root.weeks[currentWeek].teamMembers = snapshot.teamMembers;
+    root.weeks[currentWeek].teamStats = snapshot.teamStats;
+    
+    // Save the updated root to ensure captain/viceCaptain are persisted before creating new week
+    this._saveRootData(root);
 
     // Mark all existing weeks read-only
     Object.keys(root.weeks).forEach(w => { if (root.weeks[w]) root.weeks[w].isReadOnly = true; });
