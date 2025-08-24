@@ -4,6 +4,49 @@ class UIManager {
         // Intentionally empty; call initElements() after DOM is ready
     }
 
+    bindEvents(handlers = {}) {
+        const {
+            onAddPlayer,
+            onModalClose,
+            onFormSubmit,
+            onPositionFilterChange,
+            onHaveFilterChange,
+            onPrevWeek,
+            onNextWeek,
+            onCreateWeek,
+            onExportWeek,
+            onEscapeKey
+        } = handlers;
+
+        // Add player button
+        this.addPlayerBtn?.addEventListener('click', () => onAddPlayer && onAddPlayer());
+
+        // Modal close events
+        this.closeBtn?.addEventListener('click', () => onModalClose && onModalClose());
+        this.cancelBtn?.addEventListener('click', () => onModalClose && onModalClose());
+        this.modal?.addEventListener('click', (e) => {
+            if (e.target === this.modal && onModalClose) onModalClose();
+        });
+
+        // Form submission
+        this.playerForm?.addEventListener('submit', (e) => onFormSubmit && onFormSubmit(e));
+
+        // Filters
+        this.positionFilter?.addEventListener('change', () => onPositionFilterChange && onPositionFilterChange());
+        this.haveFilter?.addEventListener('change', () => onHaveFilterChange && onHaveFilterChange());
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && onEscapeKey) onEscapeKey(e);
+        });
+
+        // Week controls
+        this.prevWeekBtn?.addEventListener('click', () => onPrevWeek && onPrevWeek());
+        this.nextWeekBtn?.addEventListener('click', () => onNextWeek && onNextWeek());
+        this.createWeekBtn?.addEventListener('click', () => onCreateWeek && onCreateWeek());
+        this.exportWeekBtn?.addEventListener('click', () => onExportWeek && onExportWeek());
+    }
+
     initElements() {
         // Main elements
         this.addPlayerBtn = document.querySelector('[data-testid="add-player-button"]');
@@ -132,35 +175,18 @@ class FPLTeamManager {
     }
     
     bindEvents() {
-        // Add player button
-        this.addPlayerBtn?.addEventListener('click', () => this.openModal());
-        
-        // Modal close events
-        this.ui.closeBtn?.addEventListener('click', () => this.closeModal());
-        this.ui.cancelBtn?.addEventListener('click', () => this.closeModal());
-        this.ui.modal?.addEventListener('click', (e) => {
-            if (e.target === this.ui.modal) this.closeModal();
+        this.ui.bindEvents({
+            onAddPlayer: this.openModal.bind(this),
+            onModalClose: this.closeModal.bind(this),
+            onFormSubmit: this.handleFormSubmit.bind(this),
+            onPositionFilterChange: this.updateDisplay.bind(this),
+            onHaveFilterChange: this.updateDisplay.bind(this),
+            onEscapeKey: () => this.closeModal(),
+            onPrevWeek: this.prevWeek.bind(this),
+            onNextWeek: this.nextWeek.bind(this),
+            onCreateWeek: this.createNewWeek.bind(this),
+            onExportWeek: this.exportWeekData.bind(this),
         });
-        
-        // Form submission
-        this.ui.playerForm?.addEventListener('submit', (e) => this.handleFormSubmit(e));
-        
-        // Position filter
-        this.positionFilter?.addEventListener('change', () => this.updateDisplay());
-        
-        // Have filter
-        this.haveFilter?.addEventListener('change', () => this.updateDisplay());
-        
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') this.closeModal();
-        });
-
-        // Week controls
-        this.prevWeekBtn?.addEventListener('click', () => this.prevWeek());
-        this.nextWeekBtn?.addEventListener('click', () => this.nextWeek());
-        this.createWeekBtn?.addEventListener('click', () => this.createNewWeek());
-        this.exportWeekBtn?.addEventListener('click', () => this.exportWeekData());
     }
     
     openModal(playerId = null) {
