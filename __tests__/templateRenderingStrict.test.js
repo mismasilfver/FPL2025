@@ -59,21 +59,15 @@ describe('UIManager.renderPlayers uses <template> cloning and fills cells', () =
     localStorage.clear();
   });
 
-  test('does not call createPlayerRow and renders rows from template with correct content', () => {
+  test('renders rows from template with correct content', () => {
     const manager = new FPLTeamManager();
 
     const players = [
       { id: '1', name: 'Saka', position: 'midfield', team: 'ARS', price: 9.0, have: true, status: 'green', notes: 'Great fixtures' },
       { id: '2', name: 'Haaland', position: 'forward', team: 'MCI', price: 14.0, have: false, status: '', notes: '' },
     ];
-
-    const spy = jest.spyOn(manager.ui, 'createPlayerRow');
-
     // Call render directly to avoid side effects
     manager.ui.renderPlayers(players, { isReadOnly: false, captainId: '1', viceCaptainId: null });
-
-    // Should NOT use the old function when template exists
-    expect(spy).not.toHaveBeenCalled();
 
     const rows = document.querySelectorAll('#players-tbody tr.player-row');
     expect(rows.length).toBe(2);

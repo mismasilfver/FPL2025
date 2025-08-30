@@ -150,9 +150,14 @@ class UIManager {
 
         // Templates
         this.playerRowTemplate = document.getElementById('player-row-template');
+        this.playerModalTemplate = document.getElementById('player-modal-template');
     }
 
     openModal(player = null) {
+        // If modal not in DOM (e.g., jsdom tests), build it from template on-demand
+        if (!this.modal && this.playerModalTemplate) {
+            this.buildModalFromTemplate();
+        }
         if (player) {
             this.modalTitle.textContent = 'Edit Player';
             this.populateForm(player);
@@ -163,6 +168,27 @@ class UIManager {
 
         this.modal.style.display = 'block';
         this.playerName?.focus();
+    }
+
+    buildModalFromTemplate() {
+        if (!this.playerModalTemplate) return;
+        const frag = this.playerModalTemplate.content.cloneNode(true);
+        // Append to body for simplicity to match existing CSS expectations
+        document.body.appendChild(frag);
+        // Set references scoped to the newly added modal
+        this.modal = document.getElementById('player-modal');
+        this.modalTitle = this.modal.querySelector('#modal-title');
+        this.playerForm = this.modal.querySelector('#player-form');
+        this.closeBtn = this.modal.querySelector('.close');
+        this.cancelBtn = this.modal.querySelector('[data-testid="cancel-button"]');
+        this.playerName = this.modal.querySelector('[data-testid="player-name-input"]');
+        this.playerPosition = this.modal.querySelector('[data-testid="player-position-select"]');
+        this.playerTeam = this.modal.querySelector('[data-testid="player-team-input"]');
+        this.playerPrice = this.modal.querySelector('[data-testid="player-price-input"]');
+        this.playerStatus = this.modal.querySelector('[data-testid="player-status-select"]');
+        this.playerHave = this.modal.querySelector('[data-testid="player-have-checkbox"]');
+        this.playerNotes = this.modal.querySelector('[data-testid="player-notes-textarea"]');
+        // Note: event listeners are bound by bindEvents() in controller; tests only require presence
     }
 
     closeModal() {
@@ -226,67 +252,6 @@ UIManager.prototype.renderWeekControls = function({ currentWeek, totalWeeks, isR
     if (this.nextWeekBtn) this.nextWeekBtn.disabled = currentWeek >= totalWeeks;
 };
 
-UIManager.prototype.createPlayerRow = function(player, { isReadOnly, captainId, viceCaptainId }) {
-    const row = document.createElement('tr');
-    const isCaptain = captainId === player.id;
-    const isViceCaptain = viceCaptainId === player.id;
-    row.innerHTML = `
-            <td><strong>${player.name}</strong></td>
-            <td>${this.capitalizeFirst(player.position)}</td>
-            <td>${player.team}</td>
-            <td>£${Number(player.price).toFixed(1)}m</td>
-            <td style="text-align: center;">${player.status ? `<div class="status-circle status-${player.status}" title="${this.getStatusText(player.status)}"></div>` : ''}</td>
-            <td style="text-align: center;" data-testid="have-cell-${player.id}">
-                ${player.have ? 
-                  `<span class="have-indicator" 
-                        data-action="toggle-have" data-player-id="${player.id}"
-                        style="${isReadOnly ? '' : 'cursor: pointer;'}" 
-                        title="${isReadOnly ? 'Read-only week' : 'Click to remove from team'}"
-                        data-testid="remove-from-team-${player.id}">✓</span>` : 
-                  `<button class="btn btn-secondary" 
-                          ${isReadOnly ? 'disabled' : ''}
-                          data-action="toggle-have" data-player-id="${player.id}"
-                          style="font-size: 10px; padding: 2px 6px;" 
-                          title="${isReadOnly ? 'Read-only week' : 'Add to team'}"
-                          data-testid="add-to-team-${player.id}">+</button>`}
-            </td>
-            <td data-testid="captain-cell-${player.id}">
-                ${isCaptain ? 
-                  `<span class="captain-badge" data-testid="captain-badge-${player.id}">C</span>` : 
-                  `<button class="btn btn-secondary" 
-                          ${isReadOnly ? 'disabled' : ''}
-                          data-action="make-captain" data-player-id="${player.id}"
-                          style="font-size: 10px; padding: 2px 6px;"
-                          data-testid="make-captain-${player.id}">C</button>`}
-            </td>
-            <td data-testid="vice-captain-cell-${player.id}">
-                ${isViceCaptain ? 
-                  `<span class="vice-captain-badge" data-testid="vice-captain-badge-${player.id}">VC</span>` : 
-                  `<button class="btn btn-secondary" 
-                          ${isReadOnly ? 'disabled' : ''}
-                          data-action="make-vice" data-player-id="${player.id}"
-                          style="font-size: 10px; padding: 2px 6px;"
-                          data-testid="make-vice-captain-${player.id}">VC</button>`}
-            </td>
-            <td class="notes-cell" 
-                data-player-id="${player.id}" 
-                data-full-notes="${player.notes || ''}" 
-                title="Click to expand notes"
-                data-testid="notes-cell-${player.id}">
-                <span class="notes-text">${this.truncateText(player.notes || '', 20)}</span>
-            </td>
-            <td data-testid="actions-cell-${player.id}">
-                <button class="btn btn-edit" 
-                        ${isReadOnly ? 'disabled' : ''}
-                        data-action="edit" data-player-id="${player.id}"
-                        data-testid="edit-player-${player.id}">Edit</button>
-                <button class="btn btn-danger" 
-                        ${isReadOnly ? 'disabled' : ''}
-                        data-action="delete" data-player-id="${player.id}"
-                        data-testid="delete-player-${player.id}">Delete</button>
-            </td>`;
-    return row;
-};
 
 UIManager.prototype.buildRowFromTemplate = function(player, { isReadOnly, captainId, viceCaptainId }) {
     if (!this.playerRowTemplate) return this.createPlayerRow(player, { isReadOnly, captainId, viceCaptainId });
@@ -393,9 +358,7 @@ UIManager.prototype.renderPlayers = function(players, { isReadOnly, captainId, v
     }
     if (this.playersTbody) this.playersTbody.innerHTML = '';
     (players || []).forEach(player => {
-        const row = this.playerRowTemplate
-            ? this.buildRowFromTemplate(player, { isReadOnly, captainId, viceCaptainId })
-            : this.createPlayerRow(player, { isReadOnly, captainId, viceCaptainId });
+        const row = this.buildRowFromTemplate(player, { isReadOnly, captainId, viceCaptainId });
         this.playersTbody.appendChild(row);
     });
 };
@@ -637,7 +600,14 @@ class FPLTeamManager {
         }
         this.currentEditingId = playerId;
         const player = playerId ? this.players.find(p => p.id === playerId) : null;
+        const hadModal = !!this.ui.modal;
         this.ui.openModal(player || null);
+        // If the modal was dynamically built from a template, ensure our references
+        // are refreshed and event listeners are bound to the new elements.
+        if (!hadModal && this.ui.modal) {
+            this.initializeElements();
+            this.bindEvents();
+        }
     }
     
     closeModal() {
