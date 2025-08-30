@@ -147,9 +147,17 @@ class UIManager {
         this.playerStatus = document.querySelector('[data-testid="player-status-select"]');
         this.playerHave = document.querySelector('[data-testid="player-have-checkbox"]');
         this.playerNotes = document.querySelector('[data-testid="player-notes-textarea"]');
+
+        // Templates
+        this.playerRowTemplate = document.getElementById('player-row-template');
+        this.playerModalTemplate = document.getElementById('player-modal-template');
     }
 
     openModal(player = null) {
+        // If modal not in DOM (e.g., jsdom tests), build it from template on-demand
+        if (!this.modal && this.playerModalTemplate) {
+            this.buildModalFromTemplate();
+        }
         if (player) {
             this.modalTitle.textContent = 'Edit Player';
             this.populateForm(player);
@@ -160,6 +168,27 @@ class UIManager {
 
         this.modal.style.display = 'block';
         this.playerName?.focus();
+    }
+
+    buildModalFromTemplate() {
+        if (!this.playerModalTemplate) return;
+        const frag = this.playerModalTemplate.content.cloneNode(true);
+        // Append to body for simplicity to match existing CSS expectations
+        document.body.appendChild(frag);
+        // Set references scoped to the newly added modal
+        this.modal = document.getElementById('player-modal');
+        this.modalTitle = this.modal.querySelector('#modal-title');
+        this.playerForm = this.modal.querySelector('#player-form');
+        this.closeBtn = this.modal.querySelector('.close');
+        this.cancelBtn = this.modal.querySelector('[data-testid="cancel-button"]');
+        this.playerName = this.modal.querySelector('[data-testid="player-name-input"]');
+        this.playerPosition = this.modal.querySelector('[data-testid="player-position-select"]');
+        this.playerTeam = this.modal.querySelector('[data-testid="player-team-input"]');
+        this.playerPrice = this.modal.querySelector('[data-testid="player-price-input"]');
+        this.playerStatus = this.modal.querySelector('[data-testid="player-status-select"]');
+        this.playerHave = this.modal.querySelector('[data-testid="player-have-checkbox"]');
+        this.playerNotes = this.modal.querySelector('[data-testid="player-notes-textarea"]');
+        // Note: event listeners are bound by bindEvents() in controller; tests only require presence
     }
 
     closeModal() {
@@ -223,65 +252,97 @@ UIManager.prototype.renderWeekControls = function({ currentWeek, totalWeeks, isR
     if (this.nextWeekBtn) this.nextWeekBtn.disabled = currentWeek >= totalWeeks;
 };
 
-UIManager.prototype.createPlayerRow = function(player, { isReadOnly, captainId, viceCaptainId }) {
-    const row = document.createElement('tr');
+
+UIManager.prototype.buildRowFromTemplate = function(player, { isReadOnly, captainId, viceCaptainId }) {
+    if (!this.playerRowTemplate) return this.createPlayerRow(player, { isReadOnly, captainId, viceCaptainId });
+    const frag = this.playerRowTemplate.content.cloneNode(true);
+    const row = frag.querySelector('tr.player-row');
     const isCaptain = captainId === player.id;
     const isViceCaptain = viceCaptainId === player.id;
-    row.innerHTML = `
-            <td><strong>${player.name}</strong></td>
-            <td>${this.capitalizeFirst(player.position)}</td>
-            <td>${player.team}</td>
-            <td>£${Number(player.price).toFixed(1)}m</td>
-            <td style="text-align: center;">${player.status ? `<div class="status-circle status-${player.status}" title="${this.getStatusText(player.status)}"></div>` : ''}</td>
-            <td style="text-align: center;" data-testid="have-cell-${player.id}">
-                ${player.have ? 
-                  `<span class="have-indicator" 
-                        data-action="toggle-have" data-player-id="${player.id}"
-                        style="${isReadOnly ? '' : 'cursor: pointer;'}" 
-                        title="${isReadOnly ? 'Read-only week' : 'Click to remove from team'}"
-                        data-testid="remove-from-team-${player.id}">✓</span>` : 
-                  `<button class="btn btn-secondary" 
-                          ${isReadOnly ? 'disabled' : ''}
-                          data-action="toggle-have" data-player-id="${player.id}"
-                          style="font-size: 10px; padding: 2px 6px;" 
-                          title="${isReadOnly ? 'Read-only week' : 'Add to team'}"
-                          data-testid="add-to-team-${player.id}">+</button>`}
-            </td>
-            <td data-testid="captain-cell-${player.id}">
-                ${isCaptain ? 
-                  `<span class="captain-badge" data-testid="captain-badge-${player.id}">C</span>` : 
-                  `<button class="btn btn-secondary" 
-                          ${isReadOnly ? 'disabled' : ''}
-                          data-action="make-captain" data-player-id="${player.id}"
-                          style="font-size: 10px; padding: 2px 6px;"
-                          data-testid="make-captain-${player.id}">C</button>`}
-            </td>
-            <td data-testid="vice-captain-cell-${player.id}">
-                ${isViceCaptain ? 
-                  `<span class="vice-captain-badge" data-testid="vice-captain-badge-${player.id}">VC</span>` : 
-                  `<button class="btn btn-secondary" 
-                          ${isReadOnly ? 'disabled' : ''}
-                          data-action="make-vice" data-player-id="${player.id}"
-                          style="font-size: 10px; padding: 2px 6px;"
-                          data-testid="make-vice-captain-${player.id}">VC</button>`}
-            </td>
-            <td class="notes-cell" 
-                data-player-id="${player.id}" 
-                data-full-notes="${player.notes || ''}" 
-                title="Click to expand notes"
-                data-testid="notes-cell-${player.id}">
-                <span class="notes-text">${this.truncateText(player.notes || '', 20)}</span>
-            </td>
-            <td data-testid="actions-cell-${player.id}">
-                <button class="btn btn-edit" 
-                        ${isReadOnly ? 'disabled' : ''}
-                        data-action="edit" data-player-id="${player.id}"
-                        data-testid="edit-player-${player.id}">Edit</button>
-                <button class="btn btn-danger" 
-                        ${isReadOnly ? 'disabled' : ''}
-                        data-action="delete" data-player-id="${player.id}"
-                        data-testid="delete-player-${player.id}">Delete</button>
-            </td>`;
+
+    // Fill base columns
+    const setText = (selector, text) => {
+        const el = row.querySelector(selector);
+        if (el) el.textContent = text;
+    };
+    setText('.col-name', player.name);
+    setText('.col-position', this.capitalizeFirst(player.position));
+    setText('.col-team', player.team);
+    setText('.col-price', `£${Number(player.price).toFixed(1)}m`);
+
+    // Status
+    const statusCell = row.querySelector('.col-status');
+    if (statusCell) {
+        statusCell.innerHTML = player.status
+            ? `<div class="status-circle status-${player.status}" title="${this.getStatusText(player.status)}"></div>`
+            : '';
+    }
+
+    // Have
+    const haveCell = row.querySelector('.col-have');
+    if (haveCell) {
+        haveCell.setAttribute('data-testid', `have-cell-${player.id}`);
+        haveCell.innerHTML = player.have
+            ? `<span class="have-indicator" data-action="toggle-have" data-player-id="${player.id}"
+                    style="${isReadOnly ? '' : 'cursor: pointer;'}" 
+                    title="${isReadOnly ? 'Read-only week' : 'Click to remove from team'}"
+                    data-testid="remove-from-team-${player.id}">✓</span>`
+            : `<button class="btn btn-secondary" ${isReadOnly ? 'disabled' : ''}
+                      data-action="toggle-have" data-player-id="${player.id}"
+                      style="font-size: 10px; padding: 2px 6px;" 
+                      title="${isReadOnly ? 'Read-only week' : 'Add to team'}"
+                      data-testid="add-to-team-${player.id}">+</button>`;
+    }
+
+    // Captain cell
+    const capCell = row.querySelector('.col-captain');
+    if (capCell) {
+        capCell.setAttribute('data-testid', `captain-cell-${player.id}`);
+        capCell.innerHTML = isCaptain
+            ? `<span class="captain-badge" data-testid="captain-badge-${player.id}">C</span>`
+            : `<button class="btn btn-secondary" ${isReadOnly ? 'disabled' : ''}
+                      data-action="make-captain" data-player-id="${player.id}"
+                      style="font-size: 10px; padding: 2px 6px;"
+                      data-testid="make-captain-${player.id}">C</button>`;
+    }
+
+    // Vice cell
+    const viceCell = row.querySelector('.col-vice');
+    if (viceCell) {
+        viceCell.setAttribute('data-testid', `vice-captain-cell-${player.id}`);
+        viceCell.innerHTML = isViceCaptain
+            ? `<span class="vice-captain-badge" data-testid="vice-captain-badge-${player.id}">VC</span>`
+            : `<button class="btn btn-secondary" ${isReadOnly ? 'disabled' : ''}
+                      data-action="make-vice" data-player-id="${player.id}"
+                      style="font-size: 10px; padding: 2px 6px;"
+                      data-testid="make-vice-captain-${player.id}">VC</button>`;
+    }
+
+    // Notes cell
+    const notesCell = row.querySelector('.col-notes');
+    if (notesCell) {
+        notesCell.classList.add('notes-cell');
+        notesCell.setAttribute('data-player-id', player.id);
+        notesCell.setAttribute('data-full-notes', player.notes || '');
+        notesCell.setAttribute('title', 'Click to expand notes');
+        notesCell.setAttribute('data-testid', `notes-cell-${player.id}`);
+        notesCell.innerHTML = `<span class="notes-text">${this.truncateText(player.notes || '', 20)}</span>`;
+    }
+
+    // Actions cell
+    const actionsCell = row.querySelector('.col-actions');
+    if (actionsCell) {
+        actionsCell.setAttribute('data-testid', `actions-cell-${player.id}`);
+        actionsCell.innerHTML = `
+            <button class="btn btn-edit" ${isReadOnly ? 'disabled' : ''}
+                    data-action="edit" data-player-id="${player.id}"
+                    data-testid="edit-player-${player.id}">Edit</button>
+            <button class="btn btn-danger" ${isReadOnly ? 'disabled' : ''}
+                    data-action="delete" data-player-id="${player.id}"
+                    data-testid="delete-player-${player.id}">Delete</button>
+        `;
+    }
+
     return row;
 };
 
@@ -297,7 +358,7 @@ UIManager.prototype.renderPlayers = function(players, { isReadOnly, captainId, v
     }
     if (this.playersTbody) this.playersTbody.innerHTML = '';
     (players || []).forEach(player => {
-        const row = this.createPlayerRow(player, { isReadOnly, captainId, viceCaptainId });
+        const row = this.buildRowFromTemplate(player, { isReadOnly, captainId, viceCaptainId });
         this.playersTbody.appendChild(row);
     });
 };
@@ -328,20 +389,151 @@ UIManager.prototype.toggleNotesExpansion = function(cell) {
     }
 };
 
+// ===== Storage Service to handle localStorage interactions =====
+class StorageService {
+    constructor(storageKey = 'fpl-team-data') {
+        this.storageKey = storageKey;
+    }
+
+    // Phase 1: Check if old data exists and migrate it to the new weekly format.
+    migrateStorageIfNeeded() {
+        const oldDataKey = 'fpl-team';
+        const oldData = localStorage.getItem(oldDataKey);
+        const newData = localStorage.getItem(this.storageKey);
+
+        if (oldData && !newData) {
+            try {
+                const parsedOldData = JSON.parse(oldData);
+                if (parsedOldData && parsedOldData.players) {
+                    const initialWeekData = {
+                        players: parsedOldData.players || [],
+                        captain: parsedOldData.captain || null,
+                        viceCaptain: parsedOldData.viceCaptain || null,
+                    };
+
+                    const newStructure = {
+                        weeks: { 1: initialWeekData },
+                        currentWeek: 1,
+                        version: '2.0'
+                    };
+
+                    localStorage.setItem(this.storageKey, JSON.stringify(newStructure));
+                    // Optionally, remove the old key after successful migration
+                    // localStorage.removeItem(oldDataKey);
+                    console.log('Successfully migrated old data to new weekly format.');
+                }
+            } catch (error) {
+                console.error('Error migrating old data:', error);
+            }
+        }
+    }
+
+    loadFromStorage() {
+        const savedData = localStorage.getItem(this.storageKey);
+        if (savedData) {
+            try {
+                const data = JSON.parse(savedData);
+                if (data && data.weeks) {
+                    const currentWeek = data.currentWeek || 1;
+                    const weekData = data.weeks[currentWeek] || data.weeks[1] || {};
+                    return {
+                        players: weekData.players || [],
+                        captain: weekData.captain || null,
+                        viceCaptain: weekData.viceCaptain || null,
+                        currentWeek: currentWeek
+                    };
+                } else if (data) { // Backward compatibility, though migration should handle this
+                    return {
+                        players: data.players || [],
+                        captain: data.captain || null,
+                        viceCaptain: data.viceCaptain || null,
+                        currentWeek: 1
+                    };
+                }
+            } catch (error) {
+                console.error('Error loading data from storage:', error);
+            }
+        }
+        return { players: [], captain: null, viceCaptain: null, currentWeek: 1 }; // Default state
+    }
+
+    saveToStorage(weekToSave, { players, captain, viceCaptain }, currentWeek) {
+        const existingRaw = localStorage.getItem(this.storageKey);
+        let root = { weeks: {}, version: '2.0' };
+        if (existingRaw) {
+            try {
+                const parsed = JSON.parse(existingRaw);
+                if (parsed && parsed.weeks) root = parsed;
+            } catch (e) { /* ignore malformed data */ }
+        }
+
+        root.weeks[weekToSave] = root.weeks[weekToSave] || {};
+        root.weeks[weekToSave].players = players;
+        root.weeks[weekToSave].captain = captain;
+        root.weeks[weekToSave].viceCaptain = viceCaptain;
+
+        const teamMembers = players.filter(p => p.have).map(p => ({
+            playerId: p.id, name: p.name, position: p.position, team: p.team, price: p.price,
+        }));
+        root.weeks[weekToSave].teamMembers = teamMembers;
+        root.weeks[weekToSave].teamStats = {
+            totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
+            playerCount: teamMembers.length,
+            updatedDate: new Date().toISOString()
+        };
+
+        root.currentWeek = currentWeek;
+        localStorage.setItem(this.storageKey, JSON.stringify(root));
+    }
+
+    getWeekCount() {
+        const savedData = localStorage.getItem(this.storageKey);
+        if (savedData) {
+            try {
+                const data = JSON.parse(savedData);
+                if (data && data.weeks) {
+                    return Object.keys(data.weeks).length;
+                }
+            } catch (e) { return 1; }
+        }
+        return 1;
+    }
+
+    getWeekSnapshot(weekNumber) {
+        const savedData = localStorage.getItem(this.storageKey);
+        if (!savedData) return null;
+        try {
+            const data = JSON.parse(savedData);
+            return data.weeks ? data.weeks[weekNumber] : null;
+        } catch (e) {
+            return null;
+        }
+    }
+}
+
+// Expose StorageService globally for tests that eval the script
+if (typeof window !== 'undefined') {
+    window.StorageService = StorageService;
+}
+if (typeof global !== 'undefined') {
+    global.StorageService = StorageService;
+}
+
 // Fantasy Premier League Team Manager
 class FPLTeamManager {
-    constructor() {
+    constructor({ ui, storage } = {}) {
         this.players = [];
         this.currentEditingId = null;
         this.captain = null;
         this.viceCaptain = null;
-        this.currentWeek = 1; // phase 2: track current week in memory
-        this.ui = new UIManager();
+        this.currentWeek = 1;
+        this.ui = ui || new UIManager();
+        this.storage = storage || new StorageService(); // Use the new storage service
         
         this.initializeElements();
         // Phase 1: migrate storage (if needed) before loading
-        this.migrateStorageIfNeeded();
-        this.loadFromStorage();
+        this.storage.migrateStorageIfNeeded();
+        this.loadStateFromStorage();
         this.bindEvents();
         this.updateDisplay();
     }
@@ -408,7 +600,14 @@ class FPLTeamManager {
         }
         this.currentEditingId = playerId;
         const player = playerId ? this.players.find(p => p.id === playerId) : null;
+        const hadModal = !!this.ui.modal;
         this.ui.openModal(player || null);
+        // If the modal was dynamically built from a template, ensure our references
+        // are refreshed and event listeners are bound to the new elements.
+        if (!hadModal && this.ui.modal) {
+            this.initializeElements();
+            this.bindEvents();
+        }
     }
     
     closeModal() {
@@ -472,7 +671,7 @@ class FPLTeamManager {
         };
         
         this.players.push(player);
-        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
+        this.saveStateToStorage();
         this.updateDisplay();
     }
     
@@ -484,7 +683,7 @@ class FPLTeamManager {
         const playerIndex = this.players.findIndex(p => p.id === playerId);
         if (playerIndex !== -1) {
             this.players[playerIndex] = { ...this.players[playerIndex], ...playerData };
-            this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
+            this.saveStateToStorage();
             this.updateDisplay();
         }
     }
@@ -502,7 +701,7 @@ class FPLTeamManager {
             if (this.viceCaptain === playerId) this.viceCaptain = null;
             
             this.players = this.players.filter(p => p.id !== playerId);
-            this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
+            this.saveStateToStorage();
             this.updateDisplay();
         }
     }
@@ -528,7 +727,7 @@ class FPLTeamManager {
             }
         }
         
-        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
+        this.saveStateToStorage();
         this.updateDisplay();
     }
     
@@ -553,7 +752,7 @@ class FPLTeamManager {
             }
         }
         
-        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
+        this.saveStateToStorage();
         this.updateDisplay();
     }
     
@@ -578,7 +777,7 @@ class FPLTeamManager {
             player.have = true;
         }
         
-        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
+        this.saveStateToStorage();
         this.updateDisplay();
     }
     
@@ -618,101 +817,52 @@ class FPLTeamManager {
         // Notes interactions handled via delegated listener in UIManager
     }
     
+    saveStateToStorage() {
+        this.storage.saveToStorage(
+            this.currentWeek,
+            {
+                players: this.players,
+                captain: this.captain,
+                viceCaptain: this.viceCaptain
+            },
+            this.currentWeek
+        );
+    }
+    
+    // Backward-compatibility: tests may still call this method directly
     saveToStorage(weekToSave, { players, captain, viceCaptain }, currentWeek) {
-        const existingRaw = localStorage.getItem('fpl-team-data');
-        let root = { weeks: {}, version: '2.0' };
-        if (existingRaw) {
-            try {
-                const parsed = JSON.parse(existingRaw);
-                if (parsed && parsed.weeks) root = parsed;
-            } catch (e) { /* ignore */ }
-        }
-
-        root.weeks[weekToSave] = root.weeks[weekToSave] || {};
-        root.weeks[weekToSave].players = players;
-        root.weeks[weekToSave].captain = captain;
-        root.weeks[weekToSave].viceCaptain = viceCaptain;
-
-        const teamMembers = players.filter(p => p.have).map(p => ({
-            playerId: p.id, name: p.name, position: p.position, team: p.team, price: p.price,
-        }));
-        root.weeks[weekToSave].teamMembers = teamMembers;
-        root.weeks[weekToSave].teamStats = {
-            totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
-            playerCount: teamMembers.length,
-            updatedDate: new Date().toISOString()
-        };
-
-        root.currentWeek = currentWeek;
-        localStorage.setItem('fpl-team-data', JSON.stringify(root));
+        this.storage.saveToStorage(weekToSave, { players, captain, viceCaptain }, currentWeek);
     }
     
-    addNotesClickHandlers() {
-        const notesCells = document.querySelectorAll('.notes-cell');
-        notesCells.forEach(cell => {
-            cell.addEventListener('click', (e) => {
-                this.toggleNotesExpansion(e.target.closest('.notes-cell'));
-            });
-        });
-    }
-    
-    toggleNotesExpansion(cell) {
-        const notesText = cell.querySelector('.notes-text');
-        const fullNotes = cell.getAttribute('data-full-notes');
-        const isExpanded = cell.classList.contains('expanded');
-        
-        if (isExpanded) {
-            // Collapse
-            notesText.textContent = this.truncateText(fullNotes, 20);
-            cell.classList.remove('expanded');
-            cell.title = 'Click to expand notes';
-        } else {
-            // Expand
-            notesText.textContent = fullNotes || 'No notes';
-            cell.classList.add('expanded');
-            cell.title = 'Click to collapse notes';
-        }
-    }
-    
-    loadFromStorage() {
-        const savedData = localStorage.getItem('fpl-team-data');
-        if (savedData) {
-            try {
-                const data = JSON.parse(savedData);
-                if (data && data.weeks) {
-                    // New weekly format
-                    this.currentWeek = data.currentWeek || 1;
-                    const weekData = data.weeks[this.currentWeek] || data.weeks[1] || {};
-                    this.players = weekData.players || [];
-                    this.captain = weekData.captain || null;
-                    this.viceCaptain = weekData.viceCaptain || null;
-                } else if (data) {
-                    // Old format (for backward compatibility, though migration should handle this)
-                    this.players = data.players || [];
-                    this.captain = data.captain || null;
-                    this.viceCaptain = data.viceCaptain || null;
-                }
-            } catch (error) {
-                console.error('Error loading data from storage:', error);
-                this.players = [];
-                this.captain = null;
-                this.viceCaptain = null;
-            }
-        }
+    loadStateFromStorage() {
+        const data = this.storage.loadFromStorage();
+        this.players = data.players;
+        this.captain = data.captain;
+        this.viceCaptain = data.viceCaptain;
+        this.currentWeek = data.currentWeek;
     }
 
     // ===== Week Navigation (Phase 2) =====
 
+    getWeekCount() {
+        return this.storage.getWeekCount();
+    }
+
+    _isReadOnlyCurrentWeek() {
+        const totalWeeks = this.getWeekCount();
+        return this.currentWeek < totalWeeks;
+    }
+
+    getWeekSnapshot(weekNumber) {
+        return this.storage.getWeekSnapshot(weekNumber);
+    }
+
     createNewWeek() {
         const lastWeekNumber = this.currentWeek;
         // 1. Save the final state of the current week before creating a new one.
-        this.saveToStorage(lastWeekNumber, { 
-            players: this.players, 
-            captain: this.captain, 
-            viceCaptain: this.viceCaptain 
-        }, lastWeekNumber);
+        this.saveStateToStorage();
 
-        const lastWeekData = this.getWeekSnapshot(lastWeekNumber);
+        const lastWeekData = this.storage.getWeekSnapshot(lastWeekNumber);
 
         // 2. Increment week count and set as current.
         this.currentWeek = lastWeekNumber + 1;
@@ -723,43 +873,23 @@ class FPLTeamManager {
         this.viceCaptain = lastWeekData ? lastWeekData.viceCaptain : null;
 
         // 4. Save the new week's initial state.
-        this.saveToStorage(this.currentWeek, { 
-            players: this.players, 
-            captain: this.captain, 
-            viceCaptain: this.viceCaptain 
-        }, this.currentWeek);
+        this.saveStateToStorage();
 
         // 5. Update UI to reflect the new week.
         this.updateDisplay();
     }
 
     getWeekCount() {
-        const savedData = localStorage.getItem('fpl-team-data');
-        if (savedData) {
-            try {
-                const data = JSON.parse(savedData);
-                if (data && data.weeks) {
-                    return Object.keys(data.weeks).length;
-                }
-            } catch (e) { return 1; }
-        }
-        return 1;
+        return this.storage.getWeekCount();
     }
 
     _isReadOnlyCurrentWeek() {
-        return this.currentWeek < this.getWeekCount();
+        return this.currentWeek < this.storage.getWeekCount();
     }
 
     // Test helper to get a clean snapshot from storage
     getWeekSnapshot(weekNumber) {
-        const savedData = localStorage.getItem('fpl-team-data');
-        if (!savedData) return null;
-        try {
-            const data = JSON.parse(savedData);
-            return data.weeks ? data.weeks[weekNumber] : null;
-        } catch (e) {
-            return null;
-        }
+        return this.storage.getWeekSnapshot(weekNumber);
     }
 
     getPlayerSnapshot(weekNumber, playerId) {
@@ -768,10 +898,10 @@ class FPLTeamManager {
     }
 
     goToWeek(weekNumber) {
-        const totalWeeks = this.getWeekCount();
+        const totalWeeks = this.storage.getWeekCount();
         if (weekNumber >= 1 && weekNumber <= totalWeeks) {
             this.currentWeek = weekNumber;
-            this.loadFromStorage(); // Reloads state for the target week
+            this.loadStateFromStorage(); // Reloads state for the target week
             this.updateDisplay();
         }
     }
@@ -853,7 +983,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Conditionally export for testing purposes
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { FPLTeamManager };
+    module.exports = { FPLTeamManager, StorageService };
 }
 
 // Load CSV data as initial players
@@ -986,7 +1116,7 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem('fpl-team-data', JSON.stringify(root));
 
             // Load into manager instance
-            window.fplManager.loadFromStorage();
+            window.fplManager.loadStateFromStorage();
             window.fplManager.updateDisplay();
         }
     }, 100);

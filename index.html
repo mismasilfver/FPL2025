@@ -79,10 +79,85 @@
             </table>
         </div>
 
+        <!-- Template for player table rows -->
+        <template id="player-row-template">
+            <tr class="player-row">
+                <td class="col-name"></td>
+                <td class="col-position"></td>
+                <td class="col-team"></td>
+                <td class="col-price"></td>
+                <td class="col-status"></td>
+                <td class="col-have"></td>
+                <td class="col-captain"></td>
+                <td class="col-vice"></td>
+                <td class="col-notes"></td>
+                <td class="col-actions"></td>
+            </tr>
+        </template>
+
         <div class="empty-state" id="empty-state">
             <p>No players added yet. Click "Add Player" to start building your team!</p>
         </div>
     </div>
+
+    <!-- Template for modal (used by UIManager in environments without a static modal) -->
+    <template id="player-modal-template">
+        <div id="player-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modal-title">Add Player</h2>
+                    <span class="close">&times;</span>
+                </div>
+                <form id="player-form">
+                    <div class="form-group" id="form-group-name">
+                        <label for="player-name">Player Name *</label>
+                        <input type="text" id="player-name" name="player-name" required data-testid="player-name-input">
+                    </div>
+                    <div class="form-group" id="form-group-position">
+                        <label for="player-position">Position *</label>
+                        <select id="player-position" name="player-position" required data-testid="player-position-select">
+                            <option value="">Select Position</option>
+                            <option value="goalkeeper">Goalkeeper</option>
+                            <option value="defence">Defence</option>
+                            <option value="midfield">Midfield</option>
+                            <option value="forward">Forward</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="form-group-team">
+                        <label for="player-team">Team *</label>
+                        <input type="text" id="player-team" name="player-team" required placeholder="e.g., Arsenal, Liverpool" data-testid="player-team-input">
+                    </div>
+                    <div class="form-group" id="form-group-price">
+                        <label for="player-price">Price (£m) *</label>
+                        <input type="number" id="player-price" name="player-price" step="0.1" min="0" required data-testid="player-price-input">
+                    </div>
+                    <div class="form-group" id="form-group-status">
+                        <label for="player-status">Status</label>
+                        <select id="player-status" name="player-status" data-testid="player-status-select">
+                            <option value="">No Status</option>
+                            <option value="yellow">Maybe Good (Yellow)</option>
+                            <option value="green">Very Good (Green)</option>
+                            <option value="red">Sell/Don't Buy (Red)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="form-group-have">
+                        <label for="player-have">
+                            <input type="checkbox" id="player-have" name="player-have" data-testid="player-have-checkbox"> In My Team
+                        </label>
+                        <small class="form-help">Maximum 15 players can be in your team</small>
+                    </div>
+                    <div class="form-group" id="form-group-notes">
+                        <label for="player-notes">Notes</label>
+                        <textarea id="player-notes" name="player-notes" rows="3" placeholder="Optional notes about this player..." data-testid="player-notes-textarea"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" id="cancel-btn" class="btn btn-secondary" data-testid="cancel-button">Cancel</button>
+                        <button type="submit" class="btn btn-primary" data-testid="save-player-button">Save Player</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </template>
 
     <!-- Add/Edit Player Modal -->
     <div id="player-modal" class="modal">
