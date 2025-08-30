@@ -147,6 +147,9 @@ class UIManager {
         this.playerStatus = document.querySelector('[data-testid="player-status-select"]');
         this.playerHave = document.querySelector('[data-testid="player-have-checkbox"]');
         this.playerNotes = document.querySelector('[data-testid="player-notes-textarea"]');
+
+        // Templates
+        this.playerRowTemplate = document.getElementById('player-row-template');
     }
 
     openModal(player = null) {
@@ -285,6 +288,99 @@ UIManager.prototype.createPlayerRow = function(player, { isReadOnly, captainId, 
     return row;
 };
 
+UIManager.prototype.buildRowFromTemplate = function(player, { isReadOnly, captainId, viceCaptainId }) {
+    if (!this.playerRowTemplate) return this.createPlayerRow(player, { isReadOnly, captainId, viceCaptainId });
+    const frag = this.playerRowTemplate.content.cloneNode(true);
+    const row = frag.querySelector('tr.player-row');
+    const isCaptain = captainId === player.id;
+    const isViceCaptain = viceCaptainId === player.id;
+
+    // Fill base columns
+    const setText = (selector, text) => {
+        const el = row.querySelector(selector);
+        if (el) el.textContent = text;
+    };
+    setText('.col-name', player.name);
+    setText('.col-position', this.capitalizeFirst(player.position));
+    setText('.col-team', player.team);
+    setText('.col-price', `£${Number(player.price).toFixed(1)}m`);
+
+    // Status
+    const statusCell = row.querySelector('.col-status');
+    if (statusCell) {
+        statusCell.innerHTML = player.status
+            ? `<div class="status-circle status-${player.status}" title="${this.getStatusText(player.status)}"></div>`
+            : '';
+    }
+
+    // Have
+    const haveCell = row.querySelector('.col-have');
+    if (haveCell) {
+        haveCell.setAttribute('data-testid', `have-cell-${player.id}`);
+        haveCell.innerHTML = player.have
+            ? `<span class="have-indicator" data-action="toggle-have" data-player-id="${player.id}"
+                    style="${isReadOnly ? '' : 'cursor: pointer;'}" 
+                    title="${isReadOnly ? 'Read-only week' : 'Click to remove from team'}"
+                    data-testid="remove-from-team-${player.id}">✓</span>`
+            : `<button class="btn btn-secondary" ${isReadOnly ? 'disabled' : ''}
+                      data-action="toggle-have" data-player-id="${player.id}"
+                      style="font-size: 10px; padding: 2px 6px;" 
+                      title="${isReadOnly ? 'Read-only week' : 'Add to team'}"
+                      data-testid="add-to-team-${player.id}">+</button>`;
+    }
+
+    // Captain cell
+    const capCell = row.querySelector('.col-captain');
+    if (capCell) {
+        capCell.setAttribute('data-testid', `captain-cell-${player.id}`);
+        capCell.innerHTML = isCaptain
+            ? `<span class="captain-badge" data-testid="captain-badge-${player.id}">C</span>`
+            : `<button class="btn btn-secondary" ${isReadOnly ? 'disabled' : ''}
+                      data-action="make-captain" data-player-id="${player.id}"
+                      style="font-size: 10px; padding: 2px 6px;"
+                      data-testid="make-captain-${player.id}">C</button>`;
+    }
+
+    // Vice cell
+    const viceCell = row.querySelector('.col-vice');
+    if (viceCell) {
+        viceCell.setAttribute('data-testid', `vice-captain-cell-${player.id}`);
+        viceCell.innerHTML = isViceCaptain
+            ? `<span class="vice-captain-badge" data-testid="vice-captain-badge-${player.id}">VC</span>`
+            : `<button class="btn btn-secondary" ${isReadOnly ? 'disabled' : ''}
+                      data-action="make-vice" data-player-id="${player.id}"
+                      style="font-size: 10px; padding: 2px 6px;"
+                      data-testid="make-vice-captain-${player.id}">VC</button>`;
+    }
+
+    // Notes cell
+    const notesCell = row.querySelector('.col-notes');
+    if (notesCell) {
+        notesCell.classList.add('notes-cell');
+        notesCell.setAttribute('data-player-id', player.id);
+        notesCell.setAttribute('data-full-notes', player.notes || '');
+        notesCell.setAttribute('title', 'Click to expand notes');
+        notesCell.setAttribute('data-testid', `notes-cell-${player.id}`);
+        notesCell.innerHTML = `<span class="notes-text">${this.truncateText(player.notes || '', 20)}</span>`;
+    }
+
+    // Actions cell
+    const actionsCell = row.querySelector('.col-actions');
+    if (actionsCell) {
+        actionsCell.setAttribute('data-testid', `actions-cell-${player.id}`);
+        actionsCell.innerHTML = `
+            <button class="btn btn-edit" ${isReadOnly ? 'disabled' : ''}
+                    data-action="edit" data-player-id="${player.id}"
+                    data-testid="edit-player-${player.id}">Edit</button>
+            <button class="btn btn-danger" ${isReadOnly ? 'disabled' : ''}
+                    data-action="delete" data-player-id="${player.id}"
+                    data-testid="delete-player-${player.id}">Delete</button>
+        `;
+    }
+
+    return row;
+};
+
 UIManager.prototype.renderPlayers = function(players, { isReadOnly, captainId, viceCaptainId }) {
     if (!players || players.length === 0) {
         if (this.emptyState) this.emptyState.style.display = 'block';
@@ -297,7 +393,9 @@ UIManager.prototype.renderPlayers = function(players, { isReadOnly, captainId, v
     }
     if (this.playersTbody) this.playersTbody.innerHTML = '';
     (players || []).forEach(player => {
-        const row = this.createPlayerRow(player, { isReadOnly, captainId, viceCaptainId });
+        const row = this.playerRowTemplate
+            ? this.buildRowFromTemplate(player, { isReadOnly, captainId, viceCaptainId })
+            : this.createPlayerRow(player, { isReadOnly, captainId, viceCaptainId });
         this.playersTbody.appendChild(row);
     });
 };
