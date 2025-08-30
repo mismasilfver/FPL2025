@@ -328,20 +328,151 @@ UIManager.prototype.toggleNotesExpansion = function(cell) {
     }
 };
 
+// ===== Storage Service to handle localStorage interactions =====
+class StorageService {
+    constructor(storageKey = 'fpl-team-data') {
+        this.storageKey = storageKey;
+    }
+
+    // Phase 1: Check if old data exists and migrate it to the new weekly format.
+    migrateStorageIfNeeded() {
+        const oldDataKey = 'fpl-team';
+        const oldData = localStorage.getItem(oldDataKey);
+        const newData = localStorage.getItem(this.storageKey);
+
+        if (oldData && !newData) {
+            try {
+                const parsedOldData = JSON.parse(oldData);
+                if (parsedOldData && parsedOldData.players) {
+                    const initialWeekData = {
+                        players: parsedOldData.players || [],
+                        captain: parsedOldData.captain || null,
+                        viceCaptain: parsedOldData.viceCaptain || null,
+                    };
+
+                    const newStructure = {
+                        weeks: { 1: initialWeekData },
+                        currentWeek: 1,
+                        version: '2.0'
+                    };
+
+                    localStorage.setItem(this.storageKey, JSON.stringify(newStructure));
+                    // Optionally, remove the old key after successful migration
+                    // localStorage.removeItem(oldDataKey);
+                    console.log('Successfully migrated old data to new weekly format.');
+                }
+            } catch (error) {
+                console.error('Error migrating old data:', error);
+            }
+        }
+    }
+
+    loadFromStorage() {
+        const savedData = localStorage.getItem(this.storageKey);
+        if (savedData) {
+            try {
+                const data = JSON.parse(savedData);
+                if (data && data.weeks) {
+                    const currentWeek = data.currentWeek || 1;
+                    const weekData = data.weeks[currentWeek] || data.weeks[1] || {};
+                    return {
+                        players: weekData.players || [],
+                        captain: weekData.captain || null,
+                        viceCaptain: weekData.viceCaptain || null,
+                        currentWeek: currentWeek
+                    };
+                } else if (data) { // Backward compatibility, though migration should handle this
+                    return {
+                        players: data.players || [],
+                        captain: data.captain || null,
+                        viceCaptain: data.viceCaptain || null,
+                        currentWeek: 1
+                    };
+                }
+            } catch (error) {
+                console.error('Error loading data from storage:', error);
+            }
+        }
+        return { players: [], captain: null, viceCaptain: null, currentWeek: 1 }; // Default state
+    }
+
+    saveToStorage(weekToSave, { players, captain, viceCaptain }, currentWeek) {
+        const existingRaw = localStorage.getItem(this.storageKey);
+        let root = { weeks: {}, version: '2.0' };
+        if (existingRaw) {
+            try {
+                const parsed = JSON.parse(existingRaw);
+                if (parsed && parsed.weeks) root = parsed;
+            } catch (e) { /* ignore malformed data */ }
+        }
+
+        root.weeks[weekToSave] = root.weeks[weekToSave] || {};
+        root.weeks[weekToSave].players = players;
+        root.weeks[weekToSave].captain = captain;
+        root.weeks[weekToSave].viceCaptain = viceCaptain;
+
+        const teamMembers = players.filter(p => p.have).map(p => ({
+            playerId: p.id, name: p.name, position: p.position, team: p.team, price: p.price,
+        }));
+        root.weeks[weekToSave].teamMembers = teamMembers;
+        root.weeks[weekToSave].teamStats = {
+            totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
+            playerCount: teamMembers.length,
+            updatedDate: new Date().toISOString()
+        };
+
+        root.currentWeek = currentWeek;
+        localStorage.setItem(this.storageKey, JSON.stringify(root));
+    }
+
+    getWeekCount() {
+        const savedData = localStorage.getItem(this.storageKey);
+        if (savedData) {
+            try {
+                const data = JSON.parse(savedData);
+                if (data && data.weeks) {
+                    return Object.keys(data.weeks).length;
+                }
+            } catch (e) { return 1; }
+        }
+        return 1;
+    }
+
+    getWeekSnapshot(weekNumber) {
+        const savedData = localStorage.getItem(this.storageKey);
+        if (!savedData) return null;
+        try {
+            const data = JSON.parse(savedData);
+            return data.weeks ? data.weeks[weekNumber] : null;
+        } catch (e) {
+            return null;
+        }
+    }
+}
+
+// Expose StorageService globally for tests that eval the script
+if (typeof window !== 'undefined') {
+    window.StorageService = StorageService;
+}
+if (typeof global !== 'undefined') {
+    global.StorageService = StorageService;
+}
+
 // Fantasy Premier League Team Manager
 class FPLTeamManager {
-    constructor() {
+    constructor({ ui, storage } = {}) {
         this.players = [];
         this.currentEditingId = null;
         this.captain = null;
         this.viceCaptain = null;
-        this.currentWeek = 1; // phase 2: track current week in memory
-        this.ui = new UIManager();
+        this.currentWeek = 1;
+        this.ui = ui || new UIManager();
+        this.storage = storage || new StorageService(); // Use the new storage service
         
         this.initializeElements();
         // Phase 1: migrate storage (if needed) before loading
-        this.migrateStorageIfNeeded();
-        this.loadFromStorage();
+        this.storage.migrateStorageIfNeeded();
+        this.loadStateFromStorage();
         this.bindEvents();
         this.updateDisplay();
     }
@@ -472,7 +603,7 @@ class FPLTeamManager {
         };
         
         this.players.push(player);
-        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
+        this.saveStateToStorage();
         this.updateDisplay();
     }
     
@@ -484,7 +615,7 @@ class FPLTeamManager {
         const playerIndex = this.players.findIndex(p => p.id === playerId);
         if (playerIndex !== -1) {
             this.players[playerIndex] = { ...this.players[playerIndex], ...playerData };
-            this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
+            this.saveStateToStorage();
             this.updateDisplay();
         }
     }
@@ -502,7 +633,7 @@ class FPLTeamManager {
             if (this.viceCaptain === playerId) this.viceCaptain = null;
             
             this.players = this.players.filter(p => p.id !== playerId);
-            this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
+            this.saveStateToStorage();
             this.updateDisplay();
         }
     }
@@ -528,7 +659,7 @@ class FPLTeamManager {
             }
         }
         
-        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
+        this.saveStateToStorage();
         this.updateDisplay();
     }
     
@@ -553,7 +684,7 @@ class FPLTeamManager {
             }
         }
         
-        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
+        this.saveStateToStorage();
         this.updateDisplay();
     }
     
@@ -578,7 +709,7 @@ class FPLTeamManager {
             player.have = true;
         }
         
-        this.saveToStorage(this.currentWeek, { players: this.players, captain: this.captain, viceCaptain: this.viceCaptain }, this.currentWeek);
+        this.saveStateToStorage();
         this.updateDisplay();
     }
     
@@ -618,101 +749,52 @@ class FPLTeamManager {
         // Notes interactions handled via delegated listener in UIManager
     }
     
+    saveStateToStorage() {
+        this.storage.saveToStorage(
+            this.currentWeek,
+            {
+                players: this.players,
+                captain: this.captain,
+                viceCaptain: this.viceCaptain
+            },
+            this.currentWeek
+        );
+    }
+    
+    // Backward-compatibility: tests may still call this method directly
     saveToStorage(weekToSave, { players, captain, viceCaptain }, currentWeek) {
-        const existingRaw = localStorage.getItem('fpl-team-data');
-        let root = { weeks: {}, version: '2.0' };
-        if (existingRaw) {
-            try {
-                const parsed = JSON.parse(existingRaw);
-                if (parsed && parsed.weeks) root = parsed;
-            } catch (e) { /* ignore */ }
-        }
-
-        root.weeks[weekToSave] = root.weeks[weekToSave] || {};
-        root.weeks[weekToSave].players = players;
-        root.weeks[weekToSave].captain = captain;
-        root.weeks[weekToSave].viceCaptain = viceCaptain;
-
-        const teamMembers = players.filter(p => p.have).map(p => ({
-            playerId: p.id, name: p.name, position: p.position, team: p.team, price: p.price,
-        }));
-        root.weeks[weekToSave].teamMembers = teamMembers;
-        root.weeks[weekToSave].teamStats = {
-            totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
-            playerCount: teamMembers.length,
-            updatedDate: new Date().toISOString()
-        };
-
-        root.currentWeek = currentWeek;
-        localStorage.setItem('fpl-team-data', JSON.stringify(root));
+        this.storage.saveToStorage(weekToSave, { players, captain, viceCaptain }, currentWeek);
     }
     
-    addNotesClickHandlers() {
-        const notesCells = document.querySelectorAll('.notes-cell');
-        notesCells.forEach(cell => {
-            cell.addEventListener('click', (e) => {
-                this.toggleNotesExpansion(e.target.closest('.notes-cell'));
-            });
-        });
-    }
-    
-    toggleNotesExpansion(cell) {
-        const notesText = cell.querySelector('.notes-text');
-        const fullNotes = cell.getAttribute('data-full-notes');
-        const isExpanded = cell.classList.contains('expanded');
-        
-        if (isExpanded) {
-            // Collapse
-            notesText.textContent = this.truncateText(fullNotes, 20);
-            cell.classList.remove('expanded');
-            cell.title = 'Click to expand notes';
-        } else {
-            // Expand
-            notesText.textContent = fullNotes || 'No notes';
-            cell.classList.add('expanded');
-            cell.title = 'Click to collapse notes';
-        }
-    }
-    
-    loadFromStorage() {
-        const savedData = localStorage.getItem('fpl-team-data');
-        if (savedData) {
-            try {
-                const data = JSON.parse(savedData);
-                if (data && data.weeks) {
-                    // New weekly format
-                    this.currentWeek = data.currentWeek || 1;
-                    const weekData = data.weeks[this.currentWeek] || data.weeks[1] || {};
-                    this.players = weekData.players || [];
-                    this.captain = weekData.captain || null;
-                    this.viceCaptain = weekData.viceCaptain || null;
-                } else if (data) {
-                    // Old format (for backward compatibility, though migration should handle this)
-                    this.players = data.players || [];
-                    this.captain = data.captain || null;
-                    this.viceCaptain = data.viceCaptain || null;
-                }
-            } catch (error) {
-                console.error('Error loading data from storage:', error);
-                this.players = [];
-                this.captain = null;
-                this.viceCaptain = null;
-            }
-        }
+    loadStateFromStorage() {
+        const data = this.storage.loadFromStorage();
+        this.players = data.players;
+        this.captain = data.captain;
+        this.viceCaptain = data.viceCaptain;
+        this.currentWeek = data.currentWeek;
     }
 
     // ===== Week Navigation (Phase 2) =====
 
+    getWeekCount() {
+        return this.storage.getWeekCount();
+    }
+
+    _isReadOnlyCurrentWeek() {
+        const totalWeeks = this.getWeekCount();
+        return this.currentWeek < totalWeeks;
+    }
+
+    getWeekSnapshot(weekNumber) {
+        return this.storage.getWeekSnapshot(weekNumber);
+    }
+
     createNewWeek() {
         const lastWeekNumber = this.currentWeek;
         // 1. Save the final state of the current week before creating a new one.
-        this.saveToStorage(lastWeekNumber, { 
-            players: this.players, 
-            captain: this.captain, 
-            viceCaptain: this.viceCaptain 
-        }, lastWeekNumber);
+        this.saveStateToStorage();
 
-        const lastWeekData = this.getWeekSnapshot(lastWeekNumber);
+        const lastWeekData = this.storage.getWeekSnapshot(lastWeekNumber);
 
         // 2. Increment week count and set as current.
         this.currentWeek = lastWeekNumber + 1;
@@ -723,43 +805,23 @@ class FPLTeamManager {
         this.viceCaptain = lastWeekData ? lastWeekData.viceCaptain : null;
 
         // 4. Save the new week's initial state.
-        this.saveToStorage(this.currentWeek, { 
-            players: this.players, 
-            captain: this.captain, 
-            viceCaptain: this.viceCaptain 
-        }, this.currentWeek);
+        this.saveStateToStorage();
 
         // 5. Update UI to reflect the new week.
         this.updateDisplay();
     }
 
     getWeekCount() {
-        const savedData = localStorage.getItem('fpl-team-data');
-        if (savedData) {
-            try {
-                const data = JSON.parse(savedData);
-                if (data && data.weeks) {
-                    return Object.keys(data.weeks).length;
-                }
-            } catch (e) { return 1; }
-        }
-        return 1;
+        return this.storage.getWeekCount();
     }
 
     _isReadOnlyCurrentWeek() {
-        return this.currentWeek < this.getWeekCount();
+        return this.currentWeek < this.storage.getWeekCount();
     }
 
     // Test helper to get a clean snapshot from storage
     getWeekSnapshot(weekNumber) {
-        const savedData = localStorage.getItem('fpl-team-data');
-        if (!savedData) return null;
-        try {
-            const data = JSON.parse(savedData);
-            return data.weeks ? data.weeks[weekNumber] : null;
-        } catch (e) {
-            return null;
-        }
+        return this.storage.getWeekSnapshot(weekNumber);
     }
 
     getPlayerSnapshot(weekNumber, playerId) {
@@ -768,10 +830,10 @@ class FPLTeamManager {
     }
 
     goToWeek(weekNumber) {
-        const totalWeeks = this.getWeekCount();
+        const totalWeeks = this.storage.getWeekCount();
         if (weekNumber >= 1 && weekNumber <= totalWeeks) {
             this.currentWeek = weekNumber;
-            this.loadFromStorage(); // Reloads state for the target week
+            this.loadStateFromStorage(); // Reloads state for the target week
             this.updateDisplay();
         }
     }
@@ -853,7 +915,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Conditionally export for testing purposes
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { FPLTeamManager };
+    module.exports = { FPLTeamManager, StorageService };
 }
 
 // Load CSV data as initial players
@@ -986,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem('fpl-team-data', JSON.stringify(root));
 
             // Load into manager instance
-            window.fplManager.loadFromStorage();
+            window.fplManager.loadStateFromStorage();
             window.fplManager.updateDisplay();
         }
     }, 100);
