@@ -539,29 +539,25 @@ class StorageService {
 
     // Phase 1: Check if old data exists and migrate it to the new weekly format.
     migrateStorageIfNeeded() {
-        const oldDataKey = 'fpl-team';
-        const oldData = localStorage.getItem(oldDataKey);
-        const newData = localStorage.getItem(this.storageKey);
+        const legacyKey = 'fpl-team';
+        const backupKey = 'fpl-team-backup-v1';
+        const legacyRaw = localStorage.getItem(legacyKey);
+        const v2Raw = localStorage.getItem(this.storageKey);
 
-        if (oldData && !newData) {
+        // If v2 already exists, do nothing
+        if (v2Raw) return;
+
+        if (legacyRaw) {
             try {
-                const parsedOldData = JSON.parse(oldData);
-                if (parsedOldData && parsedOldData.players) {
-                    const initialWeekData = {
-                        players: parsedOldData.players || [],
-                        captain: parsedOldData.captain || null,
-                        viceCaptain: parsedOldData.viceCaptain || null,
-                    };
-
-                    const newStructure = {
-                        weeks: { 1: initialWeekData },
-                        currentWeek: 1,
-                        version: '2.0'
-                    };
-
-                    localStorage.setItem(this.storageKey, JSON.stringify(newStructure));
-                    // Optionally, remove the old key after successful migration
-                    // localStorage.removeItem(oldDataKey);
+                const oldData = JSON.parse(legacyRaw);
+                if (oldData && oldData.players) {
+                    // Backup legacy data if not already backed up
+                    if (!localStorage.getItem(backupKey)) {
+                        localStorage.setItem(backupKey, legacyRaw);
+                    }
+                    // Convert using pure function
+                    const v2 = migrateV1ToV2(oldData);
+                    localStorage.setItem(this.storageKey, JSON.stringify(v2));
                     console.log('Successfully migrated old data to new weekly format.');
                 }
             } catch (error) {
@@ -614,12 +610,19 @@ class StorageService {
         root.weeks[weekToSave].captain = captain;
         root.weeks[weekToSave].viceCaptain = viceCaptain;
 
-        const teamMembers = players.filter(p => p.have).map(p => ({
-            playerId: p.id, name: p.name, position: p.position, team: p.team, price: p.price,
-        }));
+        // Minimal teamMembers per v2 schema
+        const teamMembers = players
+            .filter(p => p.have)
+            .map(p => ({ playerId: p.id, addedAt: Number(weekToSave) }));
         root.weeks[weekToSave].teamMembers = teamMembers;
+        // Total team cost number per v2 schema
+        const totalTeamCost = players
+            .filter(p => p.have)
+            .reduce((s, p) => s + (Number(p.price) || 0), 0);
+        root.weeks[weekToSave].totalTeamCost = totalTeamCost;
+        // Backward-compatibility: also maintain teamStats expected by some tests/UI
         root.weeks[weekToSave].teamStats = {
-            totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
+            totalValue: totalTeamCost,
             playerCount: teamMembers.length,
             updatedDate: new Date().toISOString()
         };
@@ -651,14 +654,79 @@ class StorageService {
             return null;
         }
     }
+
+    // ---- Migration detection helpers (p1-03) ----
+    getVersion() {
+        // Prefer explicit version in v2 root under this.storageKey
+        const v2Raw = localStorage.getItem(this.storageKey);
+        if (v2Raw) {
+            try {
+                const data = JSON.parse(v2Raw);
+                if (data && typeof data.version === 'string') return data.version;
+            } catch (_) { /* ignore */ }
+        }
+        // Fallback: legacy v1 key presence implies version 1.0
+        const v1Raw = localStorage.getItem('fpl-team');
+        if (v1Raw) return '1.0';
+        return null;
+    }
+
+    needsMigration() {
+        // If we already have a valid v2 store, no migration needed
+        const v2Raw = localStorage.getItem(this.storageKey);
+        if (v2Raw) {
+            try {
+                const data = JSON.parse(v2Raw);
+                if (data && data.version === '2.0') return false;
+            } catch (_) { /* malformed v2 means we may still need migration if v1 exists */ }
+        }
+        // Migration needed if legacy v1 exists and no valid v2 is present
+        return !!localStorage.getItem('fpl-team');
+    }
+}
+
+// ---- Pure migration function (p1-05) ----
+function migrateV1ToV2(rawV1) {
+    const v1 = rawV1 ? JSON.parse(JSON.stringify(rawV1)) : {};
+    // Idempotency: if already v2, return as-is (deep clone already done above)
+    if (v1 && v1.version === '2.0' && v1.weeks && typeof v1.weeks === 'object') {
+        return v1;
+    }
+    const players = Array.isArray(v1.players) ? v1.players.map(p => ({ ...p })) : [];
+    const captain = v1.captain || null;
+    const viceCaptain = v1.viceCaptain || null;
+
+    const teamMembers = players
+        .filter(p => !!p.have)
+        .map(p => ({ playerId: p.id, addedAt: 1 }));
+
+    const totalTeamCost = players
+        .filter(p => !!p.have)
+        .reduce((sum, p) => sum + (Number(p.price) || 0), 0);
+
+    const week1 = {
+        players,
+        captain,
+        viceCaptain,
+        teamMembers,
+        totalTeamCost
+    };
+
+    return {
+        version: '2.0',
+        currentWeek: 1,
+        weeks: { '1': week1 }
+    };
 }
 
 // Expose StorageService globally for tests that eval the script
 if (typeof window !== 'undefined') {
     window.StorageService = StorageService;
+    window.migrateV1ToV2 = migrateV1ToV2;
 }
 if (typeof global !== 'undefined') {
     global.StorageService = StorageService;
+    global.migrateV1ToV2 = migrateV1ToV2;
 }
 
 // Fantasy Premier League Team Manager
