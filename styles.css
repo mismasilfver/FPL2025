@@ -37,6 +37,23 @@ body {
     color: #333;
 }
 
+/* App alert (centralized non-blocking alerts) */
+.app-alert {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 90%;
+    z-index: 2000;
+    background: #fffbea;
+    color: #7c2d12;
+    border: 1px solid #f6e05e;
+    border-radius: 8px;
+    padding: 10px 14px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    font-weight: 600;
+}
+
 .container {
     max-width: 1200px;
     margin: 0 auto;
