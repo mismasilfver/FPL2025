@@ -61,6 +61,8 @@ describe('UIManager.renderPlayers uses <template> cloning and fills cells', () =
 
   test('renders rows from template with correct content', () => {
     const manager = new FPLTeamManager();
+    // Initialize UIManager elements to cache templates
+    manager.ui.initElements(document);
 
     const players = [
       { id: '1', name: 'Saka', position: 'midfield', team: 'ARS', price: 9.0, have: true, status: 'green', notes: 'Great fixtures' },

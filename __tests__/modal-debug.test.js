@@ -39,6 +39,8 @@ describe('Modal Creation Debug', () => {
         saveToStorage: jest.fn(),
         getWeekCount: jest.fn().mockReturnValue(1),
         getWeekSnapshot: jest.fn().mockReturnValue(null),
+        getItem: jest.fn().mockResolvedValue(null),
+        setItem: jest.fn().mockResolvedValue(),
     };
 
     // Initialize manager with UI and mock storage

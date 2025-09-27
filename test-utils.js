@@ -2,126 +2,103 @@ const { TextEncoder, TextDecoder } = require('util');
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
 
-const { JSDOM, ResourceLoader } = require('jsdom');
+const { JSDOM } = require('jsdom');
 const fs = require('fs');
 const path = require('path');
 
-// Custom resource loader to fetch local files
-class CustomResourceLoader extends ResourceLoader {
-  fetch(url, options) {
-    const localPath = url.replace('http://localhost/', '');
-    const filePath = path.resolve(__dirname, localPath);
-
-    if (fs.existsSync(filePath)) {
-      return Promise.resolve(fs.readFileSync(filePath));
-    }
-
-    return super.fetch(url, options);
-  }
-}
-
-// Load HTML file
+// Load the index.html file to be used as the base for our JSDOM environment
 const html = fs.readFileSync(path.resolve(__dirname, './index.html'), 'utf8');
 
-// Create a helper function to set up the DOM
+/**
+ * Creates a JSDOM environment from the project's index.html.
+ * This ensures that the DOM structure in tests is identical to the real application.
+ * @returns {Promise<{window: JSDOM.window, document: Document, fplManager: FPLTeamManager}>}
+ */
 const createDOM = () => {
   return new Promise((resolve) => {
-    const dom = new JSDOM(html, { 
-      runScripts: 'dangerously',
-      url: 'http://localhost',
-      resources: new CustomResourceLoader(),
+    const dom = new JSDOM(html, {
+      runScripts: 'outside-only',
+      url: 'http://localhost/',
       pretendToBeVisual: true,
     });
 
-    dom.window.addEventListener('load', () => {
-      // Mock localStorage
-      const localStorageMock = (() => {
-        let store = {};
-        return {
-          getItem: (key) => store[key] || null,
-          setItem: (key, value) => {
-            store[key] = value.toString();
-          },
-          removeItem: (key) => {
-            delete store[key];
-          },
-          clear: () => {
-            store = {};
-          },
-          length: 0,
-          key: () => null
-        };
-      })();
+    dom.window.addEventListener('DOMContentLoaded', async () => {
+      const { window } = dom;
+      const { document } = window;
+      
+      // Polyfill for navigator to prevent @testing-library/user-event errors
+      if (!window.navigator) {
+        window.navigator = { userAgent: 'node.js' };
+      }
 
-      // Stub browser dialogs on this jsdom window to prevent noisy "Not implemented: window.alert" logs
-      // Tests may trigger read-only guards and delete confirmations.
-      // We stub per-window because each createDOM() creates a fresh jsdom instance.
-      dom.window.alert = jest.fn();
-      dom.window.confirm = jest.fn(() => true);
+      // Initialize FPLTeamManager for backward compatibility
+      const { FPLTeamManager, UIManager } = require('./script');
+      const uiManager = new UIManager();
+      
+      // Create shared storage for both async and sync access
+      let store = {};
+      
+      // Create localStorage mock that shares the same store
+      const mockLocalStorage = {
+        getItem: (key) => store[key] || null,
+        setItem: (key, value) => { 
+          store[key] = value; 
+        },
+        removeItem: (key) => { 
+          delete store[key]; 
+        },
+        clear: () => { 
+          store = {}; 
+        }
+      };
 
-      // Assign window, document, and storage mocks to globals so app code under test uses them
-      global.window = dom.window;
-      global.document = dom.window.document;
-      global.localStorage = localStorageMock;
-      global.Node = dom.window.Node;
-      // Keep global alert/confirm pointing at the stubbed window versions
-      global.alert = dom.window.alert;
-      global.confirm = dom.window.confirm;
+      // Mock localStorage on window for tests that access it directly
+      window.localStorage = mockLocalStorage;
 
-      resolve({
-        window: dom.window,
-        document: dom.window.document,
-        fplManager: dom.window.fplManager
-      });
+      // Create storage adapter that uses the same store
+      const storageAdapter = {
+        getItem: jest.fn((key) => Promise.resolve(store[key])),
+        setItem: jest.fn((key, value) => {
+          store[key] = value;
+          return Promise.resolve();
+        }),
+        clear: () => { 
+          store = {}; 
+        },
+        localStorage: mockLocalStorage
+      };
+
+      const fplManager = new FPLTeamManager({ ui: uiManager, storage: storageAdapter });
+      await fplManager.init(document);
+
+      // Attach to window for backward compatibility
+      window.fplManager = fplManager;
+
+      resolve({ window, document, fplManager });
     });
   });
 };
 
-// Helper function to simulate user interactions
-const userEvent = {
-  click: (element, window) => {
-    if (!element) {
-      throw new Error('Element is null or undefined');
-    }
-    const event = new window.MouseEvent('click', { 
-      bubbles: true, 
-      cancelable: true,
-      view: window 
-    });
-    element.dispatchEvent(event);
-  },
-  type: (element, value, window) => {
-    if (!element) {
-      throw new Error('Element is null or undefined');
-    }
+// Re-export userEvent from testing-library
+const originalUserEvent = require('@testing-library/user-event').default;
+
+// Helper function to replace deprecated userEvent.select
+const selectOption = async (element, value, window) => {
     element.value = value;
-    const event = new window.Event('input', { 
-      bubbles: true,
-      cancelable: true 
-    });
-    element.dispatchEvent(event);
-  },
-  select: (element, value, window) => {
-    if (!element) {
-      throw new Error('Element is null or undefined');
-    }
-    element.value = value;
-    const event = new window.Event('change', { 
-      bubbles: true,
-      cancelable: true 
-    });
-    element.dispatchEvent(event);
-  },
-  submit: (form, window) => {
-    if (!form) {
-      throw new Error('Form is null or undefined');
-    }
-    const event = new window.Event('submit', { 
-      cancelable: true, 
-      bubbles: true 
-    });
-    form.dispatchEvent(event);
-  }
+    element.dispatchEvent(new window.Event('change', { bubbles: true }));
+    element.dispatchEvent(new window.Event('input', { bubbles: true }));
 };
 
-module.exports = { createDOM, userEvent };
+// Enhanced userEvent with backward compatibility
+const enhancedUserEvent = {
+    ...originalUserEvent,
+    select: selectOption,
+    submit: async (form, window) => {
+        form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    }
+};
+
+module.exports = {
+  createDOM,
+  userEvent: enhancedUserEvent,
+};
