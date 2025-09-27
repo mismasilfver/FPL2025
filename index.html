@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Fantasy Premier League 2025/2026</title>
     <link rel="stylesheet" href="styles.css">
+    <script>
+        // Feature flag for IndexedDB storage
+        window.USE_INDEXED_DB = false; // Set to true to use IndexedDB
+    </script>
+    <script type="module" src="js/app.js"></script>
 </head>
 <body>
     <!-- Persistent alert container (UIManager will reuse this) -->
@@ -17,13 +22,14 @@
                 <span id="total-value">Total Value: £0.0m</span>
             </div>
             <div class="week-controls" data-testid="week-controls">
-                <button id="prev-week-btn" class="btn btn-secondary" data-testid="prev-week-btn">◀ Prev</button>
+                <button id="prev-week-btn" class="btn btn-secondary" data-testid="prev-week-btn" aria-label="Previous week">◀ Prev</button>
                 <div class="week-indicator" data-testid="week-indicator">
-                    <span id="week-label">Week 1</span>
-                    <span id="week-readonly-badge" class="readonly-badge" style="display:none;">Read-only</span>
+                    <span id="week-label" data-testid="week-label">Week 1</span>
+                    <span id="week-readonly-badge" class="readonly-badge" data-testid="week-readonly-badge" style="display:none;" aria-hidden="true">Read-only</span>
                 </div>
-                <button id="next-week-btn" class="btn btn-secondary" data-testid="next-week-btn">Next ▶</button>
+                <button id="next-week-btn" class="btn btn-secondary" data-testid="next-week-btn" aria-label="Next week">Next ▶</button>
                 <button id="create-week-btn" class="btn btn-primary" data-testid="create-week-btn" style="margin-left:auto;">+ Create New Week</button>
+                <button id="export-week-btn" class="btn btn-secondary" data-testid="export-week-btn" style="display:none;">Export Week Data</button>
             </div>
         </header>
 
@@ -31,7 +37,11 @@
             <button id="add-player-btn" 
                     class="btn btn-primary"
                     data-testid="add-player-button">+ Add Player</button>
-            <button id="export-week-btn" class="btn btn-secondary" data-testid="export-week-btn">Export Week Data</button>
+            <!-- Export Week button moved to week controls -->
+            <div class="import-controls">
+                <input type="file" id="import-json" accept=".json" data-testid="import-json-input">
+                <button id="import-button" class="btn btn-secondary" data-testid="import-button">Import JSON</button>
+            </div>
             <div class="position-filter" data-testid="position-filter-container">
                 <label for="position-filter">Filter by Position:</label>
                 <select id="position-filter" data-testid="position-filter-select">
@@ -51,11 +61,11 @@
             </div>
         </div>
 
-        <div class="captaincy-section">
+        <div class="captaincy-section" data-testid="captaincy-section">
             <h3>Captaincy</h3>
             <div class="captaincy-info">
-                <span id="captain-info">Captain: None selected</span>
-                <span id="vice-captain-info">Vice Captain: None selected</span>
+                <span id="captain-info" data-testid="captain-info">Captain: None selected</span>
+                <span id="vice-captain-info" data-testid="vice-captain-info">Vice Captain: None selected</span>
             </div>
         </div>
 
@@ -63,16 +73,16 @@
             <table id="players-table">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Position</th>
-                        <th>Team</th>
-                        <th>Price (£m)</th>
-                        <th>Status</th>
-                        <th>Have</th>
-                        <th>Captain</th>
-                        <th>Vice</th>
-                        <th>Notes</th>
-                        <th>Actions</th>
+                        <th data-testid="column-name">Name</th>
+                        <th data-testid="column-position">Position</th>
+                        <th data-testid="column-team">Team</th>
+                        <th data-testid="column-price">Price (£m)</th>
+                        <th data-testid="column-status">Status</th>
+                        <th data-testid="column-have">Have</th>
+                        <th data-testid="column-captain">Captain</th>
+                        <th data-testid="column-vice">Vice</th>
+                        <th data-testid="column-notes">Notes</th>
+                        <th data-testid="column-actions">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="players-tbody">
@@ -161,76 +171,6 @@
         </div>
     </template>
 
-    <!-- Add/Edit Player Modal -->
-    <div id="player-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modal-title">Add Player</h2>
-                <span class="close">&times;</span>
-            </div>
-            <form id="player-form">
-                <div class="form-group" id="form-group-name">
-                    <label for="player-name">Player Name *</label>
-                    <input type="text" id="player-name" name="player-name" required data-testid="player-name-input">
-                </div>
-                
-                <div class="form-group" id="form-group-position">
-                    <label for="player-position">Position *</label>
-                    <select id="player-position" name="player-position" required data-testid="player-position-select">
-                        <option value="">Select Position</option>
-                        <option value="goalkeeper">Goalkeeper</option>
-                        <option value="defence">Defence</option>
-                        <option value="midfield">Midfield</option>
-                        <option value="forward">Forward</option>
-                    </select>
-                </div>
-                
-                <div class="form-group" id="form-group-team">
-                    <label for="player-team">Team *</label>
-                    <input type="text" id="player-team" name="player-team" required 
-                           placeholder="e.g., Arsenal, Liverpool" data-testid="player-team-input">
-                </div>
-                
-                <div class="form-group" id="form-group-price">
-                    <label for="player-price">Price (£m) *</label>
-                    <input type="number" id="player-price" name="player-price" 
-                           step="0.1" min="0" required data-testid="player-price-input">
-                </div>
-                
-                <div class="form-group" id="form-group-status">
-                    <label for="player-status">Status</label>
-                    <select id="player-status" name="player-status" data-testid="player-status-select">
-                        <option value="">No Status</option>
-                        <option value="yellow">Maybe Good (Yellow)</option>
-                        <option value="green">Very Good (Green)</option>
-                        <option value="red">Sell/Don't Buy (Red)</option>
-                    </select>
-                </div>
-                
-                <div class="form-group" id="form-group-have">
-                    <label for="player-have">
-                        <input type="checkbox" id="player-have" name="player-have" 
-                               data-testid="player-have-checkbox"> In My Team
-                    </label>
-                    <small class="form-help">Maximum 15 players can be in your team</small>
-                </div>
-                
-                <div class="form-group" id="form-group-notes">
-                    <label for="player-notes">Notes</label>
-                    <textarea id="player-notes" name="player-notes" rows="3" 
-                              placeholder="Optional notes about this player..." 
-                              data-testid="player-notes-textarea"></textarea>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="button" id="cancel-btn" class="btn btn-secondary" 
-                            data-testid="cancel-button">Cancel</button>
-                    <button type="submit" class="btn btn-primary" 
-                            data-testid="save-player-button">Save Player</button>
-                </div>
-            </form>
-        </div>
-    </div>
 
     <script src="script.js"></script>
 </body>

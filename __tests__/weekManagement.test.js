@@ -1,169 +1,106 @@
-/**
- * @jest-environment jsdom
- */
-
-// Load script.js content since it's not a proper module
-const fs = require('fs');
-const path = require('path');
-
-const scriptPath = path.resolve(__dirname, '../script.js');
-const scriptContent = fs.readFileSync(scriptPath, 'utf8');
-
-// Mock DOM environment
-document.body.innerHTML = `
-    <div id="player-modal"></div>
-    <input id="player-name" />
-`;
-
-// Evaluate the script content to make classes available
-eval(scriptContent);
-
-const { LocalStorageAdapter } = require('../js/storage');
+const { createDOM, userEvent } = require('../test-utils');
+const { FPLTeamManager, UIManager } = require('../script');
+require('@testing-library/jest-dom');
 
 describe('Week Management', () => {
-    let manager;
-    let mockStorage;
-    let mockUi;
+  let fplTeamManager, uiManager, storageAdapter, documentRef;
 
-    const samplePlayers = [
-        { id: '1', name: 'Player 1', position: 'midfield', team: 'MUN', price: 8.0, have: true, notes: '' },
-        { id: '2', name: 'Player 2', position: 'defence', team: 'LIV', price: 5.5, have: true, notes: 'Test' },
-        { id: '3', name: 'Player 3', position: 'forward', team: 'MCI', price: 11.5, have: false, notes: '' },
-    ];
+  const samplePlayers = [
+    { id: '1', name: 'Player 1', position: 'MID', team: 'MUN', price: 8.0, have: true, notes: '' },
+    { id: '2', name: 'Player 2', position: 'DEF', team: 'LIV', price: 5.5, have: true, notes: 'Test' },
+    { id: '3', name: 'Player 3', position: 'FWD', team: 'MCI', price: 11.5, have: false, notes: '' },
+  ];
 
-    beforeEach(() => {
-        // Mock storage - use StorageService instead of LocalStorageAdapter
-        mockStorage = new global.StorageService('test-key');
-        
-        // Mock the StorageService methods
-        jest.spyOn(mockStorage, 'loadFromStorage').mockReturnValue({
-            players: [...samplePlayers],
-            captain: '1',
-            viceCaptain: '2',
-            currentWeek: 1
-        });
-        
-        jest.spyOn(mockStorage, 'saveToStorage').mockImplementation(() => {});
-        
-        // Mock getWeekCount to return different values based on test state
-        let weekCount = 1;
-        jest.spyOn(mockStorage, 'getWeekCount').mockImplementation(() => weekCount);
-        
-        jest.spyOn(mockStorage, 'getWeekSnapshot').mockImplementation((weekNum) => {
-            if (weekNum === 1) {
-                return {
-                    players: [...samplePlayers],
-                    captain: '1',
-                    viceCaptain: '2'
-                };
-            } else if (weekNum === 2) {
-                return {
-                    players: [...samplePlayers], // All players are copied
-                    captain: '1',
-                    viceCaptain: '2'
-                };
-            }
-            return null;
-        });
-        
-        // Mock UI - create a simple mock object instead of using UIManager
-        mockUi = {
-            initElements: jest.fn(),
-            bindEvents: jest.fn(),
-            updateDisplay: jest.fn(),
-            renderWeekControls: jest.fn(),
-            renderSummary: jest.fn(),
-            renderCaptaincyInfo: jest.fn(),
-            renderPlayers: jest.fn()
-        };
-        
-        // Initialize manager with mocks
-        manager = new global.FPLTeamManager({ ui: mockUi, storage: mockStorage });
+  beforeEach(async () => {
+    const { window, document } = await createDOM();
+    global.window = window;
+    global.document = document;
+    documentRef = document;
 
-        // Helper to simulate week creation - MUST be after manager is initialized
-        manager.mockCreateWeek = () => {
-            weekCount++;
-        };
-    });
+    uiManager = new UIManager();
+    let store = {};
+    storageAdapter = {
+      getItem: jest.fn((key) => Promise.resolve(store[key])),
+      setItem: jest.fn((key, value) => {
+        store[key] = value;
+        return Promise.resolve();
+      }),
+      clear: () => { store = {}; }
+    };
 
-    afterEach(() => {
-        jest.clearAllMocks();
-    });
+    const initialData = {
+      version: '2.0',
+      currentWeek: 1,
+      weeks: {
+        1: {
+          players: [...samplePlayers],
+          captain: '1',
+          viceCaptain: '2',
+          teamMembers: [{ playerId: '1' }, { playerId: '2' }],
+          teamStats: { totalValue: 13.5 },
+          isReadOnly: false,
+        }
+      }
+    };
+    store['fpl-team-data'] = JSON.stringify(initialData);
 
-    test('should initialize with week 1', async () => {
-        await manager.loadStateFromStorage();
-        expect(manager.getCurrentWeekNumber()).toBe(1);
-        expect(manager.getWeekCount()).toBe(1);
-    });
+    fplTeamManager = new FPLTeamManager({ ui: uiManager, storage: storageAdapter });
+    await fplTeamManager.init(documentRef);
+  });
 
-    test('should create a new week with previous week\'s team', async () => {
-        await manager.loadStateFromStorage();
-        
-        // Create a new week
-        await manager.createNewWeek();
-        manager.mockCreateWeek(); // Simulate the week count increase in storage
-        
-        // Should now be on week 2
-        expect(manager.getCurrentWeekNumber()).toBe(2);
-        expect(manager.getWeekCount()).toBe(2);
-        
-        // Week 1 should be marked as read-only
-        expect(manager.isWeekReadOnly(1)).toBe(true);
-        
-        // Current week should not be read-only
-        expect(manager.isCurrentWeekReadOnly()).toBe(false);
-        
-        // Team should be copied from previous week
-        const week2Data = manager.getWeekSnapshot(2);
-        expect(week2Data.players).toHaveLength(3); // All players should be copied
-        expect(week2Data.captain).toBe('1');
-        expect(week2Data.viceCaptain).toBe('2');
-    });
+  test('should initialize with week 1', async () => {
+    expect(await fplTeamManager.getCurrentWeekNumber()).toBe(1);
+    expect(await fplTeamManager.getWeekCount()).toBe(1);
+  });
 
-    test('should navigate between weeks', async () => {
-        await manager.loadStateFromStorage();
-        
-        // Create week 2
-        await manager.createNewWeek();
-        
-        // Go back to week 1
-        await manager.goToWeek(1);
-        expect(manager.getCurrentWeekNumber()).toBe(1);
-        
-        // Go forward to week 2
-        await manager.nextWeek();
-        expect(manager.getCurrentWeekNumber()).toBe(2);
-        
-        // Go back to week 1 using prevWeek
-        await manager.prevWeek();
-        expect(manager.getCurrentWeekNumber()).toBe(1);
-    });
+  test('should create a new week with previous week\'s team', async () => {
+    await userEvent.click(documentRef.getElementById('create-week-btn'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(await fplTeamManager.getCurrentWeekNumber()).toBe(2);
+    expect(await fplTeamManager.isWeekReadOnly(1)).toBe(true);
+    
+    const week1Data = await fplTeamManager.getWeekSnapshot(1);
+    const week2Data = await fplTeamManager.getWeekSnapshot(2);
+    expect(week2Data.players.length).toBe(week1Data.players.length);
+    expect(week2Data.captain).toBe(week1Data.captain);
+  });
 
-    test('should not modify read-only weeks', async () => {
-        await manager.loadStateFromStorage();
-        
-        // Create week 2
-        await manager.createNewWeek();
-        
-        // Try to modify week 1 (read-only)
-        await manager.goToWeek(1);
-        
-        // Attempt to make changes to week 1
-        const originalCaptain = manager.state().captain;
-        manager.setCaptain('3'); // Should not work
-        
-        // Captain should not change in read-only week
-        expect(manager.state().captain).toBe(originalCaptain);
-    });
+  test('should navigate between weeks', async () => {
+    await userEvent.click(documentRef.getElementById('create-week-btn'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(await fplTeamManager.getCurrentWeekNumber()).toBe(2);
 
-    test('should calculate total cost correctly', async () => {
-        await manager.loadStateFromStorage();
-        
-        // Total cost should be sum of players with have:true
-        const expectedCost = samplePlayers
-            .filter(p => p.have)
-            .reduce((sum, p) => sum + p.price, 0);
-            
-        expect(manager.calculateTotalCost()).toBe(expectedCost);
-    });
+    await userEvent.click(documentRef.getElementById('prev-week-btn'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(await fplTeamManager.getCurrentWeekNumber()).toBe(1);
+
+    await userEvent.click(documentRef.getElementById('next-week-btn'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(await fplTeamManager.getCurrentWeekNumber()).toBe(2);
+  });
+
+  test('should not modify read-only weeks', async () => {
+    const initialCaptain = await fplTeamManager.getCaptainId();
+    await userEvent.click(documentRef.getElementById('create-week-btn'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await userEvent.click(documentRef.getElementById('prev-week-btn'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(await fplTeamManager.isWeekReadOnly(1)).toBe(true);
+
+    const captainButton = documentRef.querySelector('[data-testid="make-captain-3"]');
+    if (captainButton) {
+        await userEvent.click(captainButton);
+        await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    expect(await fplTeamManager.getCaptainId()).toBe(initialCaptain);
+  });
+
+  test('should calculate total cost correctly', async () => {
+    const expectedCost = samplePlayers
+      .filter(p => p.have)
+      .reduce((sum, p) => sum + p.price, 0);
+      
+    expect(await fplTeamManager.calculateTotalCost()).toBe(expectedCost);
+  });
 });

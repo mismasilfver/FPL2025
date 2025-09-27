@@ -54,12 +54,17 @@ describe('Dynamic modal build triggers event bindings (rebinding) so controls wo
     `;
   });
 
-  test('close button hides modal after dynamic build (listeners bound)', () => {
+  test('close button hides modal after dynamic build (listeners bound)', async () => {
     const manager = new FPLTeamManager();
+    // Set up spy before initialization so it captures the bound method
     const closeSpy = jest.spyOn(manager, 'closeModal');
+    await manager.init(document); // Initialize UIManager properly
 
     manager.openModal();
-    const modal = document.getElementById('player-modal');
+    // Wait a tick for modal creation to complete
+    await new Promise(resolve => setTimeout(resolve, 0));
+    // Use the manager's modal reference instead of searching document
+    const modal = manager.ui.modal;
     expect(modal).not.toBeNull();
     expect(modal.style.display).toBe('block');
 
@@ -70,20 +75,26 @@ describe('Dynamic modal build triggers event bindings (rebinding) so controls wo
     expect(modal.style.display).toBe('none');
   });
 
-  test('form submit calls handler after dynamic build', () => {
+  test('form submit calls handler after dynamic build', async () => {
     const manager = new FPLTeamManager();
+    // Set up spy before initialization so it captures the bound method
     const submitSpy = jest.spyOn(manager, 'handleFormSubmit');
+    await manager.init(document); // Initialize UIManager properly
 
     manager.openModal();
-    const form = document.getElementById('player-form');
+    // Wait a tick for modal creation to complete
+    await new Promise(resolve => setTimeout(resolve, 0));
+    // Use the manager's modal reference instead of searching document
+    const modal = manager.ui.modal;
+    const form = modal.querySelector('#player-form');
     // Populate required fields so handler can read values
-    document.querySelector('[data-testid="player-name-input"]').value = 'Test Player';
-    document.querySelector('[data-testid="player-position-select"]').value = 'midfield';
-    document.querySelector('[data-testid="player-team-input"]').value = 'TST';
-    document.querySelector('[data-testid="player-price-input"]').value = '6.5';
-    document.querySelector('[data-testid="player-status-select"]').value = 'green';
-    document.querySelector('[data-testid="player-have-checkbox"]').checked = true;
-    document.querySelector('[data-testid="player-notes-textarea"]').value = 'note';
+    modal.querySelector('[data-testid="player-name-input"]').value = 'Test Player';
+    modal.querySelector('[data-testid="player-position-select"]').value = 'midfield';
+    modal.querySelector('[data-testid="player-team-input"]').value = 'TST';
+    modal.querySelector('[data-testid="player-price-input"]').value = '6.5';
+    modal.querySelector('[data-testid="player-status-select"]').value = 'green';
+    modal.querySelector('[data-testid="player-have-checkbox"]').checked = true;
+    modal.querySelector('[data-testid="player-notes-textarea"]').value = 'note';
 
     const event = new Event('submit', { bubbles: true, cancelable: true });
     form.dispatchEvent(event);

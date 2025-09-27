@@ -61,6 +61,7 @@ describe('UI uses <template> for player rows', () => {
 
   test('UIManager caches player row template element on init', () => {
     const manager = new FPLTeamManager();
+    manager.ui.initElements(document);
     expect(manager.ui.playerRowTemplate).toBeInstanceOf(HTMLTemplateElement);
     expect(manager.ui.playerRowTemplate.id).toBe('player-row-template');
   });
