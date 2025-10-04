@@ -6,6 +6,8 @@ import {
   assertConformsToDatabaseContract,
   REQUIRED_DATABASE_METHODS,
 } from '../js/adapters/database-adapter.contract.js';
+import { LocalStorageKeyValueAdapter } from '../js/adapters/local-storage-adapter.js';
+import { IndexedDBKeyValueAdapter } from '../js/adapters/indexeddb-adapter.js';
 
 // Contract-driven tests for any storage backend that wants to behave like a
 // simple key/value database. Adapters register themselves with the
@@ -31,6 +33,37 @@ const adaptersUnderTest = [];
 export function registerAdapterForContractTests(options) {
   adaptersUnderTest.push(options);
 }
+
+function deleteIndexedDBDatabase(dbName) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(dbName);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => resolve();
+  });
+}
+
+registerAdapterForContractTests({
+  name: 'LocalStorageKeyValueAdapter',
+  createAdapter: () => new LocalStorageKeyValueAdapter(window.localStorage, 'contract:'),
+  beforeEach: () => window.localStorage.clear(),
+});
+
+let indexedDbName = null;
+
+registerAdapterForContractTests({
+  name: 'IndexedDBKeyValueAdapter',
+  async createAdapter() {
+    indexedDbName = `contract-tests-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    return new IndexedDBKeyValueAdapter({ dbName: indexedDbName });
+  },
+  afterEach: async () => {
+    if (!indexedDbName) return;
+    await deleteIndexedDBDatabase(indexedDbName);
+    indexedDbName = null;
+  },
+});
 
 /**
  * Titles for the shared contract tests. Each title maps to an implementation
@@ -72,6 +105,10 @@ describe('DatabaseAdapter contract', () => {
     afterEach(async () => {
       if (adapter && typeof adapter.clear === 'function') {
         await adapter.clear();
+      }
+
+      if (adapter && typeof adapter.close === 'function') {
+        await adapter.close();
       }
 
       if (typeof afterHook === 'function') {

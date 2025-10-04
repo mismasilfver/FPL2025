@@ -4,28 +4,15 @@ This document describes the IndexedDB storage implementation for the Fantasy Pre
 
 ## Overview
 
-The application now supports two storage backends:
-1. **localStorage** (original implementation)
-2. **IndexedDB** (new implementation)
+The application now supports two storage backends through a shared adapter contract:
+1. **localStorage** (original implementation via `LocalStorageKeyValueAdapter`)
+2. **IndexedDB** (new implementation via `IndexedDBKeyValueAdapter`)
 
 A feature flag (`window.USE_INDEXED_DB`) controls which storage backend is used.
 
 ## Feature Flag
 
 The feature flag is defined in `index.html`:
-
-```javascript
-// Feature flag for IndexedDB storage
-window.USE_INDEXED_DB = false; // Set to true to use IndexedDB
-```
-
-Set this to `true` to use IndexedDB or `false` to use localStorage.
-
-## Storage Architecture
-
-### Storage Factory
-
-The `createStorageService` factory function in `js/storage-module.js` creates the appropriate storage service based on the feature flag:
 
 ```javascript
 import { StorageService } from './storage.js';
@@ -64,6 +51,13 @@ The IndexedDB implementation (`StorageServiceDB`) in `js/storage-db.js` uses the
 
 All methods return Promises to handle the asynchronous nature of IndexedDB.
 
+### Adapter Layer
+
+- **Contract**: `js/adapters/database-adapter.contract.js` defines the minimal async API (`get`, `set`, `remove`, `getAll`, `clear`).
+- **IndexedDB adapter**: `js/adapters/indexeddb-adapter.js` implements the contract by storing `{ key, value }` pairs in a dedicated object store. A lightweight `structuredClone` polyfill is included for test environments.
+- **Local fallback**: `js/adapters/local-storage-adapter.js` implements the same contract on top of `window.localStorage`. Both adapters can be swapped without changing higher-level code.
+- **Registration**: `__tests__/database.test.js` registers each adapter so they run through the contract tests automatically.
+
 ## Async Support
 
 To support the asynchronous nature of IndexedDB, the following changes were made:
@@ -91,6 +85,12 @@ The Jest setup in `jest.setup.js` includes:
 // Setup fake-indexeddb for testing
 require('fake-indexeddb/auto');
 ```
+
+### Adapter Contract Tests
+
+- Run `npm test -- __tests__/database.test.js` to execute the shared adapter contract tests for both LocalStorage and IndexedDB implementations.
+- The suite ensures identical behaviour for core CRUD operations, bulk retrieval, clearing, and serialising complex data types.
+- Tests automatically clean up any databases they create via `indexedDB.deleteDatabase(...)` in the adapter registration hook.
 
 ## Usage
 

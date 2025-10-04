@@ -1,15 +1,21 @@
 /* Reset and base styles */
 
-/* Storage indicator */
+/* Storage controls */
+.storage-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+}
+
 .storage-indicator {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background-color: #f0f0f0;
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-size: 12px;
-    color: #666;
+    background-color: #f7fafc;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #2d3748;
+    border: 1px solid #e2e8f0;
+    font-weight: 600;
 }
 
 /* Import controls */
