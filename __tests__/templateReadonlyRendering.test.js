@@ -38,11 +38,33 @@ describe('Template-rendered rows respect read-only state by disabling controls',
           <td class=\"col-actions\"></td>
         </tr>
       </template>
+
+      <template id=\"player-modal-template\">
+        <div id=\"player-modal\" class=\"modal\">
+          <div class=\"modal-content\">
+            <div class=\"modal-header\">
+              <h2 id=\"modal-title\">Add Player</h2>
+              <span class=\"close\">&times;</span>
+            </div>
+            <form id=\"player-form\">
+              <input id=\"player-name\" data-testid=\"player-name-input\" />
+              <select id=\"player-position\" data-testid=\"player-position-select\"></select>
+              <input id=\"player-team\" data-testid=\"player-team-input\" />
+              <input id=\"player-price\" data-testid=\"player-price-input\" />
+              <select id=\"player-status\" data-testid=\"player-status-select\"></select>
+              <input type=\"checkbox\" id=\"player-have\" data-testid=\"player-have-checkbox\" />
+              <textarea id=\"player-notes\" data-testid=\"player-notes-textarea\"></textarea>
+              <button type=\"button\" id=\"cancel-btn\" data-testid=\"cancel-button\"></button>
+            </form>
+          </div>
+        </div>
+      </template>
     `;
   });
 
   test('disables add-to-team, make-captain/vice, edit/delete buttons when read-only', () => {
     const manager = new FPLTeamManager();
+    manager.ui.initElements(document);
 
     const players = [
       { id: '1', name: 'Player A', position: 'midfield', team: 'AAA', price: 5.0, have: false, status: '', notes: '' },

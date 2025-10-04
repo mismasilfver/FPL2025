@@ -1,0 +1,8 @@
+{
+  "players": [
+    { "id": "p1", "name": "Old Keeper", "position": "goalkeeper", "team": "TST", "price": 4.5, "have": true, "notes": "", "status": "green" },
+    { "id": "p2", "name": "Old Defender", "position": "defence", "team": "TST", "price": 5.0, "have": false, "notes": "bench", "status": "yellow" }
+  ],
+  "captain": "p1",
+  "viceCaptain": null
+}
