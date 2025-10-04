@@ -12,7 +12,7 @@ A simple, responsive web application to manage your Fantasy Premier League team.
   - 🟢 Green: Very Good
   - 🔴 Red: Sell/Don't Buy
 - **Responsive Design**: Works seamlessly on desktop and mobile
-- **Local Storage**: Your data persists between sessions
+- **Storage Adapters**: Data persists between sessions using a pluggable storage layer (localStorage by default, IndexedDB optional)
 - **Position Filtering**: Filter players by position
 - **Team Summary**: Track total players (0/15) and total team value
 
@@ -36,7 +36,7 @@ Manage your team week-by-week with built-in navigation and read-only safeguards.
 - **Create New Week**: Clones players from the current week (including captain/vice) and snapshots the team into the new week. Previous weeks are marked read-only.
   - Note: Captain and Vice-Captain selections are copied to the new week. Changing them in a later week does not alter previous weeks (historical integrity).
 
-Data is stored in `localStorage` under `fpl-team-data` using a weekly schema:
+The default adapter writes to `localStorage` under `fpl-team-data` using a weekly schema:
 
 ```json
 {
@@ -57,6 +57,22 @@ Data is stored in `localStorage` under `fpl-team-data` using a weekly schema:
 ```
 
 Related tests: `__tests__/weekNavigation.test.js`, `__tests__/readonlyMode.test.js`.
+
+## Storage Architecture
+
+- **Adapter contract**: `js/adapters/database-adapter.contract.js` defines the required async API.
+- **Local adapter**: `js/adapters/local-storage-adapter.js` wraps `window.localStorage` and satisfies the contract.
+- **IndexedDB adapter**: `js/adapters/indexeddb-adapter.js` provides an IndexedDB-backed implementation.
+- **Feature flag**: Toggle `window.USE_INDEXED_DB` in `index.html` to switch between adapters at runtime.
+- **High-level services**: `js/storage.js`, `js/storage-db.js`, and `js/storage-module.js` orchestrate week persistence on top of the adapter layer.
+- **Contract tests**: `__tests__/database.test.js` runs the same suite against every registered adapter, ensuring consistent behaviour across backends.
+- **Further reading**: `docs/storage-adapters.md` provides a deeper dive into the adapter contract and how to extend it.
+
+### Switching storage backends
+
+- **In-app toggle**: Use the "Switch to IndexedDB" / "Switch to localStorage" button in the header to switch persistence layers. The preference is stored in `localStorage` (`fpl-storage-backend`) and the app reloads automatically.
+- **Command-line toggle**: Run `npm run use:indexeddb` or `npm run use:localstorage` to change the default backend written to `storage-config.js`. This is useful for automated environments or CI.
+- **Testing tip**: Before running integration tests that exercise IndexedDB behaviour, set `window.USE_INDEXED_DB = true` or run `npm run use:indexeddb` to ensure the app initializes with the correct backend.
 
 ## Running Locally
 
@@ -100,6 +116,7 @@ The test suite includes:
 - **Form Validation Tests**: Required field validation and error handling
 - **Captaincy Tests**: Setting and switching captain/vice-captain roles
 - **UI Interaction Tests**: Button clicks and form submissions
+- **Storage Contract Tests**: `__tests__/database.test.js` verifies that every storage adapter adheres to the shared database contract. Run with `npm test -- __tests__/database.test.js` for a focused check.
 
 All tests use Jest with JSDOM for DOM simulation and comprehensive coverage of user interactions.
 
@@ -131,7 +148,9 @@ Works on all modern browsers including:
 
 ## Data Storage
 
-All data is stored locally in your browser using localStorage. No external database required.
+- **Default**: Browser `localStorage` (via `LocalStorageKeyValueAdapter`).
+- **IndexedDB option**: Enable `window.USE_INDEXED_DB = true` to use `IndexedDBKeyValueAdapter` for larger datasets and richer querying.
+- **Extensibility**: Additional adapters can be created by implementing the contract defined in `js/adapters/database-adapter.contract.js` and registering them in `__tests__/database.test.js` to gain test coverage.
 
 ## Future roadmap ideas
 - proper database to allow at minimum local persistent storage

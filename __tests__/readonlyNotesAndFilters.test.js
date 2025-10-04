@@ -49,6 +49,7 @@ describe('Read-only: notes expansion and filters still work', () => {
 
   test('notes cell toggles expansion in read-only', () => {
     const manager = new FPLTeamManager();
+    manager.ui.initElements(document);
 
     const players = [
       { id: '10', name: 'Notes Guy', position: 'midfield', team: 'AAA', price: 5.0, have: true, status: '', notes: 'This is a very long note for testing expansion.' },
@@ -61,7 +62,8 @@ describe('Read-only: notes expansion and filters still work', () => {
     expect(cell).not.toBeNull();
     const beforeText = cell.querySelector('.notes-text').textContent;
 
-    // Click to expand (delegated listener is attached by constructor)
+    // Click to expand - need to bind events first for delegation to work
+    manager.ui.bindEvents({});
     cell.click();
 
     expect(cell.classList.contains('expanded')).toBe(true);
@@ -70,17 +72,29 @@ describe('Read-only: notes expansion and filters still work', () => {
     expect(afterText).toContain('This is a very long note');
   });
 
-  test('filters apply under read-only state', () => {
+  test('filters apply under read-only state', async () => {
     const manager = new FPLTeamManager();
+    manager.ui.initElements(document);
 
-    // Force controller to consider week read-only
-    jest.spyOn(manager, '_isReadOnlyCurrentWeek').mockReturnValue(true);
-
-    manager.players = [
-      { id: '1', name: 'Mid A have', position: 'midfield', team: 'A', price: 6.0, have: true, status: '', notes: '' },
-      { id: '2', name: 'Mid B not have', position: 'midfield', team: 'B', price: 6.5, have: false, status: '', notes: '' },
-      { id: '3', name: 'Fwd C have', position: 'forward', team: 'C', price: 8.0, have: true, status: '', notes: '' },
-    ];
+    // Set up proper data structure for the new format
+    const weekData = {
+      version: '2.0',
+      currentWeek: 1,
+      weeks: {
+        1: {
+          players: [
+            { id: '1', name: 'Mid A have', position: 'midfield', team: 'A', price: 6.0, have: true, status: '', notes: '' },
+            { id: '2', name: 'Mid B not have', position: 'midfield', team: 'B', price: 6.5, have: false, status: '', notes: '' },
+            { id: '3', name: 'Fwd C have', position: 'forward', team: 'C', price: 8.0, have: true, status: '', notes: '' },
+          ],
+          captain: null,
+          viceCaptain: null,
+          isReadOnly: true
+        }
+      }
+    };
+    
+    await manager.storage.setItem(manager.storageKey, JSON.stringify(weekData));
 
     // Set filters: position=midfield, have only
     const positionSelect = document.querySelector('[data-testid=\"position-filter-select\"]');
@@ -88,7 +102,7 @@ describe('Read-only: notes expansion and filters still work', () => {
     positionSelect.value = 'midfield';
     haveCheckbox.checked = true;
 
-    manager.updateDisplay();
+    await manager.updateDisplay();
 
     const rows = document.querySelectorAll('#players-tbody tr.player-row');
     expect(rows.length).toBe(1);
