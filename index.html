@@ -5,9 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Fantasy Premier League 2025/2026</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="storage-config.js"></script>
     <script>
-        // Feature flag for IndexedDB storage
-        window.USE_INDEXED_DB = false; // Set to true to use IndexedDB
+        (function() {
+            const storage = window.localStorage;
+            const storedPreference = storage ? storage.getItem('fpl-storage-backend') : null;
+            const defaultBackend = window.STORAGE_BACKEND_DEFAULT || 'localstorage';
+            const resolvedBackend = storedPreference || defaultBackend;
+            window.USE_INDEXED_DB = resolvedBackend === 'indexeddb';
+            window.ACTIVE_STORAGE_BACKEND = resolvedBackend;
+        })();
     </script>
     <script type="module" src="js/app.js"></script>
 </head>
@@ -30,6 +37,10 @@
                 <button id="next-week-btn" class="btn btn-secondary" data-testid="next-week-btn" aria-label="Next week">Next ▶</button>
                 <button id="create-week-btn" class="btn btn-primary" data-testid="create-week-btn" style="margin-left:auto;">+ Create New Week</button>
                 <button id="export-week-btn" class="btn btn-secondary" data-testid="export-week-btn" style="display:none;">Export Week Data</button>
+            </div>
+            <div class="storage-controls" data-testid="storage-controls">
+                <span id="storage-indicator" class="storage-indicator" data-testid="storage-indicator">Storage: localStorage</span>
+                <button id="toggle-storage-btn" class="btn btn-secondary" data-testid="toggle-storage-btn" type="button">Switch to IndexedDB</button>
             </div>
         </header>
 

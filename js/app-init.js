@@ -51,8 +51,9 @@ export async function initializeApp(options = {}) {
   setupImportHandler();
   
   // Add storage type indicator to the UI
-  addStorageIndicator(useIndexedDB);
-  
+  updateStorageIndicator(useIndexedDB);
+  setupStorageToggle(useIndexedDB);
+
   return mgr;
 }
 
@@ -110,12 +111,46 @@ function setupImportHandler() { // storageService is no longer needed here
  * Add storage type indicator to the UI
  * @param {boolean} useIndexedDB Whether IndexedDB is being used
  */
-function addStorageIndicator(useIndexedDB) {
-  const header = document.querySelector('header');
-  if (header) {
-    const storageIndicator = document.createElement('div');
-    storageIndicator.className = 'storage-indicator';
-    storageIndicator.textContent = `Storage: ${useIndexedDB ? 'IndexedDB' : 'localStorage'}`;
-    header.appendChild(storageIndicator);
+function updateStorageIndicator(useIndexedDB) {
+  const indicator = document.getElementById('storage-indicator');
+  if (indicator) {
+    indicator.textContent = `Storage: ${useIndexedDB ? 'IndexedDB' : 'localStorage'}`;
+    indicator.setAttribute('data-backend', useIndexedDB ? 'indexeddb' : 'localstorage');
   }
+}
+
+function setupStorageToggle(useIndexedDB) {
+  const toggleBtn = document.getElementById('toggle-storage-btn');
+  const indicator = document.getElementById('storage-indicator');
+
+  if (!toggleBtn) return;
+
+  const storage = window.localStorage;
+
+  const setButtonState = (isIndexedDB) => {
+    if (toggleBtn) {
+      toggleBtn.textContent = isIndexedDB ? 'Switch to localStorage' : 'Switch to IndexedDB';
+      toggleBtn.setAttribute('aria-pressed', String(isIndexedDB));
+    }
+
+    if (indicator) {
+      indicator.textContent = `Storage: ${isIndexedDB ? 'IndexedDB' : 'localStorage'}`;
+    }
+  };
+
+  setButtonState(useIndexedDB);
+
+  toggleBtn.addEventListener('click', () => {
+    const nextBackend = useIndexedDB ? 'localstorage' : 'indexeddb';
+
+    try {
+      if (storage) {
+        storage.setItem('fpl-storage-backend', nextBackend);
+      }
+    } catch (error) {
+      console.error('Failed to persist storage backend preference:', error);
+    }
+
+    window.location.reload();
+  }, { once: true });
 }

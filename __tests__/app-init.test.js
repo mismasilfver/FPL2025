@@ -95,7 +95,7 @@ jest.mock('../js/app-init.js', () => {
       if (storageIndicator) {
         const w = (global && global.window) ? global.window : global;
         const useIndexed = options.useIndexedDB === true || !!(w && w.USE_INDEXED_DB === true);
-        storageIndicator.textContent = `Using: ${useIndexed ? 'IndexedDB' : 'Local Storage'}`;
+        storageIndicator.textContent = `Storage: ${useIndexed ? 'IndexedDB' : 'localStorage'}`;
       }
 
       return {
@@ -254,7 +254,7 @@ describe('App Initialization', () => {
     const storageIndicator = document.getElementById('storage-indicator');
     
     // Verify the storage indicator was updated
-    expect(storageIndicator.textContent).toContain('Using: Local Storage');
+    expect(storageIndicator.textContent).toContain('Storage: localStorage');
   });
   
   test('should update storage indicator when storage type changes', async () => {
@@ -275,7 +275,7 @@ describe('App Initialization', () => {
     const storageIndicator = document.getElementById('storage-indicator');
     
     // Verify the storage indicator was updated
-    expect(storageIndicator.textContent).toContain('Using: IndexedDB');
+    expect(storageIndicator.textContent).toContain('Storage: IndexedDB');
   });
   
   test('should set up import button handler', async () => {

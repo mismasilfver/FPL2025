@@ -2,9 +2,17 @@
 
 This guide outlines how to implement a local-only database for the Fantasy Premier League app, providing persistence beyond browser localStorage without requiring online access.
 
+## Current In-Browser Storage
+
+- **Default adapter**: `LocalStorageKeyValueAdapter` in `js/adapters/local-storage-adapter.js` persists data to `window.localStorage` and is exercised by `__tests__/database.test.js`.
+- **IndexedDB option**: `IndexedDBKeyValueAdapter` in `js/adapters/indexeddb-adapter.js` offers a richer in-browser backend. Toggle `window.USE_INDEXED_DB` in `index.html` to enable it.
+- **Contract**: Both adapters implement the API defined in `js/adapters/database-adapter.contract.js`, allowing the higher-level storage services (`js/storage.js`, `js/storage-db.js`) to switch backends transparently.
+
+The remainder of this document explores next steps once the in-browser adapters are insufficient (e.g., need multi-device sync, larger datasets, or dedicated backup processes).
+
 ## Overview
 
-Three recommended local database options:
+Three recommended local database options beyond the built-in adapters:
 
 1. **SQLite with Node.js backend**: File-based SQL database (recommended)
 2. **IndexedDB with Dexie.js**: Enhanced browser storage
