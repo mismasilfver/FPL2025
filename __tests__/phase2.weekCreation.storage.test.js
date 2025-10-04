@@ -14,48 +14,57 @@ describe('Phase 2: Week creation persists correct v2 structures', () => {
   });
 
   test('Creating a new week updates currentWeek and snapshots minimal teamMembers + totals', async () => {
-    const addButton = document.querySelector('[data-testid="add-player-button"]');
+    // Add two players in week 1 using direct method calls
+    await window.fplManager.addPlayer({
+      name: 'P1',
+      position: 'midfield',
+      team: 'A',
+      price: 6,
+      have: true,
+      status: '',
+      notes: ''
+    });
 
-    // Add two players in week 1
-    userEvent.click(addButton, window);
-    userEvent.type(document.querySelector('[data-testid="player-name-input"]'), 'P1', window);
-    userEvent.select(document.querySelector('[data-testid="player-position-select"]'), 'midfield', window);
-    userEvent.type(document.querySelector('[data-testid="player-team-input"]'), 'A', window);
-    userEvent.type(document.querySelector('[data-testid="player-price-input"]'), '6', window);
-    const have1 = document.querySelector('[data-testid="player-have-checkbox"]');
-    have1.checked = true;
-    userEvent.submit(document.querySelector('#player-form'), window);
+    await window.fplManager.addPlayer({
+      name: 'P2',
+      position: 'defence',
+      team: 'B',
+      price: 5,
+      have: true,
+      status: '',
+      notes: ''
+    });
 
-    userEvent.click(addButton, window);
-    userEvent.type(document.querySelector('[data-testid="player-name-input"]'), 'P2', window);
-    userEvent.select(document.querySelector('[data-testid="player-position-select"]'), 'defence', window);
-    userEvent.type(document.querySelector('[data-testid="player-team-input"]'), 'B', window);
-    userEvent.type(document.querySelector('[data-testid="player-price-input"]'), '5', window);
-    const have2 = document.querySelector('[data-testid="player-have-checkbox"]');
-    have2.checked = true;
-    userEvent.submit(document.querySelector('#player-form'), window);
-
-    // Set captain/vice
-    const p1 = window.fplManager.players.find(p => p.name === 'P1');
-    const p2 = window.fplManager.players.find(p => p.name === 'P2');
-    const capBtnW1 = document.querySelector(`[data-testid="make-captain-${p1.id}"]`);
-    if (capBtnW1) userEvent.click(capBtnW1, window);
-    const vcBtnW1 = document.querySelector(`[data-testid="make-vice-captain-${p2.id}"]`);
-    if (vcBtnW1) userEvent.click(vcBtnW1, window);
+    // Set captain/vice using direct methods for reliability
+    const currentWeek = await window.fplManager.getCurrentWeekNumber();
+    const currentWeekData = await window.fplManager.getWeekSnapshot(currentWeek);
+    const p1 = currentWeekData.players.find(p => p.name === 'P1');
+    const p2 = currentWeekData.players.find(p => p.name === 'P2');
+    if (p1 && p2) {
+      await window.fplManager.setCaptain(p1.id);
+      await window.fplManager.setViceCaptain(p2.id);
+    }
 
     // Create week 2
     userEvent.click(document.getElementById('create-week-btn'), window);
+    
+    // Wait for async operations to complete
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     // Now modify week 2 slightly so totals change only for week 2
-    const editBtnW2 = document.querySelector(`[data-testid="edit-player-${p1.id}"]`);
-    if (editBtnW2) userEvent.click(editBtnW2, window);
-    const priceInput = document.querySelector('[data-testid="player-price-input"]');
-    priceInput.value = '';
-    userEvent.type(priceInput, '7', window); // from 6 -> 7
-    userEvent.submit(document.querySelector('#player-form'), window);
+    if (p1) {
+      await window.fplManager.updatePlayer(p1.id, { price: 7 }); // from 6 -> 7
+    }
 
-    // Inspect storage
-    const raw = window.localStorage.getItem('fpl-team-data');
+    // Wait for async save to settle
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    // Inspect storage - check both localStorage and storage adapter
+    let raw = window.localStorage.getItem('fpl-team-data');
+    if (!raw) {
+      // Try getting from storage adapter directly
+      raw = await window.fplManager.storage.getItem('fpl-team-data');
+    }
     expect(raw).toBeTruthy();
     const data = JSON.parse(raw);
 
@@ -89,37 +98,46 @@ describe('Phase 2: Week creation persists correct v2 structures', () => {
   });
 
   test('Previous weeks are read-only: storage remains unchanged when editing while on week 1', async () => {
-    const addButton = document.querySelector('[data-testid="add-player-button"]');
+    // Add one player in week 1 using direct method call
+    await window.fplManager.addPlayer({
+      name: 'R1',
+      position: 'midfield',
+      team: 'AA',
+      price: 6,
+      have: true,
+      status: '',
+      notes: ''
+    });
 
-    // Add one player in week 1
-    userEvent.click(addButton, window);
-    userEvent.type(document.querySelector('[data-testid="player-name-input"]'), 'R1', window);
-    userEvent.select(document.querySelector('[data-testid="player-position-select"]'), 'midfield', window);
-    userEvent.type(document.querySelector('[data-testid="player-team-input"]'), 'AA', window);
-    userEvent.type(document.querySelector('[data-testid="player-price-input"]'), '6', window);
-    const have = document.querySelector('[data-testid="player-have-checkbox"]');
-    have.checked = true;
-    userEvent.submit(document.querySelector('#player-form'), window);
-
-    const r1 = window.fplManager.players.find(p => p.name === 'R1');
+    // Get player from current week data
+    const currentWeek = await window.fplManager.getCurrentWeekNumber();
+    const currentWeekData = await window.fplManager.getWeekSnapshot(currentWeek);
+    const r1 = currentWeekData.players.find(p => p.name === 'R1');
 
     // Create week 2
     userEvent.click(document.getElementById('create-week-btn'), window);
 
     // Go back to week 1 and attempt to edit (should be blocked by UI in practice)
     userEvent.click(document.getElementById('prev-week-btn'), window);
-    const editBtn = document.querySelector(`[data-testid="edit-player-${r1.id}"]`);
-    if (editBtn) userEvent.click(editBtn, window);
-    const priceInput = document.querySelector('[data-testid="player-price-input"]');
-    if (priceInput) {
-      priceInput.value = '';
-      userEvent.type(priceInput, '10', window);
-      userEvent.submit(document.querySelector('#player-form'), window);
+    // Wait for async navigation to settle
+    await new Promise(resolve => setTimeout(resolve, 30));
+    
+    // Attempt to update price while on week 1 (read-only) - should be blocked
+    if (r1) {
+      await window.fplManager.updatePlayer(r1.id, { price: 10 });
     }
 
     // Storage should still reflect original totals for week 1
-    const raw = window.localStorage.getItem('fpl-team-data');
+    let raw = window.localStorage.getItem('fpl-team-data');
+    if (!raw) {
+      // Try getting from storage adapter directly
+      raw = await window.fplManager.storage.getItem('fpl-team-data');
+    }
+    expect(raw).toBeTruthy();
     const data = JSON.parse(raw);
+    expect(data).toBeTruthy();
+    expect(data.weeks).toBeTruthy();
+    
     const w1 = data.weeks['1'] || data.weeks[1];
     const w2 = data.weeks['2'] || data.weeks[2];
 

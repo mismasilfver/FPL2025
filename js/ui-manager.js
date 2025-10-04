@@ -1,3 +1,5 @@
+const DEBUG = false;
+
 export default class UIManager {
     constructor() {
         this._boundGlobal = false;
@@ -91,8 +93,8 @@ export default class UIManager {
         this.playerModalTemplate = doc.getElementById('player-modal-template');
         this.playerRowTemplate = doc.getElementById('player-row-template');
         
-        console.log('initElements - prevWeekBtn found:', !!this.prevWeekBtn);
-        console.log('initElements - playerModalTemplate found:', !!this.playerModalTemplate);
+        if (DEBUG) console.log('initElements - prevWeekBtn found:', !!this.prevWeekBtn);
+        if (DEBUG) console.log('initElements - playerModalTemplate found:', !!this.playerModalTemplate);
     }
 
     openModal(player = null) {
@@ -234,7 +236,7 @@ export default class UIManager {
         if (this.weekReadonlyBadge) this.weekReadonlyBadge.style.display = isReadOnly ? 'inline-block' : 'none';
         if (this.addPlayerBtn) this.addPlayerBtn.disabled = !!isReadOnly;
         if (this.prevWeekBtn) {
-            console.log('Setting prevWeekBtn disabled:', currentWeek <= 1, 'currentWeek:', currentWeek);
+            if (DEBUG) console.log('Setting prevWeekBtn disabled:', currentWeek <= 1, 'currentWeek:', currentWeek);
             this.prevWeekBtn.disabled = currentWeek <= 1;
         }
         if (this.nextWeekBtn) this.nextWeekBtn.disabled = currentWeek >= totalWeeks;
@@ -337,6 +339,7 @@ export default class UIManager {
             if (isViceCaptain) {
                 const span = doc.createElement('span');
                 span.className = 'vice-captain-badge';
+                span.setAttribute('data-testid', `vice-captain-badge-${player.id}`);
                 span.textContent = 'VC';
                 viceCell.appendChild(span);
             } else {

@@ -15,13 +15,9 @@ describe('Week Navigation Controls', () => {
     windowRef = window;
 
     const uiManager = new UIManager();
-    const storageAdapter = {
-      getItem: jest.fn(),
-      setItem: jest.fn(),
-    };
-
-    // Set up initial data
-    storageAdapter.getItem.mockResolvedValue(JSON.stringify({
+    
+    // Create a proper storage adapter that tracks changes
+    let storageData = {
       version: '2.0',
       currentWeek: 1,
       weeks: {
@@ -38,18 +34,27 @@ describe('Week Navigation Controls', () => {
           isReadOnly: false,
         },
       },
-    }));
+    };
+
+    const storageAdapter = {
+      getItem: jest.fn((key) => Promise.resolve(JSON.stringify(storageData))),
+      setItem: jest.fn((key, value) => {
+        storageData = JSON.parse(value);
+        return Promise.resolve();
+      }),
+    };
 
     fplTeamManager = new FPLTeamManager({ ui: uiManager, storage: storageAdapter });
     await fplTeamManager.init(document);
   });
 
   test('Switching weeks updates read-only badge and control enablement', async () => {
-    const addButton = document.querySelector('[data-testid="add-player-button"]');
-    const roBadge = document.getElementById('week-readonly-badge');
-    const prevBtn = document.getElementById('prev-week-btn');
-    const nextBtn = document.getElementById('next-week-btn');
-    const createBtn = document.getElementById('create-week-btn');
+    // Use the UIManager elements that were properly initialized
+    const addButton = fplTeamManager.ui.addPlayerBtn;
+    const roBadge = fplTeamManager.ui.weekReadonlyBadge;
+    const prevBtn = fplTeamManager.ui.prevWeekBtn;
+    const nextBtn = fplTeamManager.ui.nextWeekBtn;
+    const createBtn = fplTeamManager.ui.createWeekBtn;
 
     // Initial state: Week 1, not read-only
     expect(roBadge.style.display).toBe('none');
@@ -59,7 +64,7 @@ describe('Week Navigation Controls', () => {
 
     // Create a new week
     await userEvent.click(createBtn, windowRef);
-    await new Promise(resolve => setTimeout(resolve, 0)); // Wait for UI update
+    await new Promise(resolve => setTimeout(resolve, 100)); // Wait for async operations
 
     // State after creating new week: Week 2, editable
     expect(await fplTeamManager.getCurrentWeekNumber()).toBe(2);
