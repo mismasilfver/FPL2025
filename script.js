@@ -1,7 +1,10 @@
 import UIManager from './js/ui-manager.js';
 import { LocalStorageAdapter } from './js/storage.js';
 
-class FPLTeamManager {
+// Global debug flag for this module
+const DEBUG = false;
+
+export class FPLTeamManager {
     constructor({ ui, storage } = {}) {
         this.ui = ui || new UIManager();
         this.storage = storage; // Use the injected storage adapter
@@ -36,15 +39,15 @@ class FPLTeamManager {
     }
 
     async init(doc = document) {
-        console.log('FPLTeamManager.init called');
+        if (DEBUG) console.log('FPLTeamManager.init called');
         await this.ui.initElements(doc);
-        console.log('initElements completed');
+        if (DEBUG) console.log('initElements completed');
         this.bindEvents();
-        console.log('bindEvents completed');
-        console.log('About to call updateDisplay');
+        if (DEBUG) console.log('bindEvents completed');
+        if (DEBUG) console.log('About to call updateDisplay');
         try {
             await this.updateDisplay();
-            console.log('updateDisplay completed');
+            if (DEBUG) console.log('updateDisplay completed');
         } catch (error) {
             console.error('Error in updateDisplay:', error);
             throw error;
@@ -160,6 +163,7 @@ class FPLTeamManager {
             ...playerData,
         };
         currentWeek.players.push(player);
+        await this._ensureWeekDerivedFields(root, root.currentWeek);
         await this._saveRootData(root);
         await this.updateDisplay();
     }
@@ -171,6 +175,7 @@ class FPLTeamManager {
         const playerIndex = currentWeek.players.findIndex(p => p.id === playerId);
         if (playerIndex !== -1) {
             currentWeek.players[playerIndex] = { ...currentWeek.players[playerIndex], ...playerData };
+            await this._ensureWeekDerivedFields(root, root.currentWeek);
             await this._saveRootData(root);
             await this.updateDisplay();
         }
@@ -190,6 +195,7 @@ class FPLTeamManager {
         // Clear captain/vice-captain if they were the deleted player
         if (currentWeek.captain === playerId) currentWeek.captain = null;
         if (currentWeek.viceCaptain === playerId) currentWeek.viceCaptain = null;
+        await this._ensureWeekDerivedFields(root, root.currentWeek);
         await this._saveRootData(root);
         await this.updateDisplay();
     }
@@ -205,6 +211,7 @@ class FPLTeamManager {
                 return;
             }
             player.have = !player.have;
+            await this._ensureWeekDerivedFields(root, root.currentWeek);
             await this._saveRootData(root);
             await this.updateDisplay();
         }
@@ -255,9 +262,17 @@ class FPLTeamManager {
     }
 
     async updateDisplay() {
-        console.log('updateDisplay called');
+        if (DEBUG) console.log('updateDisplay called');
         const root = await this._getRootData();
-        console.log('Got root data:', root);
+        if (DEBUG) console.log('Got root data:', root);
+        if (!root.weeks) root.weeks = {};
+        if (!root.currentWeek) root.currentWeek = 1;
+        if (!root.weeks[root.currentWeek]) {
+            // Initialize missing current week structure (can happen after legacy import)
+            root.weeks[root.currentWeek] = { players: [], captain: null, viceCaptain: null, isReadOnly: false };
+            await this._ensureWeekDerivedFields(root, root.currentWeek);
+            await this._saveRootData(root);
+        }
         const currentWeek = root.weeks[root.currentWeek];
         const players = currentWeek.players || [];
         const captainId = currentWeek.captain;
@@ -278,7 +293,7 @@ class FPLTeamManager {
         this.ui.renderPlayers(filteredPlayers, { isReadOnly: currentWeek.isReadOnly, captainId, viceCaptainId });
         this.ui.renderSummary(players);
         this.ui.renderCaptaincyInfo(players, captainId, viceCaptainId);
-        console.log('About to call renderWeekControls with:', { currentWeek: root.currentWeek, totalWeeks: weekCount, isReadOnly: currentWeek.isReadOnly });
+        if (DEBUG) console.log('About to call renderWeekControls with:', { currentWeek: root.currentWeek, totalWeeks: weekCount, isReadOnly: currentWeek.isReadOnly });
         this.ui.renderWeekControls({ currentWeek: root.currentWeek, totalWeeks: weekCount, isReadOnly: currentWeek.isReadOnly });
     }
 
@@ -307,7 +322,50 @@ class FPLTeamManager {
         }
         try {
             // Always parse the latest data from storage
-            return JSON.parse(rawData);
+            const parsed = JSON.parse(rawData);
+            // Detect legacy shape: { week, players, captain, viceCaptain }
+            const isLegacy = !parsed.weeks && (Array.isArray(parsed.players) || typeof parsed.week !== 'undefined');
+            if (isLegacy) {
+                const legacyWeek = Number(parsed.week) || 1;
+                const migrated = {
+                    version: '2.0',
+                    currentWeek: legacyWeek,
+                    weeks: {
+                        [legacyWeek]: {
+                            players: Array.isArray(parsed.players) ? parsed.players : [],
+                            captain: parsed.captain || null,
+                            viceCaptain: parsed.viceCaptain || null,
+                            isReadOnly: false
+                        }
+                    }
+                };
+                // Compute derived fields
+                await this._ensureWeekDerivedFields(migrated, legacyWeek);
+                await this.storage.setItem(this.storageKey, JSON.stringify(migrated));
+                return migrated;
+            }
+
+            // Ensure derived fields exist for v2 data
+            if (parsed && parsed.weeks) {
+                const weekKeys = Object.keys(parsed.weeks);
+                let mutated = false;
+                for (const wk of weekKeys) {
+                    const weekObj = parsed.weeks[wk];
+                    if (weekObj && (!Array.isArray(weekObj.teamMembers) || !weekObj.teamStats || typeof weekObj.totalTeamCost === 'undefined')) {
+                        await this._ensureWeekDerivedFields(parsed, wk);
+                        mutated = true;
+                    }
+                }
+                if (!parsed.version) {
+                    parsed.version = '2.0';
+                    mutated = true;
+                }
+                if (mutated) {
+                    await this.storage.setItem(this.storageKey, JSON.stringify(parsed));
+                }
+            }
+
+            return parsed;
         } catch (e) {
             console.error('Failed to parse root data, returning default.', e);
             // Fallback to default data in case of parsing error
@@ -321,17 +379,34 @@ class FPLTeamManager {
     }
 
     _computeTeamSnapshot(players) {
-        const teamMembers = (players || []).filter(p => p.have).map(p => ({
-            playerId: p.id, name: p.name, position: p.position, team: p.team, price: p.price,
+        // Minimal teamMembers shape expected by tests: [{ addedAt, playerId }]
+        const inTeam = (players || []).filter(p => p.have);
+        const teamMembers = inTeam.map(p => ({
+            addedAt: p.addedAt || p.id, // use existing timestamp-like id if not present
+            playerId: p.id
         }));
+        const totalValue = inTeam.reduce((s, p) => s + (Number(p.price) || 0), 0);
         return {
             teamMembers,
             teamStats: {
-                totalValue: teamMembers.reduce((s, p) => s + (Number(p.price) || 0), 0),
-                playerCount: teamMembers.length,
+                totalValue,
+                playerCount: inTeam.length,
                 updatedDate: new Date().toISOString()
-            }
+            },
+            totalTeamCost: totalValue
         };
+    }
+
+    // Ensure derived fields on a specific week are up-to-date based on its players
+    async _ensureWeekDerivedFields(root, weekNumber) {
+        const wn = String(weekNumber);
+        const wk = root.weeks[wn];
+        if (!wk) return;
+        const { teamMembers, teamStats, totalTeamCost } = this._computeTeamSnapshot(wk.players || []);
+        wk.teamMembers = teamMembers;
+        wk.teamStats = teamStats;
+        // Mirror total cost to a dedicated field as expected by tests
+        wk.totalTeamCost = totalTeamCost;
     }
 
     async createNewWeek() {
@@ -340,12 +415,17 @@ class FPLTeamManager {
 
         if (root.weeks[currentWeekNumber]) {
             root.weeks[currentWeekNumber].isReadOnly = true;
+            // Recompute derived fields for the week we are freezing
+            await this._ensureWeekDerivedFields(root, currentWeekNumber);
         }
 
         const newWeekNumber = currentWeekNumber + 1;
         // Deep copy the current week's data to the new week
         root.weeks[newWeekNumber] = JSON.parse(JSON.stringify(root.weeks[currentWeekNumber] || { players: [], captain: null, viceCaptain: null }));
         root.weeks[newWeekNumber].isReadOnly = false;
+
+        // Recompute derived fields for the new week as well
+        await this._ensureWeekDerivedFields(root, newWeekNumber);
 
         root.currentWeek = newWeekNumber;
         await this._saveRootData(root);
@@ -504,3 +584,6 @@ class FPLTeamManager {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { FPLTeamManager, UIManager };
 }
+
+// Default export for ESM consumers
+export default FPLTeamManager;

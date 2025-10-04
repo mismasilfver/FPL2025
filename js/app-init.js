@@ -48,7 +48,7 @@ export async function initializeApp(options = {}) {
   await mgr.init();
   
   // Set up the import button handler
-  setupImportHandler(storageService);
+  setupImportHandler();
   
   // Add storage type indicator to the UI
   addStorageIndicator(useIndexedDB);
@@ -60,29 +60,47 @@ export async function initializeApp(options = {}) {
  * Set up the import button handler
  * @param {Object} storageService The storage service to use for importing
  */
-function setupImportHandler(storageService) {
+function setupImportHandler() { // storageService is no longer needed here
   const importButton = document.getElementById('import-button');
   const importInput = document.getElementById('import-json');
   
   if (importButton && importInput) {
     importButton.addEventListener('click', async () => {
       if (!importInput.files || importInput.files.length === 0) {
-        window.fplManager.ui.showAlert('Please select a JSON file to import.');
+        window.fplManager?.ui.showAlert('Please select a JSON file to import.');
         return;
       }
       
       try {
         const file = importInput.files[0];
-        const data = await importFromJSON(file);
-        
-        await storageService.importFromJSON(JSON.stringify(data));
-        await window.fplManager.loadStateFromStorage();
+        const importedData = await importFromJSON(file);
+
+        // Get current root data
+        const rootData = await window.fplManager._getRootData();
+
+        // Determine the week number from the imported file (legacy or v2 format)
+        const importedWeekNumber = importedData.week || (importedData.weeks && Object.keys(importedData.weeks)[0]) || rootData.currentWeek;
+
+        // Extract players and other relevant data for that week
+        const weekDataToMerge = importedData.weeks ? 
+            importedData.weeks[importedWeekNumber] : 
+            { players: importedData.players, captain: importedData.captain, viceCaptain: importedData.viceCaptain, isReadOnly: false };
+
+        // Merge the imported week's data into the root data
+        rootData.weeks[importedWeekNumber] = weekDataToMerge;
+        rootData.currentWeek = Number(importedWeekNumber);
+
+        // Ensure derived fields are calculated for the newly imported week
+        await window.fplManager._ensureWeekDerivedFields(rootData, importedWeekNumber);
+
+        // Save the merged data and update the display
+        await window.fplManager._saveRootData(rootData);
         await window.fplManager.updateDisplay();
         
-        window.fplManager.ui.showAlert('Data imported successfully!');
+        window.fplManager?.ui.showAlert(`Week ${importedWeekNumber} data imported successfully!`);
       } catch (error) {
         console.error('Import failed:', error);
-        window.fplManager.ui.showAlert(`Import failed: ${error.message}`);
+        window.fplManager?.ui.showAlert(`Import failed: ${error.message}`);
       }
     });
   }

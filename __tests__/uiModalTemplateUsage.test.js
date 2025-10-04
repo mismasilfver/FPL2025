@@ -51,6 +51,7 @@ describe('UI uses <template> for modal and builds it on open', () => {
 
   test('UIManager caches modal template and builds modal on open', () => {
     const manager = new FPLTeamManager();
+    manager.ui.initElements(document);
 
     // Should cache the template element
     expect(manager.ui.playerModalTemplate).toBeInstanceOf(HTMLTemplateElement);
@@ -59,8 +60,8 @@ describe('UI uses <template> for modal and builds it on open', () => {
     // Modal should not exist initially
     expect(document.getElementById('player-modal')).toBeNull();
 
-    // Open modal should build from template (currently will fail before implementation)
-    manager.openModal();
+    // Open modal should build from template - call UIManager directly
+    manager.ui.openModal();
 
     const modal = document.getElementById('player-modal');
     expect(modal).not.toBeNull();

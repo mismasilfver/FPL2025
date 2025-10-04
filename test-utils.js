@@ -84,6 +84,9 @@ const originalUserEvent = require('@testing-library/user-event').default;
 
 // Helper function to replace deprecated userEvent.select
 const selectOption = async (element, value, window) => {
+    if (!element) {
+        throw new Error(`Element is null - cannot set value to ${value}`);
+    }
     element.value = value;
     element.dispatchEvent(new window.Event('change', { bubbles: true }));
     element.dispatchEvent(new window.Event('input', { bubbles: true }));

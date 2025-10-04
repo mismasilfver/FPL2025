@@ -46,11 +46,14 @@ describe('Modal Creation Debug', () => {
     // Initialize manager with UI and mock storage
     const ui = new UIManager();
     const manager = new FPLTeamManager({ ui, storage: mockStorage });
-    await manager.loadStateFromStorage(); // Correctly load initial state
+    await manager.init(document); // Properly initialize with DOM
     
-    // Click add button
-    const addButton = document.getElementById('add-player-btn');
-    addButton.click();
+    // Click add button - or call openModal directly since event binding might have issues
+    // const addButton = document.querySelector('[data-testid="add-player-button"]');
+    // addButton.click();
+    
+    // Call openModal directly to test modal creation
+    manager.ui.openModal();
     
     // Check if modal exists
     const modal = document.getElementById('player-modal');

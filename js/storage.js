@@ -110,21 +110,6 @@ class StorageService {
     }
 
     /**
-     * Imports data from a JSON string.
-     * @param {string} jsonString The JSON string to import.
-     * @returns {Promise<void>}
-     */
-    async importFromJSON(jsonString) {
-        try {
-            const data = JSON.parse(jsonString);
-            return this.saveRootData(data);
-        } catch (e) {
-            console.error('Error importing JSON data:', e);
-            throw new Error('Invalid JSON data');
-        }
-    }
-
-    /**
      * Creates a new week by copying data from the current week
      * @returns {Promise<boolean>} True if successful, false otherwise
      */

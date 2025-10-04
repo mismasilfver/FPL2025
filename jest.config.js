@@ -4,9 +4,11 @@ module.exports = {
 
   // The test environment that will be used for testing
   testEnvironment: 'jsdom',
-
-  // A URL for the jsdom environment.
-  testURL: 'http://localhost',
+  
+  // A URL for the jsdom environment (replacement for deprecated testURL)
+  testEnvironmentOptions: {
+    url: 'http://localhost'
+  },
 
   // An array of glob patterns indicating a set of files for which coverage information should be collected
   collectCoverageFrom: [
