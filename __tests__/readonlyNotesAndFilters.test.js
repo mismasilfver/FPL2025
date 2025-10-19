@@ -2,19 +2,27 @@
  * @jest-environment jsdom
  */
 
+require('../test-setup');
 const { FPLTeamManager } = require('../script.js');
+const { __getMockStorage } = require('../js/storage-module.js');
 
 describe('Read-only: notes expansion and filters still work', () => {
   beforeEach(() => {
     localStorage.clear();
+    const storage = __getMockStorage?.();
+    storage?.reset?.();
     document.body.innerHTML = `
-      <button data-testid=\"add-player-button\"></button>
-      <div class=\"players-table-container\"><table id=\"players-table\"><tbody id=\"players-tbody\"></tbody></table></div>
-      <div id=\"empty-state\"></div>
-      <div id=\"week-label\"></div>
-      <span id=\"week-readonly-badge\" style=\"display:none\"></span>
-      <select id=\"position-filter\" data-testid=\"position-filter-select\">
-        <option value=\"all\">All</option>
+      <button data-testid="add-player-button"></button>
+      <div class="players-table-container"><table id="players-table"><tbody id="players-tbody"></tbody></table></div>
+      <div id="empty-state"></div>
+      <div id="week-label"></div>
+      <span id="week-readonly-badge" style="display:none"></span>
+      <select id="position-filter" data-testid="position-filter-select">
+        <option value="all">All</option>
+        <option value="goalkeeper">Goalkeeper</option>
+        <option value="defence">Defence</option>
+        <option value="midfield">Midfield</option>
+        <option value="forward">Forward</option>
         <option value=\"goalkeeper\">Goalkeeper</option>
         <option value=\"defence\">Defence</option>
         <option value=\"midfield\">Midfield</option>
@@ -94,7 +102,14 @@ describe('Read-only: notes expansion and filters still work', () => {
       }
     };
     
-    await manager.storage.setItem(manager.storageKey, JSON.stringify(weekData));
+    const storage = __getMockStorage?.();
+    if (storage && typeof storage.setRootData === 'function') {
+      await storage.setRootData(weekData);
+    } else if (typeof manager.storage.setRootData === 'function') {
+      await manager.storage.setRootData(weekData);
+    } else {
+      throw new Error('No storage implementation with setRootData available for readonly filters test.');
+    }
 
     // Set filters: position=midfield, have only
     const positionSelect = document.querySelector('[data-testid=\"position-filter-select\"]');

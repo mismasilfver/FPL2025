@@ -15,13 +15,21 @@ import * as ScriptModule from '../script.js';
  * @returns {Promise<void>} A promise that resolves when initialization is complete
  */
 export async function initializeApp(options = {}) {
-  const { useIndexedDB = window.USE_INDEXED_DB === true } = options;
+  const {
+    useIndexedDB = window.USE_INDEXED_DB === true,
+    storageBackend = window.ACTIVE_STORAGE_BACKEND || 'localstorage'
+  } = options;
   
   // Create the appropriate storage service
   const storageService = createStorageService({
+    backend: storageBackend,
     useIndexedDB,
     storageKey: 'fpl-team-data'
   });
+  
+  if (typeof storageService.initialize === 'function') {
+    await storageService.initialize();
+  }
   
   // Patch FPLTeamManager methods to be async-compatible
   // This must be done before creating an instance
@@ -34,7 +42,7 @@ export async function initializeApp(options = {}) {
   if (!ManagerCtor) {
     throw new Error('FPLTeamManager class not available on window');
   }
-  const mgr = new ManagerCtor();
+  const mgr = new ManagerCtor({ storage: storageService });
 
   // Assign to global scope for access from tests or other scripts
   if (typeof window !== 'undefined') {
@@ -51,8 +59,8 @@ export async function initializeApp(options = {}) {
   setupImportHandler();
   
   // Add storage type indicator to the UI
-  updateStorageIndicator(useIndexedDB);
-  setupStorageToggle(useIndexedDB);
+  updateStorageIndicator(storageBackend);
+  setupStorageToggle(storageBackend);
 
   return mgr;
 }
@@ -111,15 +119,16 @@ function setupImportHandler() { // storageService is no longer needed here
  * Add storage type indicator to the UI
  * @param {boolean} useIndexedDB Whether IndexedDB is being used
  */
-function updateStorageIndicator(useIndexedDB) {
+function updateStorageIndicator(activeBackend) {
   const indicator = document.getElementById('storage-indicator');
   if (indicator) {
-    indicator.textContent = `Storage: ${useIndexedDB ? 'IndexedDB' : 'localStorage'}`;
-    indicator.setAttribute('data-backend', useIndexedDB ? 'indexeddb' : 'localstorage');
+    const label = formatBackendLabel(activeBackend);
+    indicator.textContent = `Storage: ${label}`;
+    indicator.setAttribute('data-backend', activeBackend);
   }
 }
 
-function setupStorageToggle(useIndexedDB) {
+function setupStorageToggle(activeBackend) {
   const toggleBtn = document.getElementById('toggle-storage-btn');
   const indicator = document.getElementById('storage-indicator');
 
@@ -127,21 +136,25 @@ function setupStorageToggle(useIndexedDB) {
 
   const storage = window.localStorage;
 
-  const setButtonState = (isIndexedDB) => {
+  const setButtonState = (backend) => {
     if (toggleBtn) {
-      toggleBtn.textContent = isIndexedDB ? 'Switch to localStorage' : 'Switch to IndexedDB';
-      toggleBtn.setAttribute('aria-pressed', String(isIndexedDB));
+      toggleBtn.textContent = backend === 'sqlite'
+        ? 'Switch to localStorage'
+        : backend === 'indexeddb'
+          ? 'Switch to SQLite'
+          : 'Switch to IndexedDB';
+      toggleBtn.setAttribute('aria-pressed', backend !== 'localstorage');
     }
 
     if (indicator) {
-      indicator.textContent = `Storage: ${isIndexedDB ? 'IndexedDB' : 'localStorage'}`;
+      indicator.textContent = `Storage: ${formatBackendLabel(backend)}`;
     }
   };
 
-  setButtonState(useIndexedDB);
+  setButtonState(activeBackend);
 
   toggleBtn.addEventListener('click', () => {
-    const nextBackend = useIndexedDB ? 'localstorage' : 'indexeddb';
+    const nextBackend = getNextBackend(activeBackend);
 
     try {
       if (storage) {
@@ -153,4 +166,21 @@ function setupStorageToggle(useIndexedDB) {
 
     window.location.reload();
   }, { once: true });
+}
+
+function getNextBackend(current) {
+  if (current === 'localstorage') return 'indexeddb';
+  if (current === 'indexeddb') return 'sqlite';
+  return 'localstorage';
+}
+
+function formatBackendLabel(backend) {
+  switch (backend) {
+    case 'indexeddb':
+      return 'IndexedDB';
+    case 'sqlite':
+      return 'SQLite';
+    default:
+      return 'localStorage';
+  }
 }

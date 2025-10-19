@@ -1,5 +1,5 @@
 import UIManager from './js/ui-manager.js';
-import { LocalStorageAdapter } from './js/storage.js';
+import { createStorageService, createDefaultRoot } from './js/storage-module.js';
 
 // Global debug flag for this module
 const DEBUG = false;
@@ -7,12 +7,30 @@ const DEBUG = false;
 export class FPLTeamManager {
     constructor({ ui, storage } = {}) {
         this.ui = ui || new UIManager();
-        this.storage = storage; // Use the injected storage adapter
-        if (!this.storage && typeof LocalStorageAdapter !== 'undefined') {
-            this.storage = new LocalStorageAdapter();
-        }
+        this.storage = storage || createStorageService({ backend: 'localstorage' });
         this.storageKey = 'fpl-team-data'; // Centralize storage key
+        this._supportsRootApi = false;
+        this._storageReady = this._initializeStorage();
         // State is now managed directly via storage, not in-memory properties.
+    }
+
+    async _initializeStorage() {
+        if (!this.storage) {
+            this.storage = createStorageService({ backend: 'localstorage' });
+        }
+
+        if (typeof this.storage.initialize === 'function') {
+            try {
+                await this.storage.initialize();
+            } catch (error) {
+                console.error('Failed to initialize storage service:', error);
+            }
+        }
+
+        this._supportsRootApi = typeof this.storage.getRootData === 'function'
+            && typeof this.storage.setRootData === 'function';
+
+        return true;
     }
 
     async getCaptainId() {
@@ -55,16 +73,11 @@ export class FPLTeamManager {
     }
 
     async saveStateToStorage() {
-        const rawData = await this.storage.getItem(this.storageKey);
-        let rootData;
-        try {
-            rootData = rawData ? JSON.parse(rawData) : this._getRootData();
-        } catch (e) {
-            rootData = this._getRootData();
-        }
+        await this._storageReady;
+        let rootData = await this._getRootData();
 
-        if (!rootData.weeks) {
-            rootData.weeks = {};
+        if (!rootData || typeof rootData !== 'object') {
+            rootData = createDefaultRoot();
         }
 
         const currentWeek = await this.getCurrentWeekNumber();
@@ -78,7 +91,7 @@ export class FPLTeamManager {
         rootData.version = rootData.version || '2.0';
         rootData.currentWeek = await this.getCurrentWeekNumber();
 
-        await this.storage.setItem(this.storageKey, JSON.stringify(rootData));
+        await this._setRootData(rootData);
     }
 
     bindEvents() {
@@ -157,13 +170,19 @@ export class FPLTeamManager {
     async addPlayer(playerData) {
         if (await this.isCurrentWeekReadOnly()) return;
         const root = await this._getRootData();
-        const currentWeek = root.weeks[root.currentWeek];
+        const currentWeekNumber = root.currentWeek;
+        const existingWeek = root.weeks[currentWeekNumber] || { players: [], captain: null, viceCaptain: null };
+        const workingWeek = this._cloneWeekData(existingWeek);
+
         const player = {
             id: Date.now().toString(),
             ...playerData,
         };
-        currentWeek.players.push(player);
-        await this._ensureWeekDerivedFields(root, root.currentWeek);
+        workingWeek.players.push(player);
+
+        root.weeks[currentWeekNumber] = workingWeek;
+
+        await this._ensureWeekDerivedFields(root, currentWeekNumber);
         await this._saveRootData(root);
         await this.updateDisplay();
     }
@@ -171,11 +190,14 @@ export class FPLTeamManager {
     async updatePlayer(playerId, playerData) {
         if (await this.isCurrentWeekReadOnly()) return;
         const root = await this._getRootData();
-        const currentWeek = root.weeks[root.currentWeek];
-        const playerIndex = currentWeek.players.findIndex(p => p.id === playerId);
+        const currentWeekNumber = root.currentWeek;
+        const existingWeek = root.weeks[currentWeekNumber] || { players: [], captain: null, viceCaptain: null };
+        const workingWeek = this._cloneWeekData(existingWeek);
+        const playerIndex = workingWeek.players.findIndex(p => p.id === playerId);
         if (playerIndex !== -1) {
-            currentWeek.players[playerIndex] = { ...currentWeek.players[playerIndex], ...playerData };
-            await this._ensureWeekDerivedFields(root, root.currentWeek);
+            workingWeek.players[playerIndex] = { ...workingWeek.players[playerIndex], ...playerData };
+            root.weeks[currentWeekNumber] = workingWeek;
+            await this._ensureWeekDerivedFields(root, currentWeekNumber);
             await this._saveRootData(root);
             await this.updateDisplay();
         }
@@ -190,12 +212,15 @@ export class FPLTeamManager {
         }
         
         const root = await this._getRootData();
-        const currentWeek = root.weeks[root.currentWeek];
-        currentWeek.players = currentWeek.players.filter(p => p.id !== playerId);
+        const currentWeekNumber = root.currentWeek;
+        const existingWeek = root.weeks[currentWeekNumber] || { players: [], captain: null, viceCaptain: null };
+        const workingWeek = this._cloneWeekData(existingWeek);
+        workingWeek.players = workingWeek.players.filter(p => p.id !== playerId);
         // Clear captain/vice-captain if they were the deleted player
-        if (currentWeek.captain === playerId) currentWeek.captain = null;
-        if (currentWeek.viceCaptain === playerId) currentWeek.viceCaptain = null;
-        await this._ensureWeekDerivedFields(root, root.currentWeek);
+        if (workingWeek.captain === playerId) workingWeek.captain = null;
+        if (workingWeek.viceCaptain === playerId) workingWeek.viceCaptain = null;
+        root.weeks[currentWeekNumber] = workingWeek;
+        await this._ensureWeekDerivedFields(root, currentWeekNumber);
         await this._saveRootData(root);
         await this.updateDisplay();
     }
@@ -203,15 +228,18 @@ export class FPLTeamManager {
     async toggleHave(playerId) {
         if (await this.isCurrentWeekReadOnly()) return;
         const root = await this._getRootData();
-        const currentWeek = root.weeks[root.currentWeek];
-        const player = currentWeek.players.find(p => p.id === playerId);
+        const currentWeekNumber = root.currentWeek;
+        const existingWeek = root.weeks[currentWeekNumber] || { players: [], captain: null, viceCaptain: null };
+        const workingWeek = this._cloneWeekData(existingWeek);
+        const player = workingWeek.players.find(p => p.id === playerId);
         if (player) {
-            if (!player.have && currentWeek.players.filter(p => p.have).length >= 15) {
+            if (!player.have && workingWeek.players.filter(p => p.have).length >= 15) {
                 alert('You can only have 15 players in your team.');
                 return;
             }
             player.have = !player.have;
-            await this._ensureWeekDerivedFields(root, root.currentWeek);
+            root.weeks[currentWeekNumber] = workingWeek;
+            await this._ensureWeekDerivedFields(root, currentWeekNumber);
             await this._saveRootData(root);
             await this.updateDisplay();
         }
@@ -313,69 +341,96 @@ export class FPLTeamManager {
     }
 
     async _getRootData() {
-        const rawData = await this.storage.getItem(this.storageKey);
-        if (!rawData) {
-            // If no data, create and save default data
-            const defaultData = { version: '2.0', currentWeek: 1, weeks: { 1: { players: [], captain: null, viceCaptain: null, isReadOnly: false } } };
-            await this.storage.setItem(this.storageKey, JSON.stringify(defaultData));
-            return defaultData;
-        }
-        try {
-            // Always parse the latest data from storage
-            const parsed = JSON.parse(rawData);
-            // Detect legacy shape: { week, players, captain, viceCaptain }
-            const isLegacy = !parsed.weeks && (Array.isArray(parsed.players) || typeof parsed.week !== 'undefined');
-            if (isLegacy) {
-                const legacyWeek = Number(parsed.week) || 1;
-                const migrated = {
-                    version: '2.0',
-                    currentWeek: legacyWeek,
-                    weeks: {
-                        [legacyWeek]: {
-                            players: Array.isArray(parsed.players) ? parsed.players : [],
-                            captain: parsed.captain || null,
-                            viceCaptain: parsed.viceCaptain || null,
-                            isReadOnly: false
-                        }
-                    }
-                };
-                // Compute derived fields
-                await this._ensureWeekDerivedFields(migrated, legacyWeek);
-                await this.storage.setItem(this.storageKey, JSON.stringify(migrated));
-                return migrated;
+        await this._storageReady;
+
+        let root;
+
+        if (this._supportsRootApi) {
+            try {
+                root = await this.storage.getRootData();
+            } catch (error) {
+                console.error('Failed to load root data from storage service:', error);
+                root = null;
+            }
+        } else {
+            const rawData = await this.storage.getItem(this.storageKey);
+            if (!rawData) {
+                const defaults = createDefaultRoot();
+                await this._setRootData(defaults);
+                return defaults;
             }
 
-            // Ensure derived fields exist for v2 data
-            if (parsed && parsed.weeks) {
-                const weekKeys = Object.keys(parsed.weeks);
-                let mutated = false;
-                for (const wk of weekKeys) {
-                    const weekObj = parsed.weeks[wk];
-                    if (weekObj && (!Array.isArray(weekObj.teamMembers) || !weekObj.teamStats || typeof weekObj.totalTeamCost === 'undefined')) {
-                        await this._ensureWeekDerivedFields(parsed, wk);
-                        mutated = true;
+            try {
+                root = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+            } catch (error) {
+                console.error('Failed to parse root data, returning default.', error);
+                const defaults = createDefaultRoot();
+                await this._setRootData(defaults);
+                return defaults;
+            }
+        }
+
+        if (!root || typeof root !== 'object') {
+            const defaults = createDefaultRoot();
+            await this._setRootData(defaults);
+            return defaults;
+        }
+
+        // Detect legacy shape: { week, players, captain, viceCaptain }
+        const isLegacy = !root.weeks && (Array.isArray(root.players) || typeof root.week !== 'undefined');
+        if (isLegacy) {
+            const legacyWeek = Number(root.week) || 1;
+            const migrated = {
+                version: '2.0',
+                currentWeek: legacyWeek,
+                weeks: {
+                    [legacyWeek]: {
+                        players: Array.isArray(root.players) ? root.players : [],
+                        captain: root.captain || null,
+                        viceCaptain: root.viceCaptain || null,
+                        isReadOnly: false
                     }
                 }
-                if (!parsed.version) {
-                    parsed.version = '2.0';
+            };
+            await this._ensureWeekDerivedFields(migrated, legacyWeek);
+            await this._setRootData(migrated);
+            return migrated;
+        }
+
+        if (root && root.weeks) {
+            const weekKeys = Object.keys(root.weeks);
+            let mutated = false;
+            for (const wk of weekKeys) {
+                const weekObj = root.weeks[wk];
+                if (weekObj && (!Array.isArray(weekObj.teamMembers) || !weekObj.teamStats || typeof weekObj.totalTeamCost === 'undefined')) {
+                    await this._ensureWeekDerivedFields(root, wk);
                     mutated = true;
                 }
-                if (mutated) {
-                    await this.storage.setItem(this.storageKey, JSON.stringify(parsed));
-                }
             }
-
-            return parsed;
-        } catch (e) {
-            console.error('Failed to parse root data, returning default.', e);
-            // Fallback to default data in case of parsing error
-            return { version: '2.0', currentWeek: 1, weeks: { 1: { players: [], captain: null, viceCaptain: null, isReadOnly: false } } };
+            if (!root.version) {
+                root.version = '2.0';
+                mutated = true;
+            }
+            if (mutated) {
+                await this._setRootData(root);
+            }
         }
+
+        return root;
     }
 
     async _saveRootData(root) {
         root.version = root.version || '2.0';
-        await this.storage.setItem(this.storageKey, JSON.stringify(root));
+        const snapshot = JSON.parse(JSON.stringify(root));
+        await this._setRootData(snapshot);
+    }
+
+    async _setRootData(root) {
+        await this._storageReady;
+        if (this._supportsRootApi) {
+            return this.storage.setRootData(root);
+        }
+        return this.storage.setItem(this.storageKey, JSON.stringify(root));
     }
 
     _computeTeamSnapshot(players) {
@@ -397,32 +452,66 @@ export class FPLTeamManager {
         };
     }
 
+    _cloneWeekData(week) {
+        const snapshot = JSON.parse(JSON.stringify(week || {}));
+        const players = Array.isArray(snapshot.players) ? snapshot.players.map(player => ({ ...player })) : [];
+        const teamMembers = Array.isArray(snapshot.teamMembers) ? snapshot.teamMembers.map(member => ({ ...member })) : [];
+        const teamStats = snapshot.teamStats && typeof snapshot.teamStats === 'object'
+            ? { ...snapshot.teamStats }
+            : { totalValue: 0, playerCount: 0, updatedDate: new Date().toISOString() };
+
+        return {
+            players,
+            captain: snapshot.captain ?? null,
+            viceCaptain: snapshot.viceCaptain ?? null,
+            isReadOnly: !!snapshot.isReadOnly,
+            teamMembers,
+            teamStats,
+            totalTeamCost: typeof snapshot.totalTeamCost === 'number' ? snapshot.totalTeamCost : 0,
+            notes: typeof snapshot.notes !== 'undefined' ? snapshot.notes : '',
+        };
+    }
+
     // Ensure derived fields on a specific week are up-to-date based on its players
     async _ensureWeekDerivedFields(root, weekNumber) {
         const wn = String(weekNumber);
-        const wk = root.weeks[wn];
-        if (!wk) return;
-        const { teamMembers, teamStats, totalTeamCost } = this._computeTeamSnapshot(wk.players || []);
-        wk.teamMembers = teamMembers;
-        wk.teamStats = teamStats;
+        const existingWeek = root.weeks[wn];
+        if (!existingWeek) return;
+
+        const workingWeek = this._cloneWeekData(existingWeek);
+        const { teamMembers, teamStats, totalTeamCost } = this._computeTeamSnapshot(existingWeek.players || []);
+
+        workingWeek.teamMembers = teamMembers;
+        workingWeek.teamStats = teamStats;
         // Mirror total cost to a dedicated field as expected by tests
-        wk.totalTeamCost = totalTeamCost;
+        workingWeek.totalTeamCost = totalTeamCost;
+
+        root.weeks[wn] = workingWeek;
     }
 
     async createNewWeek() {
         const root = await this._getRootData();
         const currentWeekNumber = root.currentWeek;
 
+        const currentWeekPayload = root.weeks[currentWeekNumber] || { players: [], captain: null, viceCaptain: null };
+        const snapshotForClone = this._cloneWeekData(currentWeekPayload);
+
         if (root.weeks[currentWeekNumber]) {
-            root.weeks[currentWeekNumber].isReadOnly = true;
-            // Recompute derived fields for the week we are freezing
             await this._ensureWeekDerivedFields(root, currentWeekNumber);
+
+            const frozenWeek = this._cloneWeekData(root.weeks[currentWeekNumber]);
+            frozenWeek.isReadOnly = true;
+            root.weeks[currentWeekNumber] = frozenWeek;
+
+            if (typeof Object.freeze === 'function') {
+                Object.freeze(root.weeks[currentWeekNumber]);
+            }
         }
 
         const newWeekNumber = currentWeekNumber + 1;
-        // Deep copy the current week's data to the new week
-        root.weeks[newWeekNumber] = JSON.parse(JSON.stringify(root.weeks[currentWeekNumber] || { players: [], captain: null, viceCaptain: null }));
-        root.weeks[newWeekNumber].isReadOnly = false;
+        const clonedWeek = this._cloneWeekData(snapshotForClone);
+        clonedWeek.isReadOnly = false;
+        root.weeks[newWeekNumber] = clonedWeek;
 
         // Recompute derived fields for the new week as well
         await this._ensureWeekDerivedFields(root, newWeekNumber);
