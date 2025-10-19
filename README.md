@@ -160,9 +160,8 @@ Works on all modern browsers including:
 
 
 ## Potential implementation of database and authentication (online)
-- use firebase or supabase for database
+- use firebase or supabase for database or SQLite for fully offline db
 - use firebase or supabase authentication for authentication
-- added two readme files on the topic and options
 
 ## Lessons learned about using agentic AI (Windsurf)
 - good tests are important (duh)

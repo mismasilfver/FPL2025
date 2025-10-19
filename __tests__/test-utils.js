@@ -62,6 +62,21 @@ class MockStorageService {
         return Promise.resolve();
     }
 
+    async setRootData(root) {
+        this.data = { ...root };
+        return Promise.resolve(this.data);
+    }
+
+    async getItem(_key) {
+        return Promise.resolve(JSON.stringify(this.data));
+    }
+
+    async setItem(_key, value) {
+        const payload = typeof value === 'string' ? JSON.parse(value) : value;
+        this.data = { ...payload };
+        return Promise.resolve();
+    }
+
     async getWeekCount() {
         return Object.keys(this.data.weeks).length;
     }
