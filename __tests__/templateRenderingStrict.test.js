@@ -9,31 +9,29 @@ describe('UIManager.renderPlayers uses <template> cloning and fills cells', () =
     localStorage.clear();
     if (typeof global.setupDOM === 'function') {
       global.setupDOM();
-      const existingTemplate = document.getElementById('player-row-template');
-      if (existingTemplate) {
-        existingTemplate.remove();
-      }
-      document.body.insertAdjacentHTML('beforeend', `
-        <template id="player-row-template">
-          <tr class="player-row">
-            <td class="col-name"></td>
-            <td class="col-position"></td>
-            <td class="col-team"></td>
-            <td class="col-price"></td>
-            <td class="col-status"></td>
-            <td class="col-have"></td>
-            <td class="col-captain"></td>
-            <td class="col-vice"></td>
-            <td class="col-notes"></td>
-            <td class="col-actions"></td>
-          </tr>
-        </template>
-      `);
     }
   });
 
   test('renders rows from template with correct content', () => {
     const manager = new FPLTeamManager();
+    const existingTemplate = document.getElementById('player-row-template');
+    if (existingTemplate) existingTemplate.remove();
+    document.body.insertAdjacentHTML('beforeend', `
+      <template id="player-row-template">
+        <tr class="player-row">
+          <td class="col-name"></td>
+          <td class="col-position"></td>
+          <td class="col-team"></td>
+          <td class="col-price"></td>
+          <td class="col-status"></td>
+          <td class="col-have"></td>
+          <td class="col-captain"></td>
+          <td class="col-vice"></td>
+          <td class="col-notes"></td>
+          <td class="col-actions"></td>
+        </tr>
+      </template>
+    `);
     // Initialize UIManager elements to cache templates
     manager.ui.initElements(document);
 
