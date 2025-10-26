@@ -1,6 +1,8 @@
 /**
- * Storage service factory supporting localStorage, IndexedDB (fallback) and SQLite HTTP backends.
+ * Storage service factory supporting localStorage, IndexedDB and SQLite HTTP backends.
  */
+
+import { StorageServiceDB } from './storage-db.js';
 
 const DEFAULT_STORAGE_KEY = 'fpl-team-data';
 const DEFAULT_SQLITE_BASE_URL = '/api/storage';
@@ -158,13 +160,6 @@ class SQLiteStorageService {
   }
 }
 
-class IndexedDBFallbackService extends LocalStorageService {
-  constructor(options = {}) {
-    super(options);
-    console.warn('[storage] IndexedDB backend is not yet integrated on the frontend; falling back to localStorage.');
-  }
-}
-
 export function createStorageService(options = {}) {
   const {
     backend = 'localstorage',
@@ -179,8 +174,8 @@ export function createStorageService(options = {}) {
   }
 
   if (backend === 'indexeddb') {
-    const fallback = new IndexedDBFallbackService({ storageKey });
-    return createWithLegacyFacade(fallback, storageKey);
+    const indexedDb = new StorageServiceDB({ storageKey });
+    return createWithLegacyFacade(indexedDb, storageKey);
   }
 
   const local = new LocalStorageService({ storageKey });
