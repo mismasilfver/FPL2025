@@ -12,7 +12,9 @@ module.exports = {
 
   // An array of glob patterns indicating a set of files for which coverage information should be collected
   collectCoverageFrom: [
-    'script.js', // Only collect coverage from the main script file
+    'script.js',
+    'js/**/*.js',
+    '!js/adapters/**/*.js',
   ],
 
   // The directory where Jest should output its coverage files

@@ -12,7 +12,7 @@ A simple, responsive web application to manage your Fantasy Premier League team.
   - 🟢 Green: Very Good
   - 🔴 Red: Sell/Don't Buy
 - **Responsive Design**: Works seamlessly on desktop and mobile
-- **Storage Adapters**: Data persists between sessions using a pluggable storage layer (localStorage by default, IndexedDB optional)
+- **Storage Adapters**: Data persists between sessions using a pluggable storage layer (localStorage by default, IndexedDB or SQLite optional)
 - **Position Filtering**: Filter players by position
 - **Team Summary**: Track total players (0/15) and total team value
 
@@ -62,17 +62,20 @@ Related tests: `__tests__/weekNavigation.test.js`, `__tests__/readonlyMode.test.
 
 - **Adapter contract**: `js/adapters/database-adapter.contract.js` defines the required async API.
 - **Local adapter**: `js/adapters/local-storage-adapter.js` wraps `window.localStorage` and satisfies the contract.
-- **IndexedDB adapter**: `js/adapters/indexeddb-adapter.js` provides an IndexedDB-backed implementation.
+-- **IndexedDB adapter**: `js/adapters/indexeddb-adapter.js` provides an IndexedDB-backed implementation.
+- **SQLite adapter**: `js/adapters/sqlite-adapter.js` speaks to the local Express/SQLite API for fully offline durability.
 - **Feature flag**: Toggle `window.USE_INDEXED_DB` in `index.html` to switch between adapters at runtime.
 - **High-level services**: `js/storage.js`, `js/storage-db.js`, and `js/storage-module.js` orchestrate week persistence on top of the adapter layer.
-- **Contract tests**: `__tests__/database.test.js` runs the same suite against every registered adapter, ensuring consistent behaviour across backends.
+- **Adapter contract tests**: `__tests__/database.test.js` runs the same suite against every registered adapter, ensuring consistent behaviour across the low-level key/value layer.
+- **Storage service contract tests** *(new)*: `__tests__/storage-contract.test.js` exercises the high-level storage facade (localStorage, IndexedDB, SQLite) with shared happy-path and defensive scenarios. Run with `npm test -- __tests__/storage-contract.test.js` to verify the three-backend flow end-to-end.
 - **Further reading**: `docs/storage-adapters.md` provides a deeper dive into the adapter contract and how to extend it.
 
 ### Switching storage backends
 
-- **In-app toggle**: Use the "Switch to IndexedDB" / "Switch to localStorage" button in the header to switch persistence layers. The preference is stored in `localStorage` (`fpl-storage-backend`) and the app reloads automatically.
-- **Command-line toggle**: Run `npm run use:indexeddb` or `npm run use:localstorage` to change the default backend written to `storage-config.js`. This is useful for automated environments or CI.
-- **Testing tip**: Before running integration tests that exercise IndexedDB behaviour, set `window.USE_INDEXED_DB = true` or run `npm run use:indexeddb` to ensure the app initializes with the correct backend.
+- **In-app toggle**: Use the storage dropdown in the header to choose between **localStorage**, **IndexedDB**, or **SQLite**. The preference is stored in `localStorage` (`fpl-storage-backend`) and the app reloads automatically.
+- **Command-line toggle**: Run `npm run use:localstorage`, `npm run use:indexeddb`, or `npm run use:sqlite` to change the default backend written to `storage-config.js`. This is useful for automated environments or CI.
+- **Health check**: Selecting SQLite triggers a `/api/storage/root` health check; if the API is unreachable, the UI warns and falls back to localStorage.
+- **Testing tip**: Before running integration tests that exercise IndexedDB behaviour, set `window.USE_INDEXED_DB = true` or run `npm run use:indexeddb`. For SQLite flows, start the Express server (`npm run start:server`) so `/api/storage/*` routes are available.
 
 ## Running Locally
 
@@ -86,7 +89,13 @@ To run this project on your local machine:
     ```
 4.  **Open your browser** and go to `http://localhost:8080`.
 
-Alternatively, you can simply open the `index.html` file directly in your web browser.
+Alternatively, you can simply open the `index.html` file directly in your web browser for localStorage/IndexedDB experiments. To exercise the SQLite backend you must run the API server first:
+
+```bash
+npm install
+npm run start:server
+# In another terminal serve the front-end (e.g. python3 -m http.server)
+```
 
 ## Testing
 
@@ -116,7 +125,9 @@ The test suite includes:
 - **Form Validation Tests**: Required field validation and error handling
 - **Captaincy Tests**: Setting and switching captain/vice-captain roles
 - **UI Interaction Tests**: Button clicks and form submissions
-- **Storage Contract Tests**: `__tests__/database.test.js` verifies that every storage adapter adheres to the shared database contract. Run with `npm test -- __tests__/database.test.js` for a focused check.
+- **Storage Contract Tests**: `__tests__/database.test.js` verifies that every storage adapter (localStorage, IndexedDB, SQLite) adheres to the shared database contract. Run with `npm test -- __tests__/database.test.js` for a focused check.
+- **Storage Service Contract Tests** *(new)*: `__tests__/storage-contract.test.js` validates the factory-created storage services across all backends, including legacy helpers and defensive failure paths. Run with `npm test -- __tests__/storage-contract.test.js`.
+- **SQLite End-to-End Tests**: `__tests__/storage.sqlite.e2e.test.js` spins up the Express server in-memory and exercises the HTTP API. Run with `npm test -- __tests__/storage.sqlite.e2e.test.js`.
 
 All tests use Jest with JSDOM for DOM simulation and comprehensive coverage of user interactions.
 

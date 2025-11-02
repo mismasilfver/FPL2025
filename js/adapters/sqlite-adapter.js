@@ -45,10 +45,16 @@ export class SQLiteKeyValueAdapter {
     this.baseUrl = baseUrl;
     this.namespace = namespace;
     this.fetch = fetchImpl || (typeof window !== 'undefined' ? window.fetch.bind(window) : null);
+    this._queue = Promise.resolve();
 
     if (typeof this.fetch !== 'function') {
       throw new Error('SQLiteKeyValueAdapter requires a fetch implementation');
     }
+  }
+
+  _enqueue(task) {
+    this._queue = this._queue.then(task, task);
+    return this._queue;
   }
 
   _buildKey(key) {
@@ -57,6 +63,7 @@ export class SQLiteKeyValueAdapter {
   }
 
   async get(key) {
+    await this._queue;
     const storageKey = this._buildKey(key);
     const url = buildUrl(this.baseUrl, `root`);
     const root = await this._getRoot(url);
@@ -66,22 +73,29 @@ export class SQLiteKeyValueAdapter {
   async set(key, value) {
     const storageKey = this._buildKey(key);
     const url = buildUrl(this.baseUrl, `root`);
-    const root = await this._getRoot(url);
-    const next = { ...root, [storageKey]: value };
-    await this._putRoot(url, next);
+
+    return this._enqueue(async () => {
+      const root = await this._getRoot(url);
+      const next = { ...root, [storageKey]: value };
+      await this._putRoot(url, next);
+    });
   }
 
   async remove(key) {
     const storageKey = this._buildKey(key);
     const url = buildUrl(this.baseUrl, `root`);
-    const root = await this._getRoot(url);
-    if (!root || !(storageKey in root)) return;
-    const next = { ...root };
-    delete next[storageKey];
-    await this._putRoot(url, next);
+
+    return this._enqueue(async () => {
+      const root = await this._getRoot(url);
+      if (!root || !(storageKey in root)) return;
+      const next = { ...root };
+      delete next[storageKey];
+      await this._putRoot(url, next);
+    });
   }
 
   async getAll() {
+    await this._queue;
     const url = buildUrl(this.baseUrl, `root`);
     const root = await this._getRoot(url);
     if (!root) return {};
@@ -95,14 +109,17 @@ export class SQLiteKeyValueAdapter {
 
   async clear() {
     const url = buildUrl(this.baseUrl, `root`);
-    const root = await this._getRoot(url);
-    if (!root) return;
 
-    const filtered = Object.fromEntries(
-      Object.entries(root).filter(([key]) => !key.startsWith(this.namespace))
-    );
+    return this._enqueue(async () => {
+      const root = await this._getRoot(url);
+      if (!root) return;
 
-    await this._putRoot(url, filtered);
+      const filtered = Object.fromEntries(
+        Object.entries(root).filter(([key]) => !key.startsWith(this.namespace))
+      );
+
+      await this._putRoot(url, filtered);
+    });
   }
 
   async _getRoot(url) {
