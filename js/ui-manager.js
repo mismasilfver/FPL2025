@@ -89,9 +89,6 @@ export default class UIManager {
         this.captainInfo = doc.getElementById('captain-info');
         this.viceCaptainInfo = doc.getElementById('vice-captain-info');
         
-        // Cache templates
-        this.playerModalTemplate = doc.getElementById('player-modal-template');
-        this.playerRowTemplate = doc.getElementById('player-row-template');
         
         if (DEBUG) console.log('initElements - prevWeekBtn found:', !!this.prevWeekBtn);
         if (DEBUG) console.log('initElements - playerModalTemplate found:', !!this.playerModalTemplate);
@@ -115,10 +112,11 @@ export default class UIManager {
     }
 
     buildModalFromTemplate() {
-        if (!this.playerModalTemplate) return console.error('Player modal template not found');
-        
-        const frag = this.playerModalTemplate.content.cloneNode(true);
         const doc = this.document || document;
+        const playerModalTemplate = doc.getElementById('player-modal-template');
+        if (!playerModalTemplate) return console.error('Player modal template not found');
+        
+        const frag = playerModalTemplate.content.cloneNode(true);
         doc.body.appendChild(frag);
         // Use the same document context to find the modal
         this.modal = doc.getElementById('player-modal');
@@ -242,17 +240,44 @@ export default class UIManager {
         if (this.nextWeekBtn) this.nextWeekBtn.disabled = currentWeek >= totalWeeks;
     }
 
+    ensurePlayerRowTemplate(doc) {
+        const targetDoc = doc || (this.playersTbody ? this.playersTbody.ownerDocument : document);
+        if (!targetDoc) return null;
+
+        let template = targetDoc.getElementById('player-row-template');
+        if (!template) {
+            template = targetDoc.createElement('template');
+            template.id = 'player-row-template';
+            template.innerHTML = `
+      <tr class="player-row">
+        <td class="col-name"></td>
+        <td class="col-position"></td>
+        <td class="col-team"></td>
+        <td class="col-price"></td>
+        <td class="col-status"></td>
+        <td class="col-have"></td>
+        <td class="col-captain"></td>
+        <td class="col-vice"></td>
+        <td class="col-notes"></td>
+        <td class="col-actions"></td>
+      </tr>
+    `;
+            targetDoc.body?.appendChild(template);
+        }
+        return template;
+    }
+
     buildRowFromTemplate(player, { isReadOnly, captainId, viceCaptainId }) {
-        if (!this.playerRowTemplate) {
+        const doc = this.playersTbody ? this.playersTbody.ownerDocument : document;
+        const playerRowTemplate = this.ensurePlayerRowTemplate(doc);
+
+        if (!playerRowTemplate) {
             console.error('Player row template not found');
             return null;
         }
         
-        // Use the document from the tbody's owner document to ensure compatibility
-        const doc = this.playersTbody ? this.playersTbody.ownerDocument : document;
-        
         // Clone the template content
-        const templateContent = this.playerRowTemplate.content.cloneNode(true);
+        const templateContent = playerRowTemplate.content.cloneNode(true);
         const row = templateContent.querySelector('tr');
         row.className = 'player-row';
         row.id = `player-row-${player.id}`;

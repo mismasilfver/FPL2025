@@ -60,6 +60,7 @@ export async function initializeApp(options = {}) {
   
   // Add storage type indicator to the UI
   updateStorageIndicator(storageBackend);
+  await syncStorageOptionsState(storageBackend);
   setupStorageToggle(storageBackend);
 
   return mgr;
@@ -119,42 +120,142 @@ function setupImportHandler() { // storageService is no longer needed here
  * Add storage type indicator to the UI
  * @param {boolean} useIndexedDB Whether IndexedDB is being used
  */
+async function syncStorageOptionsState(activeBackend) {
+  const optionsList = document.getElementById('storage-options');
+  if (!optionsList) return;
+
+  if (activeBackend === 'sqlite') {
+    const apiHealthy = await checkSqliteHealth();
+    if (!apiHealthy) {
+      const toggleBtn = document.getElementById('toggle-storage-btn');
+      const sqliteOption = optionsList.querySelector('[data-backend="sqlite"]');
+      if (sqliteOption) {
+        sqliteOption.setAttribute('aria-disabled', 'true');
+        sqliteOption.classList.add('is-disabled');
+      }
+      if (toggleBtn) {
+        toggleBtn.setAttribute('data-warning', 'sqlite-unavailable');
+      }
+      window.fplManager?.ui?.showAlert?.('SQLite backend is unavailable. Falling back to localStorage.');
+      const storage = window.localStorage;
+      try {
+        if (storage) {
+          storage.setItem('fpl-storage-backend', 'localstorage');
+        }
+      } catch (error) {
+        console.error('Failed to persist fallback backend preference:', error);
+      }
+      window.ACTIVE_STORAGE_BACKEND = 'localstorage';
+      window.USE_INDEXED_DB = false;
+      updateStorageIndicator('localstorage');
+      return;
+    }
+  }
+
+  const options = Array.from(optionsList.querySelectorAll('[role="option"]'));
+  options.forEach((option) => {
+    const backend = option.getAttribute('data-backend');
+    const isActive = backend === activeBackend;
+    option.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    option.classList.toggle('is-selected', isActive);
+    if (backend === 'sqlite') {
+      option.removeAttribute('aria-disabled');
+      option.classList.remove('is-disabled');
+    }
+  });
+}
+
+async function checkSqliteHealth() {
+  try {
+    const response = await fetch('/api/storage/root', { method: 'GET' });
+    return response.ok;
+  } catch (error) {
+    console.warn('SQLite health check failed:', error);
+    return false;
+  }
+}
+
 function updateStorageIndicator(activeBackend) {
   const indicator = document.getElementById('storage-indicator');
+  const optionsList = document.getElementById('storage-options');
+
   if (indicator) {
     const label = formatBackendLabel(activeBackend);
     indicator.textContent = `Storage: ${label}`;
     indicator.setAttribute('data-backend', activeBackend);
   }
+
+  if (optionsList) {
+    const options = Array.from(optionsList.querySelectorAll('[role="option"]'));
+    options.forEach((option) => {
+      const isActive = option.getAttribute('data-backend') === activeBackend;
+      option.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      option.classList.toggle('is-selected', isActive);
+    });
+  }
 }
 
-function setupStorageToggle(activeBackend) {
+function setupStorageToggle() {
   const toggleBtn = document.getElementById('toggle-storage-btn');
   const indicator = document.getElementById('storage-indicator');
+  const optionsList = document.getElementById('storage-options');
 
-  if (!toggleBtn) return;
+  if (!toggleBtn || !optionsList) return;
 
   const storage = window.localStorage;
 
-  const setButtonState = (backend) => {
-    if (toggleBtn) {
-      toggleBtn.textContent = backend === 'sqlite'
-        ? 'Switch to localStorage'
-        : backend === 'indexeddb'
-          ? 'Switch to SQLite'
-          : 'Switch to IndexedDB';
-      toggleBtn.setAttribute('aria-pressed', backend !== 'localstorage');
-    }
+  const closeMenu = () => {
+    optionsList.hidden = true;
+    toggleBtn.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('click', handleOutsideClick);
+  };
 
-    if (indicator) {
-      indicator.textContent = `Storage: ${formatBackendLabel(backend)}`;
+  const openMenu = () => {
+    optionsList.hidden = false;
+    toggleBtn.setAttribute('aria-expanded', 'true');
+    document.addEventListener('click', handleOutsideClick);
+  };
+
+  const handleOutsideClick = (event) => {
+    if (!optionsList.contains(event.target) && event.target !== toggleBtn) {
+      closeMenu();
     }
   };
 
-  setButtonState(activeBackend);
+  const activeBackend = indicator?.getAttribute('data-backend') || 'localstorage';
+  updateStorageIndicator(activeBackend);
 
-  toggleBtn.addEventListener('click', () => {
-    const nextBackend = getNextBackend(activeBackend);
+  toggleBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (optionsList.hidden) {
+      openMenu();
+    } else {
+      closeMenu();
+    }
+  });
+
+  optionsList.addEventListener('click', async (event) => {
+    const option = event.target.closest('[role="option"]');
+    if (!option) return;
+
+    const nextBackend = option.getAttribute('data-backend');
+    if (!nextBackend) return;
+
+    if (option.getAttribute('aria-disabled') === 'true') {
+      closeMenu();
+      return;
+    }
+
+    if (nextBackend === 'sqlite') {
+      const healthy = await checkSqliteHealth();
+      if (!healthy) {
+        option.setAttribute('aria-disabled', 'true');
+        option.classList.add('is-disabled');
+        closeMenu();
+        window.fplManager?.ui?.showAlert?.('SQLite backend is unavailable right now.');
+        return;
+      }
+    }
 
     try {
       if (storage) {
@@ -164,14 +265,10 @@ function setupStorageToggle(activeBackend) {
       console.error('Failed to persist storage backend preference:', error);
     }
 
+    closeMenu();
+    updateStorageIndicator(nextBackend);
     window.location.reload();
-  }, { once: true });
-}
-
-function getNextBackend(current) {
-  if (current === 'localstorage') return 'indexeddb';
-  if (current === 'indexeddb') return 'sqlite';
-  return 'localstorage';
+  });
 }
 
 function formatBackendLabel(backend) {

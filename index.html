@@ -11,7 +11,13 @@
             const storage = window.localStorage;
             const storedPreference = storage ? storage.getItem('fpl-storage-backend') : null;
             const defaultBackend = window.STORAGE_BACKEND_DEFAULT || 'localstorage';
-            const resolvedBackend = storedPreference || defaultBackend;
+            const allowedBackends = new Set(['localstorage', 'indexeddb', 'sqlite']);
+            const resolvedBackend = allowedBackends.has(storedPreference)
+                ? storedPreference
+                : allowedBackends.has(defaultBackend)
+                    ? defaultBackend
+                    : 'localstorage';
+
             window.USE_INDEXED_DB = resolvedBackend === 'indexeddb';
             window.ACTIVE_STORAGE_BACKEND = resolvedBackend;
         })();
@@ -40,7 +46,16 @@
             </div>
             <div class="storage-controls" data-testid="storage-controls">
                 <span id="storage-indicator" class="storage-indicator" data-testid="storage-indicator">Storage: localStorage</span>
-                <button id="toggle-storage-btn" class="btn btn-secondary" data-testid="toggle-storage-btn" type="button">Switch to IndexedDB</button>
+                <div class="storage-toggle">
+                    <button id="toggle-storage-btn" class="btn btn-secondary" data-testid="toggle-storage-btn" type="button" aria-haspopup="listbox" aria-expanded="false">
+                        Change Storage
+                    </button>
+                    <ul id="storage-options" class="storage-options" data-testid="storage-options" role="listbox" aria-label="Storage backend" hidden>
+                        <li role="option" data-backend="localstorage" aria-selected="true">localStorage</li>
+                        <li role="option" data-backend="indexeddb">IndexedDB</li>
+                        <li role="option" data-backend="sqlite">SQLite</li>
+                    </ul>
+                </div>
             </div>
         </header>
 

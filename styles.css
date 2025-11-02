@@ -8,6 +8,10 @@
     margin-top: 12px;
 }
 
+.storage-toggle {
+    position: relative;
+}
+
 .storage-indicator {
     background-color: #f7fafc;
     padding: 6px 12px;
@@ -16,6 +20,57 @@
     color: #2d3748;
     border: 1px solid #e2e8f0;
     font-weight: 600;
+}
+
+.storage-options {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    list-style: none;
+    padding: 4px 0;
+    margin: 0;
+    background: #ffffff;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+    min-width: 160px;
+    z-index: 1000;
+}
+
+.storage-options[hidden] {
+    display: none;
+}
+
+.storage-options li {
+    padding: 8px 12px;
+    font-size: 14px;
+    color: #2d3748;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.storage-options li:hover,
+.storage-options li:focus {
+    background: #edf2f7;
+    outline: none;
+}
+
+.storage-options li.is-selected::before {
+    content: '•';
+    color: #3182ce;
+    font-size: 18px;
+}
+
+.storage-options li.is-disabled {
+    color: #a0aec0;
+    cursor: not-allowed;
+}
+
+.storage-options li.is-disabled:hover,
+.storage-options li.is-disabled:focus {
+    background: transparent;
 }
 
 /* Import controls */
