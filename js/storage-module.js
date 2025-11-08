@@ -97,9 +97,10 @@ class LocalStorageService {
 }
 
 class SQLiteStorageService {
-  constructor({ baseUrl = DEFAULT_SQLITE_BASE_URL, fetchImpl } = {}) {
+  constructor({ baseUrl = DEFAULT_SQLITE_BASE_URL, fetchImpl, storageKey = DEFAULT_STORAGE_KEY } = {}) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.fetch = fetchImpl || (typeof window !== 'undefined' ? window.fetch.bind(window) : null);
+    this.storageKey = storageKey;
 
     if (typeof this.fetch !== 'function') {
       throw new Error('SQLiteStorageService requires a fetch implementation.');
@@ -169,7 +170,11 @@ export function createStorageService(options = {}) {
   } = options;
 
   if (backend === 'sqlite') {
-    const sqlite = new SQLiteStorageService({ baseUrl: baseUrl || DEFAULT_SQLITE_BASE_URL, fetchImpl });
+    const sqlite = new SQLiteStorageService({
+      baseUrl: baseUrl || DEFAULT_SQLITE_BASE_URL,
+      fetchImpl,
+      storageKey
+    });
     return createWithLegacyFacade(sqlite, storageKey);
   }
 

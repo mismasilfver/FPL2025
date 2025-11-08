@@ -1,4 +1,5 @@
-import { createStorageService, createDefaultRoot } from '../js/storage-module.js';
+const { createStorageService, createDefaultRoot } = jest.requireActual('../js/storage-module.js');
+const { createSQLiteApiMock } = require('../test-utils/sqlite-api-mock.js');
 
 describe('createStorageService', () => {
   const originalFetch = global.fetch;
@@ -90,6 +91,67 @@ describe('createStorageService', () => {
     });
     expect(service).toBeDefined();
     expect(typeof service.getRootData).toBe('function');
+  });
+
+  test('SQLite-backed service loads and persists using the HTTP mock API', async () => {
+    const initialRoot = createDefaultRoot();
+    const api = createSQLiteApiMock({ initialRoot });
+    global.fetch = api.fetchMock;
+
+    const service = createStorageService({
+      backend: 'sqlite',
+      baseUrl: 'http://localhost/api/storage',
+      fetchImpl: api.fetchMock
+    });
+
+    const root = await service.getRootData();
+    expect(root).toMatchObject({ currentWeek: 1, version: '2.0' });
+
+    expect(api.fetchMock).toHaveBeenCalledWith(
+      'http://localhost/api/storage/root',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({ Accept: 'application/json' })
+      })
+    );
+
+    const updatedRoot = {
+      version: '2.0',
+      currentWeek: 3,
+      weeks: {
+        1: root.weeks['1'],
+        3: {
+          players: [{ id: 'p3', have: true, price: 9 }],
+          captain: 'p3',
+          viceCaptain: null,
+          teamMembers: [{ playerId: 'p3', addedAt: 3 }],
+          teamStats: { totalValue: 9, playerCount: 1 },
+          totalTeamCost: 9,
+          isReadOnly: false
+        }
+      }
+    };
+
+    await service.setRootData(updatedRoot);
+
+    expect(api.fetchMock).toHaveBeenLastCalledWith(
+      'http://localhost/api/storage/root',
+      expect.objectContaining({
+        method: 'PUT',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        })
+      })
+    );
+
+    const persisted = api.getState();
+    expect(persisted.currentWeek).toBe(3);
+    expect(persisted.weeks['3']).toMatchObject({ captain: 'p3', totalTeamCost: 9 });
+
+    const reloaded = await service.getRootData();
+    expect(reloaded.currentWeek).toBe(3);
+    expect(reloaded.weeks['3']).toMatchObject({ viceCaptain: null, totalTeamCost: 9 });
   });
 });
 
