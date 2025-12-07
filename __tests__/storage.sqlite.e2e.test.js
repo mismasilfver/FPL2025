@@ -2,50 +2,29 @@
  * @jest-environment node
  */
 
-const { startServer } = require('../server/server');
-const database = require('../server/database');
-
-const waitForEvent = (emitter, event) =>
-  new Promise((resolve, reject) => {
-    const onError = (error) => {
-      cleanup();
-      reject(error);
-    };
-
-    const onEvent = (...args) => {
-      cleanup();
-      resolve(...args);
-    };
-
-    const cleanup = () => {
-      emitter.removeListener(event, onEvent);
-      emitter.removeListener('error', onError);
-    };
-
-    emitter.once(event, onEvent);
-    emitter.once('error', onError);
-  });
+const { createSQLiteTestServer } = require('../test-utils/create-sqlite-test-server.js');
 
 describe('SQLite storage server end-to-end', () => {
   let server;
   let baseUrl;
 
   beforeAll(async () => {
-    server = startServer(0, { fileName: ':memory:' });
-    await waitForEvent(server, 'listening');
-    const address = server.address();
-    baseUrl = `http://127.0.0.1:${address.port}`;
+    server = await createSQLiteTestServer();
+    baseUrl = `${server.baseUrl}/api/storage`;
   });
 
   afterAll(async () => {
     if (server) {
-      await new Promise((resolve) => server.close(resolve));
+      await server.teardown();
     }
-    database.closeDatabase();
+  });
+
+  beforeEach(async () => {
+    await server.reset();
   });
 
   test('initial root payload is returned and can be updated', async () => {
-    const rootResponse = await fetch(`${baseUrl}/api/storage/root`);
+    const rootResponse = await fetch(`${baseUrl}/root`);
     expect(rootResponse.status).toBe(200);
     const rootPayload = await rootResponse.json();
 
@@ -67,7 +46,7 @@ describe('SQLite storage server end-to-end', () => {
       }
     };
 
-    const putResponse = await fetch(`${baseUrl}/api/storage/root`, {
+    const putResponse = await fetch(`${baseUrl}/root`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedRoot)
@@ -81,14 +60,14 @@ describe('SQLite storage server end-to-end', () => {
       teamStats: { totalValue: 12, totalPlayers: 1 }
     });
 
-    const confirmResponse = await fetch(`${baseUrl}/api/storage/root`);
+    const confirmResponse = await fetch(`${baseUrl}/root`);
     const confirmedRoot = await confirmResponse.json();
     expect(confirmedRoot.currentWeek).toBe(2);
     expect(Object.keys(confirmedRoot.weeks)).toContain('2');
   });
 
   test('week CRUD endpoints operate over HTTP', async () => {
-    const postResponse = await fetch(`${baseUrl}/api/storage/weeks`, {
+    const postResponse = await fetch(`${baseUrl}/weeks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -104,22 +83,22 @@ describe('SQLite storage server end-to-end', () => {
     const createdWeek = await postResponse.json();
     expect(createdWeek.weekNumber).toBe(3);
 
-    const getResponse = await fetch(`${baseUrl}/api/storage/weeks/3`);
+    const getResponse = await fetch(`${baseUrl}/weeks/3`);
     expect(getResponse.status).toBe(200);
     const fetchedWeek = await getResponse.json();
     expect(fetchedWeek.players).toEqual([{ id: 'p3', price: 8.5 }]);
 
-    const listResponse = await fetch(`${baseUrl}/api/storage/weeks`);
+    const listResponse = await fetch(`${baseUrl}/weeks`);
     const weeks = await listResponse.json();
     expect(Array.isArray(weeks)).toBe(true);
     expect(weeks.find((week) => week.weekNumber === 3)).toBeDefined();
 
-    const deleteResponse = await fetch(`${baseUrl}/api/storage/weeks/3`, {
+    const deleteResponse = await fetch(`${baseUrl}/weeks/3`, {
       method: 'DELETE'
     });
     expect(deleteResponse.status).toBe(204);
 
-    const missingResponse = await fetch(`${baseUrl}/api/storage/weeks/3`);
+    const missingResponse = await fetch(`${baseUrl}/weeks/3`);
     expect(missingResponse.status).toBe(404);
   });
 });

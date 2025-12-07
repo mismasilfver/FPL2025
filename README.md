@@ -62,7 +62,7 @@ Related tests: `__tests__/weekNavigation.test.js`, `__tests__/readonlyMode.test.
 
 - **Adapter contract**: `js/adapters/database-adapter.contract.js` defines the required async API.
 - **Local adapter**: `js/adapters/local-storage-adapter.js` wraps `window.localStorage` and satisfies the contract.
--- **IndexedDB adapter**: `js/adapters/indexeddb-adapter.js` provides an IndexedDB-backed implementation.
+- **IndexedDB adapter**: `js/adapters/indexeddb-adapter.js` provides an IndexedDB-backed implementation.
 - **SQLite adapter**: `js/adapters/sqlite-adapter.js` speaks to the local Express/SQLite API for fully offline durability.
 - **Feature flag**: Toggle `window.USE_INDEXED_DB` in `index.html` to switch between adapters at runtime.
 - **High-level services**: `js/storage.js`, `js/storage-db.js`, and `js/storage-module.js` orchestrate week persistence on top of the adapter layer.
@@ -183,3 +183,41 @@ Works on all modern browsers including:
 ---
 
 **Note**: This is an MVP (Minimum Viable Product) version. All player and team data must be entered manually.
+
+### Recent changes (storage + testing)
+
+- Added SQLite HTTP API mock for TDD: `test-utils/sqlite-api-mock.js` used by `__tests__/storage-module.test.js` to validate GET/PUT flows without a real server.
+- Created real server harness helpers:
+  - In-memory DB: `test-utils/create-sqlite-test-server.js`
+  - Disk-backed DB (temp dir): `test-utils/create-sqlite-disk-test-server.js`
+- New integration tests using the helpers:
+  - Helper coverage: `__tests__/sqlite-server.helper.test.js`, `__tests__/sqlite-disk-server.helper.test.js`
+  - Storage service E2E: `__tests__/sqlite-storage.service.e2e.test.js`
+  - Server HTTP API E2E (refactored to helper): `__tests__/storage.sqlite.e2e.test.js`
+- Factory improvements: `createStorageService` now forwards `baseUrl`, `fetchImpl`, and `storageKey` to `SQLiteStorageService`.
+- Added npm scripts: `test:all`, `test:fast`, `test:storage`, `test:ui`, `test:storage:int`.
+- Cleaned up temporary debug logs in tests and services.
+
+### Test filtering presets
+
+```bash
+npm run test:all            # run everything
+npm run test:fast           # run with workers for speed
+npm run test:storage        # local + IndexedDB + SQLite mock
+npm run test:ui             # DOM + modal subset
+npm run test:storage:int    # SQLite integration (server-based)
+```
+
+### Additional coverage notes
+
+- SQLite End-to-End: `__tests__/storage.sqlite.e2e.test.js` uses the new helper to spin up the Express server and exercises the HTTP API.
+- SQLite Helper Tests: `__tests__/sqlite-server.helper.test.js` (in-memory) and `__tests__/sqlite-disk-server.helper.test.js` (disk-backed) validate the server harness utilities.
+- SQLite Storage Service E2E: `__tests__/sqlite-storage.service.e2e.test.js` runs `SQLiteStorageService` against the real HTTP server via the helper, including error-path coverage.
+
+### Additional files
+
+- `test-utils/` – Testing utilities and helpers:
+  - `sqlite-api-mock.js` — mock for `/api/storage/root` used in unit tests
+  - `create-sqlite-test-server.js` — in-memory server harness for E2E
+  - `create-sqlite-disk-test-server.js` — disk-backed server harness for E2E
+- `server/` – Express + SQLite API (storage routes and database module)
