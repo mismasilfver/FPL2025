@@ -8,6 +8,7 @@
     "test:fast": "jest -w 4",
     "test:storage": "jest __tests__/storage-module.test.js __tests__/indexeddb.integration.test.js",
     "test:ui": "jest __tests__/app-init.test.js __tests__/playerManagement.test.js __tests__/weekNavigation.clean.test.js",
+    "test:storage:int": "jest __tests__/sqlite-server.helper.test.js __tests__/storage.sqlite.e2e.test.js __tests__/sqlite-storage.service.e2e.test.js",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:server": "jest --runTestsByPath __tests__/storage.api.test.js",
