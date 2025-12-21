@@ -330,14 +330,26 @@ export class FPLTeamManager {
         const weekData = await this.getWeekSnapshot(currentWeek);
         const dataStr = JSON.stringify(weekData, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(dataBlob);
+        const urlApi = (typeof window !== 'undefined' && window.URL)
+            || (typeof global !== 'undefined' && global.URL)
+            || null;
+
+        const canCreateObjectUrl = urlApi && typeof urlApi.createObjectURL === 'function';
+        const canRevokeObjectUrl = urlApi && typeof urlApi.revokeObjectURL === 'function';
+
+        if (!canCreateObjectUrl || !canRevokeObjectUrl) {
+            console.warn('URL.createObjectURL is not available; skipping export.');
+            return;
+        }
+
+        const url = urlApi.createObjectURL(dataBlob);
         const link = document.createElement('a');
         link.href = url;
         link.download = `fpl_week_${currentWeek}_data.json`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        urlApi.revokeObjectURL(url);
     }
 
     async _getRootData() {
