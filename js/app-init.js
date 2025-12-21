@@ -8,6 +8,8 @@ import { exportToJSON, importFromJSON } from './import-export.js';
 import { patchFPLTeamManagerAsync } from './fpl-async-patch.js';
 import * as ScriptModule from '../script.js';
 
+const DEFAULT_STORAGE_INIT_TIMEOUT_MS = 2500;
+
 /**
  * Initialize the application with the appropriate storage backend
  * @param {Object} options Configuration options
@@ -17,19 +19,22 @@ import * as ScriptModule from '../script.js';
 export async function initializeApp(options = {}) {
   const {
     useIndexedDB = window.USE_INDEXED_DB === true,
-    storageBackend = window.ACTIVE_STORAGE_BACKEND || 'localstorage'
+    storageBackend = window.ACTIVE_STORAGE_BACKEND || 'localstorage',
+    storageInitTimeoutMs = DEFAULT_STORAGE_INIT_TIMEOUT_MS
   } = options;
-  
-  // Create the appropriate storage service
-  const storageService = createStorageService({
+
+  const storageKey = 'fpl-team-data';
+
+  const {
+    service: storageService,
+    backend: activeBackend,
+    fallbackInfo
+  } = await createInitializedStorageService({
     backend: storageBackend,
     useIndexedDB,
-    storageKey: 'fpl-team-data'
+    storageKey,
+    timeoutMs: storageInitTimeoutMs
   });
-  
-  if (typeof storageService.initialize === 'function') {
-    await storageService.initialize();
-  }
   
   // Patch FPLTeamManager methods to be async-compatible
   // This must be done before creating an instance
@@ -54,16 +59,270 @@ export async function initializeApp(options = {}) {
 
   // Perform async initialization (data loading, initial render)
   await mgr.init();
+
+  if (fallbackInfo?.message) {
+    mgr.ui?.showAlert?.(fallbackInfo.message);
+    recordInitEvent({ stage: 'ui', type: 'notice', message: fallbackInfo.message });
+  }
   
   // Set up the import button handler
   setupImportHandler();
   
   // Add storage type indicator to the UI
-  updateStorageIndicator(storageBackend);
-  await syncStorageOptionsState(storageBackend);
-  setupStorageToggle(storageBackend);
+  updateStorageIndicator(activeBackend);
+  await syncStorageOptionsState(activeBackend);
+  setupStorageToggle(activeBackend);
 
   return mgr;
+}
+
+async function createInitializedStorageService({ backend, useIndexedDB, storageKey, timeoutMs }) {
+  const preferIndexedDb = backend === 'indexeddb' && useIndexedDB !== false;
+  const diagnostics = ensureDiagnosticsContainer();
+  diagnostics.backendRequested = backend;
+
+  if (!preferIndexedDb) {
+    const resolvedBackend = backend === 'indexeddb' ? 'localstorage' : backend;
+    if (backend === 'indexeddb') {
+      recordInitEvent({
+        stage: 'storage',
+        type: 'fallback',
+        from: 'indexeddb',
+        to: resolvedBackend,
+        reason: 'disabled'
+      });
+    }
+
+    const service = safeCreateStorageService({ backend: resolvedBackend, storageKey });
+    recordInitEvent({ stage: 'storage', type: 'attempt', backend: resolvedBackend });
+
+    const result = await initializeWithTimeout(service, timeoutMs, resolvedBackend);
+
+    if (result.status === 'error') {
+      recordInitEvent({
+        stage: 'storage',
+        type: 'error',
+        backend: resolvedBackend,
+        error: result.error?.message
+      });
+      throw result.error;
+    }
+
+    recordInitEvent({
+      stage: 'storage',
+      type: 'success',
+      backend: resolvedBackend,
+      elapsedMs: result.elapsedMs
+    });
+
+    setRuntimeBackendFlags(resolvedBackend);
+    console.info(`[app-init] Storage backend ready: ${resolvedBackend}`);
+
+    return {
+      service,
+      backend: resolvedBackend,
+      fallbackInfo: backend === 'indexeddb'
+        ? { message: 'IndexedDB backend disabled. Using localStorage instead.' }
+        : undefined
+    };
+  }
+
+  const primaryBackend = 'indexeddb';
+  const service = safeCreateStorageService({ backend: primaryBackend, storageKey });
+  recordInitEvent({ stage: 'storage', type: 'attempt', backend: primaryBackend });
+
+  const result = await initializeWithTimeout(service, timeoutMs, primaryBackend);
+
+  if (result.status === 'success' || result.status === 'skipped') {
+    recordInitEvent({
+      stage: 'storage',
+      type: 'success',
+      backend: primaryBackend,
+      elapsedMs: result.elapsedMs
+    });
+    setRuntimeBackendFlags(primaryBackend);
+    console.info(`[app-init] Storage backend ready: ${primaryBackend}`);
+    return { service, backend: primaryBackend, fallbackInfo: undefined };
+  }
+
+  let fallbackReason = 'timeout';
+  let fallbackError;
+
+  if (result.status === 'error') {
+    fallbackReason = 'error';
+    fallbackError = result.error;
+    recordInitEvent({
+      stage: 'storage',
+      type: 'error',
+      backend: primaryBackend,
+      error: fallbackError?.message
+    });
+  }
+
+  const fallbackBackend = 'localstorage';
+  recordInitEvent({
+    stage: 'storage',
+    type: 'fallback',
+    from: primaryBackend,
+    to: fallbackBackend,
+    reason: fallbackReason,
+    elapsedMs: result.elapsedMs
+  });
+
+  try {
+    await service.teardown?.();
+  } catch (teardownError) {
+    console.error('Failed to teardown stalled IndexedDB service:', teardownError);
+    recordInitEvent({
+      stage: 'storage',
+      type: 'teardown-error',
+      backend: primaryBackend,
+      error: teardownError?.message
+    });
+  }
+
+  const warnMessage = fallbackReason === 'timeout'
+    ? `IndexedDB initialization timed out after ${timeoutMs}ms. Falling back to localStorage.`
+    : `IndexedDB initialization failed: ${fallbackError?.message || 'unknown error'}. Falling back to localStorage.`;
+  console.warn(warnMessage);
+
+  persistActiveBackendPreference(fallbackBackend);
+  setRuntimeBackendFlags(fallbackBackend);
+
+  const fallbackService = safeCreateStorageService({ backend: fallbackBackend, storageKey });
+  recordInitEvent({ stage: 'storage', type: 'attempt', backend: fallbackBackend });
+
+  const fallbackResult = await initializeWithTimeout(fallbackService, timeoutMs, fallbackBackend);
+
+  if (fallbackResult.status === 'error') {
+    recordInitEvent({
+      stage: 'storage',
+      type: 'error',
+      backend: fallbackBackend,
+      error: fallbackResult.error?.message
+    });
+    throw fallbackResult.error;
+  }
+
+  recordInitEvent({
+    stage: 'storage',
+    type: 'success',
+    backend: fallbackBackend,
+    elapsedMs: fallbackResult.elapsedMs
+  });
+
+  console.info(`[app-init] Storage backend ready: ${fallbackBackend}`);
+
+  const fallbackInfo = {
+    message: fallbackReason === 'timeout'
+      ? 'IndexedDB backend timed out during initialization. Using localStorage instead.'
+      : 'IndexedDB backend failed during initialization. Using localStorage instead.'
+  };
+
+  return {
+    service: fallbackService,
+    backend: fallbackBackend,
+    fallbackInfo
+  };
+}
+
+function safeCreateStorageService(options) {
+  try {
+    return createStorageService(options);
+  } catch (error) {
+    recordInitEvent({
+      stage: 'storage',
+      type: 'error',
+      backend: options?.backend,
+      error: error?.message
+    });
+    throw error;
+  }
+}
+
+async function initializeWithTimeout(service, timeoutMs, backend) {
+  if (!service || typeof service.initialize !== 'function') {
+    return { status: 'skipped', elapsedMs: 0 };
+  }
+
+  const start = Date.now();
+  let timeoutId;
+
+  const initPromise = Promise.resolve().then(() => service.initialize());
+  const guardedInit = initPromise
+    .then(() => ({ status: 'success', elapsedMs: Date.now() - start }))
+    .catch((error) => ({ status: 'error', error, elapsedMs: Date.now() - start }));
+
+  const timeoutPromise = new Promise((resolve) => {
+    timeoutId = setTimeout(() => {
+      resolve({ status: 'timeout', elapsedMs: Date.now() - start });
+    }, timeoutMs);
+  });
+
+  const outcome = await Promise.race([guardedInit, timeoutPromise]);
+  clearTimeout(timeoutId);
+
+  if (outcome.status === 'timeout') {
+    // Ensure eventual settle of initialize promise is handled to avoid unhandled rejections
+    guardedInit.catch(() => {});
+    recordInitEvent({
+      stage: 'storage',
+      type: 'timeout',
+      backend,
+      elapsedMs: outcome.elapsedMs
+    });
+  }
+
+  return outcome;
+}
+
+function ensureDiagnosticsContainer() {
+  const host = typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : {};
+  if (!host.fplInitDiagnostics) {
+    host.fplInitDiagnostics = {
+      startedAt: Date.now(),
+      events: []
+    };
+  }
+  return host.fplInitDiagnostics;
+}
+
+function recordInitEvent(event) {
+  const diagnostics = ensureDiagnosticsContainer();
+  diagnostics.events.push({ ...event, timestamp: Date.now() });
+  return diagnostics;
+}
+
+function persistActiveBackendPreference(backend) {
+  try {
+    const storage = typeof window !== 'undefined' ? window.localStorage : undefined;
+    if (storage) {
+      storage.setItem('fpl-storage-backend', backend);
+      recordInitEvent({ stage: 'storage', type: 'preference-persisted', backend });
+    }
+  } catch (error) {
+    console.error('Failed to persist fallback backend preference:', error);
+    recordInitEvent({
+      stage: 'storage',
+      type: 'preference-error',
+      backend,
+      error: error?.message
+    });
+  }
+}
+
+function setRuntimeBackendFlags(backend) {
+  const isIndexedDb = backend === 'indexeddb';
+
+  if (typeof window !== 'undefined') {
+    window.ACTIVE_STORAGE_BACKEND = backend;
+    window.USE_INDEXED_DB = isIndexedDb;
+  }
+
+  if (typeof global !== 'undefined') {
+    global.ACTIVE_STORAGE_BACKEND = backend;
+    global.USE_INDEXED_DB = isIndexedDb;
+  }
 }
 
 /**

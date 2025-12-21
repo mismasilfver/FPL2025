@@ -125,6 +125,7 @@ beforeEach(() => {
   global.FPLTeamManager = MockFPLTeamManager;
   window.USE_INDEXED_DB = false;
   window.ACTIVE_STORAGE_BACKEND = 'localstorage';
+  delete window.fplInitDiagnostics;
   appInstance = undefined;
 
   if (typeof window.location.reload?.mockClear === 'function') {
@@ -230,5 +231,61 @@ describe('App initialization storage dropdown', () => {
     expect(sqliteOption.classList.contains('is-disabled')).toBe(true);
     expect(optionsList.hidden).toBe(true);
     expect(window.location.reload).not.toHaveBeenCalled();
+  });
+});
+
+describe('IndexedDB fallback resilience', () => {
+  test('falls back to localStorage when IndexedDB initialization stalls and records diagnostics', async () => {
+    jest.useFakeTimers();
+
+    const stalledService = {
+      initialize: jest.fn(() => new Promise(() => {})),
+      getRootData: jest.fn(),
+      setRootData: jest.fn(),
+      teardown: jest.fn()
+    };
+
+    createStorageService.mockImplementationOnce(() => stalledService);
+
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => {});
+
+    window.ACTIVE_STORAGE_BACKEND = 'indexeddb';
+    window.USE_INDEXED_DB = true;
+
+    try {
+      const initPromise = initApp({ storageBackend: 'indexeddb', storageInitTimeoutMs: 50 });
+
+      await Promise.resolve();
+      jest.advanceTimersByTime(50);
+      await flushPromises();
+      await flushPromises();
+
+      const manager = await initPromise;
+
+      expect(manager).toBeDefined();
+      expect(createStorageService).toHaveBeenNthCalledWith(1, expect.objectContaining({ backend: 'indexeddb' }));
+      expect(createStorageService).toHaveBeenNthCalledWith(2, expect.objectContaining({ backend: 'localstorage' }));
+      expect(MockFPLTeamManager).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('IndexedDB initialization timed out'));
+      expect(window.fplInitDiagnostics).toBeDefined();
+      expect(window.fplInitDiagnostics.events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            stage: 'storage',
+            type: 'fallback',
+            from: 'indexeddb',
+            to: 'localstorage',
+            reason: 'timeout'
+          })
+        ])
+      );
+    } finally {
+      warnSpy.mockRestore();
+      errorSpy.mockRestore();
+      infoSpy.mockRestore();
+      jest.useRealTimers();
+    }
   });
 });

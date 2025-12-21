@@ -7,6 +7,14 @@ export default class UIManager {
         this.currentEditingId = null;
     }
 
+    _logButtonClick(button, payload = {}) {
+        try {
+            console.log('[UIManager] Button click', { button, ...payload });
+        } catch (error) {
+            if (DEBUG) console.error('Failed to log button click', error);
+        }
+    }
+
     bindEvents(handlers = {}) {
         // Store handlers for later use in modal binding
         this.handlers = handlers;
@@ -18,13 +26,34 @@ export default class UIManager {
         } = handlers;
 
         if (!this._boundGlobal) {
-            this.addPlayerBtn?.addEventListener('click', () => onAddPlayer?.());
-            this.positionFilter?.addEventListener('change', () => onPositionFilterChange?.());
-            this.haveFilter?.addEventListener('change', () => onHaveFilterChange?.());
-            this.prevWeekBtn?.addEventListener('click', () => onPrevWeek?.());
-            this.nextWeekBtn?.addEventListener('click', () => onNextWeek?.());
-            this.createWeekBtn?.addEventListener('click', () => onCreateWeek?.());
-            this.exportWeekBtn?.addEventListener('click', () => onExportWeek?.());
+            this.addPlayerBtn?.addEventListener('click', () => {
+                this._logButtonClick('add-player');
+                onAddPlayer?.();
+            });
+            this.positionFilter?.addEventListener('change', () => {
+                this._logButtonClick('position-filter-change');
+                onPositionFilterChange?.();
+            });
+            this.haveFilter?.addEventListener('change', () => {
+                this._logButtonClick('have-filter-change');
+                onHaveFilterChange?.();
+            });
+            this.prevWeekBtn?.addEventListener('click', () => {
+                this._logButtonClick('previous-week');
+                onPrevWeek?.();
+            });
+            this.nextWeekBtn?.addEventListener('click', () => {
+                this._logButtonClick('next-week');
+                onNextWeek?.();
+            });
+            this.createWeekBtn?.addEventListener('click', () => {
+                this._logButtonClick('create-week');
+                onCreateWeek?.();
+            });
+            this.exportWeekBtn?.addEventListener('click', () => {
+                this._logButtonClick('export-week');
+                onExportWeek?.();
+            });
 
             if (this.playersTbody) {
                 this.playersTbody.addEventListener('click', (e) => {
@@ -36,6 +65,8 @@ export default class UIManager {
                         const action = actionEl.getAttribute('data-action');
                         const playerId = actionEl.getAttribute('data-player-id');
                         if (!action || !playerId) return;
+
+                        this._logButtonClick('player-action', { action, playerId });
 
                         switch (action) {
                             case 'toggle-have': onToggleHave?.(playerId); break;
@@ -53,8 +84,14 @@ export default class UIManager {
         }
 
         // Re-bind modal events if modal is rebuilt
-        this.modal?.querySelector('.close')?.addEventListener('click', () => onModalClose?.());
-        this.modal?.querySelector('[data-testid="cancel-button"]')?.addEventListener('click', () => onModalClose?.());
+        this.modal?.querySelector('.close')?.addEventListener('click', () => {
+            this._logButtonClick('modal-close');
+            onModalClose?.();
+        });
+        this.modal?.querySelector('[data-testid="cancel-button"]')?.addEventListener('click', () => {
+            this._logButtonClick('modal-cancel');
+            onModalClose?.();
+        });
         this.modal?.addEventListener('click', (e) => {
             if (e.target === this.modal) onModalClose?.();
         });
@@ -150,6 +187,7 @@ export default class UIManager {
         if (closeBtn) {
             closeBtn.addEventListener('click', (e) => {
                 e.preventDefault();
+                this._logButtonClick('modal-close');
                 onModalClose?.();
             });
         }
@@ -158,12 +196,16 @@ export default class UIManager {
         if (cancelBtn) {
             cancelBtn.addEventListener('click', (e) => {
                 e.preventDefault();
+                this._logButtonClick('modal-cancel');
                 onModalClose?.();
             });
         }
         
         this.modal.addEventListener('click', (e) => {
-            if (e.target === this.modal) onModalClose?.();
+            if (e.target === this.modal) {
+                this._logButtonClick('modal-overlay');
+                onModalClose?.();
+            }
         });
         
         // Bind form submit event
