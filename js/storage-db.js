@@ -14,7 +14,26 @@ export class StorageServiceDB {
     this.dbName = dbName;
     this.dbVersion = dbVersion;
     this.storageKey = storageKey;
+    this._seedPromise = null;
+    this._resolveDbReady = null;
+    this._rejectDbReady = null;
+    this.dbReady = new Promise((resolve, reject) => {
+      this._resolveDbReady = resolve;
+      this._rejectDbReady = reject;
+    });
     this.initialized = this.initDB();
+  }
+
+  async _getStoreItemDirect(storeName, key) {
+    await this.dbReady;
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const request = store.get(key);
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(new Error(`Error getting ${key} from ${storeName}`));
+    });
   }
 
   async initDB() {
@@ -43,18 +62,28 @@ export class StorageServiceDB {
       
       request.onsuccess = (event) => {
         this.db = event.target.result;
+        this._resolveDbReady?.();
         this.initialize().then(resolve).catch(reject);
       };
       
       request.onerror = (event) => {
-        reject(new Error(`Database error: ${event.target.errorCode}`));
+        const error = new Error(`Database error: ${event.target.errorCode}`);
+        this._rejectDbReady?.(error);
+        reject(error);
       };
     });
   }
 
   async initialize() {
-    // Check if root exists
-    const rootData = await this._getStoreItem('root', 'singleton');
+    if (!this._seedPromise) {
+      this._seedPromise = this._seedDatabaseIfNeeded();
+    }
+    return this._seedPromise;
+  }
+
+  async _seedDatabaseIfNeeded() {
+    await this.dbReady;
+    const rootData = await this._getStoreItemDirect('root', 'singleton');
     if (rootData) return;
     
     // Initialize with empty data
@@ -89,6 +118,7 @@ export class StorageServiceDB {
   // Helper: Get a single item from a store
   async _getStoreItem(storeName, key) {
     await this.initialized;
+    await this.dbReady;
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(storeName, 'readonly');
       const store = tx.objectStore(storeName);
@@ -102,6 +132,7 @@ export class StorageServiceDB {
   // Helper: Get all items from a store
   async _getAllStoreItems(storeName) {
     await this.initialized;
+    await this.dbReady;
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(storeName, 'readonly');
       const store = tx.objectStore(storeName);
@@ -115,6 +146,7 @@ export class StorageServiceDB {
   // Helper: Get items by index
   async _getByIndex(storeName, indexName, key) {
     await this.initialized;
+    await this.dbReady;
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(storeName, 'readonly');
       const store = tx.objectStore(storeName);

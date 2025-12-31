@@ -17,65 +17,6 @@ const createRequest = (executor) => {
       const result = executor();
       request.result = clone(result);
       request.onsuccess?.({ target: request });
-
-describe('StorageServiceDB initialization flow', () => {
-  const originalIndexedDB = global.indexedDB;
-
-  afterEach(() => {
-    global.indexedDB = originalIndexedDB;
-  });
-
-  const makeRequest = (result) => {
-    const request = {};
-    queueMicrotask(() => {
-      request.result = result;
-      request.onsuccess?.({ target: { result } });
-    });
-    return request;
-  };
-
-  test('initialized resolves when IndexedDB open succeeds', async () => {
-    const fakeStores = {
-      root: {
-        get: jest.fn(() => makeRequest(null)),
-        put: jest.fn(() => makeRequest(undefined))
-      },
-      weeks: {
-        put: jest.fn(() => makeRequest(undefined))
-      }
-    };
-
-    const fakeDb = {
-      objectStoreNames: { contains: () => true },
-      transaction: jest.fn(() => {
-        const tx = {
-          objectStore: (name) => fakeStores[name],
-          oncomplete: undefined,
-          onerror: undefined
-        };
-
-        queueMicrotask(() => tx.oncomplete?.({ target: tx }));
-        return tx;
-      })
-    };
-
-    global.indexedDB = {
-      open: jest.fn(() => {
-        const request = {};
-        queueMicrotask(() => {
-          request.result = fakeDb;
-          request.onsuccess?.({ target: { result: fakeDb } });
-        });
-        return request;
-      })
-    };
-
-    const service = new StorageServiceDB();
-
-    await expect(service.initialized).resolves.toBeUndefined();
-    expect(fakeStores.root.get).toHaveBeenCalledWith('singleton');
-  });
-});
     } catch (error) {
       request.error = error;
       request.onerror?.({ target: request });
@@ -201,6 +142,105 @@ const createFakeDb = (data) => {
     }
   };
 };
+
+describe('StorageServiceDB initialization flow', () => {
+  const originalIndexedDB = global.indexedDB;
+
+  afterEach(() => {
+    global.indexedDB = originalIndexedDB;
+  });
+
+  const makeRequest = (result) => {
+    const request = {};
+    queueMicrotask(() => {
+      request.result = result;
+      request.onsuccess?.({ target: { result } });
+    });
+    return request;
+  };
+
+  test('initialized resolves when IndexedDB open succeeds', async () => {
+    const fakeStores = {
+      root: {
+        get: jest.fn(() => makeRequest(null)),
+        put: jest.fn(() => makeRequest(undefined))
+      },
+      weeks: {
+        put: jest.fn(() => makeRequest(undefined))
+      }
+    };
+
+    const fakeDb = {
+      objectStoreNames: { contains: () => true },
+      transaction: jest.fn(() => {
+        const tx = {
+          objectStore: (name) => fakeStores[name],
+          oncomplete: undefined,
+          onerror: undefined
+        };
+
+        queueMicrotask(() => tx.oncomplete?.({ target: tx }));
+        return tx;
+      })
+    };
+
+    global.indexedDB = {
+      open: jest.fn(() => {
+        const request = {};
+        queueMicrotask(() => {
+          request.result = fakeDb;
+          request.onsuccess?.({ target: { result: fakeDb } });
+        });
+        return request;
+      })
+    };
+
+    const service = new StorageServiceDB();
+
+    await expect(service.initialized).resolves.toBeUndefined();
+    expect(fakeStores.root.get).toHaveBeenCalledWith('singleton');
+  });
+
+  test('initialize method resolves even when called after constructor', async () => {
+    const fakeStores = {
+      root: {
+        get: jest.fn(() => makeRequest({ id: 'singleton' })),
+        put: jest.fn(() => makeRequest(undefined))
+      },
+      weeks: {
+        put: jest.fn(() => makeRequest(undefined))
+      }
+    };
+
+    const fakeDb = {
+      objectStoreNames: { contains: () => true },
+      transaction: jest.fn(() => {
+        const tx = {
+          objectStore: (name) => fakeStores[name],
+          oncomplete: undefined,
+          onerror: undefined
+        };
+
+        queueMicrotask(() => tx.oncomplete?.({ target: tx }));
+        return tx;
+      })
+    };
+
+    global.indexedDB = {
+      open: jest.fn(() => {
+        const request = {};
+        queueMicrotask(() => {
+          request.result = fakeDb;
+          request.onsuccess?.({ target: { result: fakeDb } });
+        });
+        return request;
+      })
+    };
+
+    const service = new StorageServiceDB();
+    await expect(service.initialize()).resolves.toBeUndefined();
+  });
+});
 
 const createService = (initial = {}) => {
   const data = {
