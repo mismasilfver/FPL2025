@@ -241,15 +241,27 @@ function safeCreateStorageService(options) {
 }
 
 async function initializeWithTimeout(service, timeoutMs, backend) {
-  if (!service || typeof service.initialize !== 'function') {
+  if (!service) {
     return { status: 'skipped', elapsedMs: 0 };
   }
 
   const start = Date.now();
   let timeoutId;
 
-  const initPromise = Promise.resolve().then(() => service.initialize());
-  const guardedInit = initPromise
+  let initPromise;
+  try {
+    if (service.initialized && typeof service.initialized.then === 'function') {
+      initPromise = service.initialized;
+    } else if (typeof service.initialize === 'function') {
+      initPromise = Promise.resolve().then(() => service.initialize());
+    } else {
+      return { status: 'skipped', elapsedMs: 0 };
+    }
+  } catch (error) {
+    return { status: 'error', error, elapsedMs: Date.now() - start };
+  }
+
+  const guardedInit = Promise.resolve(initPromise)
     .then(() => ({ status: 'success', elapsedMs: Date.now() - start }))
     .catch((error) => ({ status: 'error', error, elapsedMs: Date.now() - start }));
 
