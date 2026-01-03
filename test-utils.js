@@ -5,6 +5,7 @@ global.TextDecoder = TextDecoder;
 const { JSDOM } = require('jsdom');
 const fs = require('fs');
 const path = require('path');
+const { patchFPLTeamManagerAsync } = require('./js/fpl-async-patch.js');
 
 // Load the index.html file to be used as the base for our JSDOM environment
 const html = fs.readFileSync(path.resolve(__dirname, './index.html'), 'utf8');
@@ -34,6 +35,9 @@ const createDOM = () => {
       // Initialize FPLTeamManager for backward compatibility
       const { FPLTeamManager, UIManager } = require('./script');
       const uiManager = new UIManager();
+
+      // Ensure async-compatible methods in test environment as well
+      patchFPLTeamManagerAsync(FPLTeamManager);
       
       // Create shared storage for both async and sync access
       let store = {};
