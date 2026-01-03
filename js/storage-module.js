@@ -269,15 +269,23 @@ async function parseResponse(response) {
 }
 
 function createWithLegacyFacade(service, storageKey) {
-  const facade = Object.create(Object.getPrototypeOf(service) || Object.prototype);
-  Object.assign(facade, service);
+  service.storageKey = storageKey;
 
-  facade.storageKey = storageKey;
+  const originalGetItem = typeof service.getItem === 'function'
+    ? service.getItem.bind(service)
+    : null;
+  const originalSetItem = typeof service.setItem === 'function'
+    ? service.setItem.bind(service)
+    : null;
+  const originalGetRootData = typeof service.getRootData === 'function'
+    ? service.getRootData.bind(service)
+    : null;
+  const originalSetRootData = typeof service.setRootData === 'function'
+    ? service.setRootData.bind(service)
+    : null;
 
-  facade.getItem = async function(key) {
-    const result = await (typeof service.getItem === 'function'
-      ? service.getItem(key)
-      : service.getRootData());
+  service.getItem = async function(key) {
+    const result = await (originalGetItem ? originalGetItem(key) : originalGetRootData?.());
 
     if (typeof result === 'string' || result === null) {
       return result;
@@ -286,18 +294,18 @@ function createWithLegacyFacade(service, storageKey) {
     return JSON.stringify(result);
   };
 
-  facade.setItem = async function(key, value) {
+  service.setItem = async function(key, value) {
     const payload = typeof value === 'string' ? value : JSON.stringify(value);
     const parsed = typeof value === 'string' ? JSON.parse(value) : value;
 
-    if (typeof service.setItem === 'function') {
-      return service.setItem(key, payload);
+    if (originalSetItem) {
+      return originalSetItem(key, payload);
     }
 
-    return service.setRootData(parsed);
+    return originalSetRootData ? originalSetRootData(parsed) : undefined;
   };
 
-  return facade;
+  return service;
 }
 
 if (typeof module !== 'undefined' && module.exports) {

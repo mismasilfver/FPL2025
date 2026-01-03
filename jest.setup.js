@@ -8,6 +8,26 @@ if (!global.window) {
   global.window = global;
 }
 
+// Ensure structuredClone is available (Node < 17)
+if (typeof global.structuredClone !== 'function') {
+  try {
+    const { structuredClone: nodeStructuredClone } = require('util');
+    if (typeof nodeStructuredClone === 'function') {
+      global.structuredClone = nodeStructuredClone;
+    }
+  } catch (error) {
+    // util.structuredClone not available; fall back to JSON cloning below
+  }
+
+  if (typeof global.structuredClone !== 'function') {
+    global.structuredClone = (value) => JSON.parse(JSON.stringify(value));
+  }
+}
+
+if (global.window && typeof global.window.structuredClone !== 'function') {
+  global.window.structuredClone = global.structuredClone;
+}
+
 // Add missing browser APIs
 if (!global.window.MouseEvent) {
   global.window.MouseEvent = class MouseEvent extends Event {

@@ -26,9 +26,14 @@ jest.mock('../js/storage-module.js', () => {
   };
 });
 
+jest.mock('../js/fpl-async-patch.js', () => ({
+  patchFPLTeamManagerAsync: jest.fn()
+}));
+
 const { initializeApp } = require('../js/app-init.js');
 const { createStorageService } = require('../js/storage-module.js');
 const { FPLTeamManager: MockFPLTeamManager } = require('../script.js');
+const { patchFPLTeamManagerAsync } = require('../js/fpl-async-patch.js');
 
 jest.mock('../script.js', () => {
   const makeManager = () => ({
@@ -97,6 +102,7 @@ beforeEach(() => {
 
   createStorageService.mockClear();
   MockFPLTeamManager.mockClear();
+  patchFPLTeamManagerAsync.mockClear();
 
   global.fetch = jest.fn().mockResolvedValue({ ok: true });
 
@@ -117,12 +123,15 @@ beforeEach(() => {
         </div>
       </div>
     </header>
+    <main>
+      <div class="controls" data-testid="controls-container"></div>
+    </main>
   `;
 
   window.fplManager = undefined;
   global.fplManager = undefined;
-  window.FPLTeamManager = MockFPLTeamManager;
-  global.FPLTeamManager = MockFPLTeamManager;
+  window.FPLTeamManager = undefined;
+  global.FPLTeamManager = undefined;
   window.USE_INDEXED_DB = false;
   window.ACTIVE_STORAGE_BACKEND = 'localstorage';
   delete window.fplInitDiagnostics;
@@ -146,6 +155,13 @@ async function initApp(options = {}) {
 }
 
 describe('App initialization storage dropdown', () => {
+  test('patches module-exported manager class before instantiation', async () => {
+    await initApp({ storageBackend: 'localstorage' });
+    await flushPromises();
+
+    expect(patchFPLTeamManagerAsync).toHaveBeenCalledWith(MockFPLTeamManager);
+  });
+
   test('initializes with sqlite backend and marks option selected', async () => {
     await initApp({ storageBackend: 'sqlite' });
     await flushPromises();
@@ -195,6 +211,16 @@ describe('App initialization storage dropdown', () => {
 
     expect(optionsList.hidden).toBe(true);
     expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  test('elevates storage controls so dropdown sits above main controls', async () => {
+    await initApp({ storageBackend: 'localstorage' });
+
+    const header = document.querySelector('header');
+    const controls = document.querySelector('.controls');
+
+    expect(header?.dataset.layer).toBe('storage-top');
+    expect(controls?.dataset.layer).toBe('primary-controls');
   });
 
   test('disables sqlite option and falls back when health check fails during init', async () => {

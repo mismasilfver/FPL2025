@@ -36,17 +36,17 @@ export async function initializeApp(options = {}) {
     timeoutMs: storageInitTimeoutMs
   });
   
-  // Patch FPLTeamManager methods to be async-compatible
-  // This must be done before creating an instance
-  patchFPLTeamManagerAsync();
-  
-  // Initialize the FPL Team Manager using resolved class
+  // Resolve the manager constructor from module exports or legacy globals
   const ManagerCtor = (ScriptModule && (ScriptModule.FPLTeamManager || ScriptModule.default))
     || (typeof window !== 'undefined' && window.FPLTeamManager)
     || (typeof global !== 'undefined' && global.FPLTeamManager);
   if (!ManagerCtor) {
     throw new Error('FPLTeamManager class not available on window');
   }
+
+  // Patch FPLTeamManager methods to be async-compatible before instantiation
+  patchFPLTeamManagerAsync(ManagerCtor);
+
   const mgr = new ManagerCtor({ storage: storageService });
 
   // Assign to global scope for access from tests or other scripts
@@ -71,6 +71,7 @@ export async function initializeApp(options = {}) {
   // Add storage type indicator to the UI
   updateStorageIndicator(activeBackend);
   await syncStorageOptionsState(activeBackend);
+  applyStorageControlsLayering();
   setupStorageToggle(activeBackend);
 
   return mgr;
@@ -237,6 +238,19 @@ function safeCreateStorageService(options) {
       error: error?.message
     });
     throw error;
+  }
+}
+
+function applyStorageControlsLayering() {
+  const header = document.querySelector('header');
+  const controls = document.querySelector('.controls');
+
+  if (header) {
+    header.dataset.layer = 'storage-top';
+  }
+
+  if (controls) {
+    controls.dataset.layer = 'primary-controls';
   }
 }
 

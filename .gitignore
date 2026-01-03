@@ -6,3 +6,4 @@ Initdata/
 package-lock.json
 data/
 *.db
+**/coverage

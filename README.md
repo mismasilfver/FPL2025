@@ -15,6 +15,8 @@ A simple, responsive web application to manage your Fantasy Premier League team.
 - **Storage Adapters**: Data persists between sessions using a pluggable storage layer (localStorage by default, IndexedDB or SQLite optional)
 - **Position Filtering**: Filter players by position
 - **Team Summary**: Track total players (0/15) and total team value
+- **Data Import/Export**: Export any week to JSON and import saved snapshots to keep history portable across devices
+- **Resilient Storage Selection**: Built-in health checks surface warnings and automatically fall back when a backend is unavailable
 
 ## How to Use
 
@@ -24,6 +26,14 @@ A simple, responsive web application to manage your Fantasy Premier League team.
 4. **Set Vice Captain**: Click "VC" button to set/unset vice captain
 5. **Filter**: Use the position dropdown to filter by player position
 6. **Delete**: Click "Delete" to remove players from your team
+7. **Export**: Use the "Export Week Data" button to download the current week as JSON (disabled in read-only weeks)
+8. **Import**: Choose a JSON file via the Import controls to merge an existing snapshot into the current state
+
+## Import & Export Workflow
+
+- **Exports** capture only the currently selected week. The download is named `fpl-data-week-<week>.json` for fast sharing.
+- **Imports** accept legacy single-week payloads and modern v2 schemas. The imported week is normalized, derived fields are recomputed, and the UI refreshes automatically.
+- **Validation**: Invalid JSON files surface actionable alerts in the UI so you can correct issues quickly.
 
 ## Weekly Management
 
@@ -65,6 +75,7 @@ Related tests: `__tests__/weekNavigation.test.js`, `__tests__/readonlyMode.test.
 - **IndexedDB adapter**: `js/adapters/indexeddb-adapter.js` provides an IndexedDB-backed implementation.
 - **SQLite adapter**: `js/adapters/sqlite-adapter.js` speaks to the local Express/SQLite API for fully offline durability.
 - **Feature flag**: Toggle `window.USE_INDEXED_DB` in `index.html` to switch between adapters at runtime.
+- **App initializer**: `js/app-init.js` negotiates storage availability, applies async patches, raises diagnostics, and updates the UI indicator.
 - **High-level services**: `js/storage.js`, `js/storage-db.js`, and `js/storage-module.js` orchestrate week persistence on top of the adapter layer.
 - **Adapter contract tests**: `__tests__/database.test.js` runs the same suite against every registered adapter, ensuring consistent behaviour across the low-level key/value layer.
 - **Storage service contract tests** *(new)*: `__tests__/storage-contract.test.js` exercises the high-level storage facade (localStorage, IndexedDB, SQLite) with shared happy-path and defensive scenarios. Run with `npm test -- __tests__/storage-contract.test.js` to verify the three-backend flow end-to-end.
@@ -74,7 +85,7 @@ Related tests: `__tests__/weekNavigation.test.js`, `__tests__/readonlyMode.test.
 
 - **In-app toggle**: Use the storage dropdown in the header to choose between **localStorage**, **IndexedDB**, or **SQLite**. The preference is stored in `localStorage` (`fpl-storage-backend`) and the app reloads automatically.
 - **Command-line toggle**: Run `npm run use:localstorage`, `npm run use:indexeddb`, or `npm run use:sqlite` to change the default backend written to `storage-config.js`. This is useful for automated environments or CI.
-- **Health check**: Selecting SQLite triggers a `/api/storage/root` health check; if the API is unreachable, the UI warns and falls back to localStorage.
+- **Health check & fallback**: Selecting SQLite triggers a `/api/storage/root` health check. Failures disable the option, display a warning, persist a safe fallback, and keep localStorage active.
 - **Testing tip**: Before running integration tests that exercise IndexedDB behaviour, set `window.USE_INDEXED_DB = true` or run `npm run use:indexeddb`. For SQLite flows, start the Express server (`npm run start:server`) so `/api/storage/*` routes are available.
 
 ## Running Locally
@@ -93,7 +104,8 @@ Alternatively, you can simply open the `index.html` file directly in your web br
 
 ```bash
 npm install
-npm run start:server
+npm run start:server     # production-like server
+# or npm run dev:server  # nodemon watch mode for local iteration
 # In another terminal serve the front-end (e.g. python3 -m http.server)
 ```
 
@@ -128,6 +140,7 @@ The test suite includes:
 - **Storage Contract Tests**: `__tests__/database.test.js` verifies that every storage adapter (localStorage, IndexedDB, SQLite) adheres to the shared database contract. Run with `npm test -- __tests__/database.test.js` for a focused check.
 - **Storage Service Contract Tests** *(new)*: `__tests__/storage-contract.test.js` validates the factory-created storage services across all backends, including legacy helpers and defensive failure paths. Run with `npm test -- __tests__/storage-contract.test.js`.
 - **SQLite End-to-End Tests**: `__tests__/storage.sqlite.e2e.test.js` spins up the Express server in-memory and exercises the HTTP API. Run with `npm test -- __tests__/storage.sqlite.e2e.test.js`.
+- **App Initialization Tests**: `__tests__/app-init.test.js` verifies storage selection UI, IndexedDB fallback timing, and SQLite health checks.
 
 All tests use Jest with JSDOM for DOM simulation and comprehensive coverage of user interactions.
 
@@ -197,6 +210,10 @@ Works on all modern browsers including:
 - Factory improvements: `createStorageService` now forwards `baseUrl`, `fetchImpl`, and `storageKey` to `SQLiteStorageService`.
 - Added npm scripts: `test:all`, `test:fast`, `test:storage`, `test:ui`, `test:storage:int`.
 - Cleaned up temporary debug logs in tests and services.
+- Import/export flow now ships in `js/app-init.js` and `js/import-export.js`, allowing users to move weekly snapshots between environments.
+- Storage dropdown layering ensures the menu renders above controls, and SQLite availability is surfaced with inline warnings plus automatic fallback and preference persistence.
+- Diagnostics: initialization attempts, fallbacks, and errors are captured via `window.fplInitDiagnostics` for easier troubleshooting in tests and during manual runs.
+- Strengthened `__tests__/app-init.test.js` to assert the new UI layers, health checks, and fallback behaviour end-to-end.
 
 ### Test filtering presets
 
