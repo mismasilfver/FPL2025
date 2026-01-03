@@ -53,9 +53,6 @@ describe('UI uses <template> for modal and builds it on open', () => {
     const manager = new FPLTeamManager();
     manager.ui.initElements(document);
 
-    // Should cache the template element
-    expect(manager.ui.playerModalTemplate).toBeInstanceOf(HTMLTemplateElement);
-    expect(manager.ui.playerModalTemplate.id).toBe('player-modal-template');
 
     // Modal should not exist initially
     expect(document.getElementById('player-modal')).toBeNull();

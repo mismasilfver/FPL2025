@@ -8,6 +8,8 @@ import {
 } from '../js/adapters/database-adapter.contract.js';
 import { LocalStorageKeyValueAdapter } from '../js/adapters/local-storage-adapter.js';
 import { IndexedDBKeyValueAdapter } from '../js/adapters/indexeddb-adapter.js';
+import { SQLiteKeyValueAdapter } from '../js/adapters/sqlite-adapter.js';
+import * as sqliteDatabase from '../server/database.js';
 
 // Contract-driven tests for any storage backend that wants to behave like a
 // simple key/value database. Adapters register themselves with the
@@ -43,6 +45,95 @@ function deleteIndexedDBDatabase(dbName) {
     request.onblocked = () => resolve();
   });
 }
+
+function createJsonResponse(data, status = 200) {
+  const ok = status >= 200 && status < 300;
+  const body = data === undefined ? '' : JSON.stringify(data);
+  return {
+    ok,
+    status,
+    statusText: ok ? 'OK' : 'Error',
+    async text() {
+      return body;
+    }
+  };
+}
+
+function createSQLiteFetchMock() {
+  return jest.fn(async (url, options = {}) => {
+    const method = (options.method || 'GET').toUpperCase();
+
+    if (url.endsWith('/api/storage/root')) {
+      if (method === 'GET') {
+        const root = sqliteDatabase.getRootData();
+        return createJsonResponse(root);
+      }
+      if (method === 'PUT') {
+        const payload = JSON.parse(options.body || '{}');
+        const updated = sqliteDatabase.setRootData(payload);
+        return createJsonResponse(updated);
+      }
+    }
+
+    if (url.endsWith('/api/storage/weeks') && method === 'GET') {
+      return createJsonResponse(sqliteDatabase.listWeeks());
+    }
+
+    if (url.match(/\/api\/storage\/weeks\/\d+$/) && method === 'GET') {
+      const weekNumber = Number(url.split('/').pop());
+      const week = sqliteDatabase.getWeek(weekNumber);
+      if (!week) {
+        return createJsonResponse({ message: 'Week not found' }, 404);
+      }
+      return createJsonResponse(week);
+    }
+
+    return createJsonResponse({ message: 'Not implemented in mock fetch' }, 404);
+  });
+}
+
+function createSQLiteContractFetchMock(storeRef) {
+  return jest.fn(async (url, options = {}) => {
+    const method = (options.method || 'GET').toUpperCase();
+
+    if (!url.endsWith('/api/storage/root')) {
+      return createJsonResponse({ message: 'Unsupported route in contract mock' }, 404);
+    }
+
+    if (method === 'GET') {
+      return createJsonResponse(storeRef.value);
+    }
+
+    if (method === 'PUT') {
+      const payload = JSON.parse(options.body || '{}');
+      storeRef.value = { ...payload };
+      return createJsonResponse(storeRef.value);
+    }
+
+    return createJsonResponse({ message: 'Unsupported method in contract mock' }, 405);
+  });
+}
+
+let sqliteContractFetchMock;
+const sqliteContractStore = { value: {} };
+
+registerAdapterForContractTests({
+  name: 'SQLiteKeyValueAdapter',
+  createAdapter() {
+    sqliteContractStore.value = {};
+    sqliteContractFetchMock = createSQLiteContractFetchMock(sqliteContractStore);
+    return new SQLiteKeyValueAdapter({
+      baseUrl: 'http://localhost/api/storage',
+      namespace: 'contract:',
+      fetchImpl: sqliteContractFetchMock
+    });
+  },
+  afterEach() {
+    sqliteContractFetchMock?.mockClear?.();
+    sqliteContractFetchMock = null;
+    sqliteContractStore.value = {};
+  }
+});
 
 registerAdapterForContractTests({
   name: 'LocalStorageKeyValueAdapter',
@@ -194,5 +285,59 @@ describe('DatabaseAdapter contract', () => {
       const allValues = await adapter.getAll();
       expect(allValues).toEqual(payload);
     });
+  });
+});
+
+describe('SQLiteKeyValueAdapter internals', () => {
+  let adapter;
+  let fetchMock;
+
+  beforeEach(() => {
+    sqliteDatabase.configureDatabase({ fileName: ':memory:' });
+    sqliteDatabase.initializeSchema({ fileName: ':memory:' });
+    fetchMock = createSQLiteFetchMock();
+    adapter = new SQLiteKeyValueAdapter({
+      baseUrl: 'http://localhost/api/storage',
+      fetchImpl: fetchMock
+    });
+  });
+
+  afterEach(() => {
+    fetchMock?.mockClear?.();
+    fetchMock = null;
+    adapter = null;
+    sqliteDatabase.closeDatabase();
+  });
+
+  test('set/get proxies through to SQLite storage', async () => {
+    await adapter.set('foo', { bar: true });
+    const value = await adapter.get('foo');
+
+    expect(value).toEqual({ bar: true });
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  test('getAll aggregates only namespaced keys', async () => {
+    await adapter.set('alpha', 1);
+    await adapter.set('beta', 2);
+
+    const values = await adapter.getAll();
+
+    expect(values).toMatchObject({ alpha: 1, beta: 2 });
+    const root = sqliteDatabase.getRootData();
+    expect(Object.keys(root).some((key) => key.startsWith('db:'))).toBe(true);
+  });
+
+  test('clear removes adapter namespace while preserving core root data', async () => {
+    await adapter.set('alpha', 1);
+    await adapter.set('beta', 2);
+
+    await adapter.clear();
+
+    const values = await adapter.getAll();
+    expect(values).toEqual({});
+
+    const root = sqliteDatabase.getRootData();
+    expect(root).toMatchObject({ currentWeek: 1, version: '2.0' });
   });
 });

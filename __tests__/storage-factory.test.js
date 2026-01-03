@@ -2,8 +2,9 @@
  * Tests for the storage factory module - Mock Implementation
  */
 
-// Mock the storage module
+// Mock the storage module while preserving actual exports
 jest.mock('../js/storage-module.js', () => {
+  const actual = jest.requireActual('../js/storage-module.js');
   class MockStorageService {
     constructor(options = {}) {
       this.storageKey = options.storageKey || 'fpl-team-data';
@@ -19,8 +20,7 @@ jest.mock('../js/storage-module.js', () => {
   }
 
   return {
-    StorageService: MockStorageService,
-    StorageServiceDB: MockStorageServiceDB,
+    ...actual,
     createStorageService: (options = {}) => {
       return options.useIndexedDB 
         ? new MockStorageServiceDB(options) 

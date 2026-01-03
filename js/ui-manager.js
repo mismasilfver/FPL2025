@@ -7,6 +7,14 @@ export default class UIManager {
         this.currentEditingId = null;
     }
 
+    _logButtonClick(button, payload = {}) {
+        try {
+            console.log('[UIManager] Button click', { button, ...payload });
+        } catch (error) {
+            if (DEBUG) console.error('Failed to log button click', error);
+        }
+    }
+
     bindEvents(handlers = {}) {
         // Store handlers for later use in modal binding
         this.handlers = handlers;
@@ -18,13 +26,34 @@ export default class UIManager {
         } = handlers;
 
         if (!this._boundGlobal) {
-            this.addPlayerBtn?.addEventListener('click', () => onAddPlayer?.());
-            this.positionFilter?.addEventListener('change', () => onPositionFilterChange?.());
-            this.haveFilter?.addEventListener('change', () => onHaveFilterChange?.());
-            this.prevWeekBtn?.addEventListener('click', () => onPrevWeek?.());
-            this.nextWeekBtn?.addEventListener('click', () => onNextWeek?.());
-            this.createWeekBtn?.addEventListener('click', () => onCreateWeek?.());
-            this.exportWeekBtn?.addEventListener('click', () => onExportWeek?.());
+            this.addPlayerBtn?.addEventListener('click', () => {
+                this._logButtonClick('add-player');
+                onAddPlayer?.();
+            });
+            this.positionFilter?.addEventListener('change', () => {
+                this._logButtonClick('position-filter-change');
+                onPositionFilterChange?.();
+            });
+            this.haveFilter?.addEventListener('change', () => {
+                this._logButtonClick('have-filter-change');
+                onHaveFilterChange?.();
+            });
+            this.prevWeekBtn?.addEventListener('click', () => {
+                this._logButtonClick('previous-week');
+                onPrevWeek?.();
+            });
+            this.nextWeekBtn?.addEventListener('click', () => {
+                this._logButtonClick('next-week');
+                onNextWeek?.();
+            });
+            this.createWeekBtn?.addEventListener('click', () => {
+                this._logButtonClick('create-week');
+                onCreateWeek?.();
+            });
+            this.exportWeekBtn?.addEventListener('click', () => {
+                this._logButtonClick('export-week');
+                onExportWeek?.();
+            });
 
             if (this.playersTbody) {
                 this.playersTbody.addEventListener('click', (e) => {
@@ -36,6 +65,8 @@ export default class UIManager {
                         const action = actionEl.getAttribute('data-action');
                         const playerId = actionEl.getAttribute('data-player-id');
                         if (!action || !playerId) return;
+
+                        this._logButtonClick('player-action', { action, playerId });
 
                         switch (action) {
                             case 'toggle-have': onToggleHave?.(playerId); break;
@@ -53,8 +84,14 @@ export default class UIManager {
         }
 
         // Re-bind modal events if modal is rebuilt
-        this.modal?.querySelector('.close')?.addEventListener('click', () => onModalClose?.());
-        this.modal?.querySelector('[data-testid="cancel-button"]')?.addEventListener('click', () => onModalClose?.());
+        this.modal?.querySelector('.close')?.addEventListener('click', () => {
+            this._logButtonClick('modal-close');
+            onModalClose?.();
+        });
+        this.modal?.querySelector('[data-testid="cancel-button"]')?.addEventListener('click', () => {
+            this._logButtonClick('modal-cancel');
+            onModalClose?.();
+        });
         this.modal?.addEventListener('click', (e) => {
             if (e.target === this.modal) onModalClose?.();
         });
@@ -89,9 +126,6 @@ export default class UIManager {
         this.captainInfo = doc.getElementById('captain-info');
         this.viceCaptainInfo = doc.getElementById('vice-captain-info');
         
-        // Cache templates
-        this.playerModalTemplate = doc.getElementById('player-modal-template');
-        this.playerRowTemplate = doc.getElementById('player-row-template');
         
         if (DEBUG) console.log('initElements - prevWeekBtn found:', !!this.prevWeekBtn);
         if (DEBUG) console.log('initElements - playerModalTemplate found:', !!this.playerModalTemplate);
@@ -115,10 +149,11 @@ export default class UIManager {
     }
 
     buildModalFromTemplate() {
-        if (!this.playerModalTemplate) return console.error('Player modal template not found');
-        
-        const frag = this.playerModalTemplate.content.cloneNode(true);
         const doc = this.document || document;
+        const playerModalTemplate = doc.getElementById('player-modal-template');
+        if (!playerModalTemplate) return console.error('Player modal template not found');
+        
+        const frag = playerModalTemplate.content.cloneNode(true);
         doc.body.appendChild(frag);
         // Use the same document context to find the modal
         this.modal = doc.getElementById('player-modal');
@@ -152,6 +187,7 @@ export default class UIManager {
         if (closeBtn) {
             closeBtn.addEventListener('click', (e) => {
                 e.preventDefault();
+                this._logButtonClick('modal-close');
                 onModalClose?.();
             });
         }
@@ -160,12 +196,16 @@ export default class UIManager {
         if (cancelBtn) {
             cancelBtn.addEventListener('click', (e) => {
                 e.preventDefault();
+                this._logButtonClick('modal-cancel');
                 onModalClose?.();
             });
         }
         
         this.modal.addEventListener('click', (e) => {
-            if (e.target === this.modal) onModalClose?.();
+            if (e.target === this.modal) {
+                this._logButtonClick('modal-overlay');
+                onModalClose?.();
+            }
         });
         
         // Bind form submit event
@@ -242,17 +282,44 @@ export default class UIManager {
         if (this.nextWeekBtn) this.nextWeekBtn.disabled = currentWeek >= totalWeeks;
     }
 
+    ensurePlayerRowTemplate(doc) {
+        const targetDoc = doc || (this.playersTbody ? this.playersTbody.ownerDocument : document);
+        if (!targetDoc) return null;
+
+        let template = targetDoc.getElementById('player-row-template');
+        if (!template) {
+            template = targetDoc.createElement('template');
+            template.id = 'player-row-template';
+            template.innerHTML = `
+      <tr class="player-row">
+        <td class="col-name"></td>
+        <td class="col-position"></td>
+        <td class="col-team"></td>
+        <td class="col-price"></td>
+        <td class="col-status"></td>
+        <td class="col-have"></td>
+        <td class="col-captain"></td>
+        <td class="col-vice"></td>
+        <td class="col-notes"></td>
+        <td class="col-actions"></td>
+      </tr>
+    `;
+            targetDoc.body?.appendChild(template);
+        }
+        return template;
+    }
+
     buildRowFromTemplate(player, { isReadOnly, captainId, viceCaptainId }) {
-        if (!this.playerRowTemplate) {
+        const doc = this.playersTbody ? this.playersTbody.ownerDocument : document;
+        const playerRowTemplate = this.ensurePlayerRowTemplate(doc);
+
+        if (!playerRowTemplate) {
             console.error('Player row template not found');
             return null;
         }
         
-        // Use the document from the tbody's owner document to ensure compatibility
-        const doc = this.playersTbody ? this.playersTbody.ownerDocument : document;
-        
         // Clone the template content
-        const templateContent = this.playerRowTemplate.content.cloneNode(true);
+        const templateContent = playerRowTemplate.content.cloneNode(true);
         const row = templateContent.querySelector('tr');
         row.className = 'player-row';
         row.id = `player-row-${player.id}`;

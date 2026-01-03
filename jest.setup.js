@@ -8,6 +8,26 @@ if (!global.window) {
   global.window = global;
 }
 
+// Ensure structuredClone is available (Node < 17)
+if (typeof global.structuredClone !== 'function') {
+  try {
+    const { structuredClone: nodeStructuredClone } = require('util');
+    if (typeof nodeStructuredClone === 'function') {
+      global.structuredClone = nodeStructuredClone;
+    }
+  } catch (error) {
+    // util.structuredClone not available; fall back to JSON cloning below
+  }
+
+  if (typeof global.structuredClone !== 'function') {
+    global.structuredClone = (value) => JSON.parse(JSON.stringify(value));
+  }
+}
+
+if (global.window && typeof global.window.structuredClone !== 'function') {
+  global.window.structuredClone = global.structuredClone;
+}
+
 // Add missing browser APIs
 if (!global.window.MouseEvent) {
   global.window.MouseEvent = class MouseEvent extends Event {
@@ -49,9 +69,34 @@ const path = require('path');
 const html = fs.readFileSync(path.resolve(__dirname, './index.html'), 'utf8');
 
 beforeEach(() => {
-  // Set up the document's body with the HTML from index.html
-  // This ensures each test starts with a fresh DOM
-  document.body.innerHTML = /<body[^>]*>([\s\S]*)<\/body>/.exec(html)[1];
+  if (typeof document === 'undefined' || !document?.body) {
+    return;
+  }
+
+  const match = /<body[^>]*>([\s\S]*)<\/body>/.exec(html);
+  if (match && match[1]) {
+    document.body.innerHTML = match[1];
+  }
+
+  if (!document.getElementById('player-row-template')) {
+    const template = document.createElement('template');
+    template.id = 'player-row-template';
+    template.innerHTML = `
+      <tr class="player-row">
+        <td class="col-name"></td>
+        <td class="col-position"></td>
+        <td class="col-team"></td>
+        <td class="col-price"></td>
+        <td class="col-status"></td>
+        <td class="col-have"></td>
+        <td class="col-captain"></td>
+        <td class="col-vice"></td>
+        <td class="col-notes"></td>
+        <td class="col-actions"></td>
+      </tr>
+    `;
+    document.body.appendChild(template);
+  }
 });
 
 beforeAll(() => {
