@@ -7,16 +7,23 @@ import { makeMethodAsync } from './async-helpers.js';
 /**
  * Patch FPLTeamManager methods to be async-compatible
  * This ensures all methods properly handle promises from storage services
+ * @param {Function} FPLTeamManagerClass The class to patch
  */
-export function patchFPLTeamManagerAsync() {
-  // Get FPLTeamManager from global scope or parameter
-  const FPLTeamManagerClass = typeof window !== 'undefined' ? window.FPLTeamManager : null;
-  
+export function patchFPLTeamManagerAsync(FPLTeamManagerClass) {
+  // Allow fallback to legacy globals to avoid breaking older entry points
   if (!FPLTeamManagerClass) {
-    console.error('FPLTeamManager not found in global scope');
+    if (typeof window !== 'undefined' && window.FPLTeamManager) {
+      FPLTeamManagerClass = window.FPLTeamManager;
+    } else if (typeof global !== 'undefined' && global.FPLTeamManager) {
+      FPLTeamManagerClass = global.FPLTeamManager;
+    }
+  }
+
+  if (!FPLTeamManagerClass || typeof FPLTeamManagerClass !== 'function') {
+    console.warn('FPLTeamManager constructor not provided for async patch');
     return;
   }
-  
+
   // Core storage methods
   makeMethodAsync(FPLTeamManagerClass.prototype, 'loadStateFromStorage');
   makeMethodAsync(FPLTeamManagerClass.prototype, 'saveStateToStorage');

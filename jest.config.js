@@ -1,6 +1,6 @@
 module.exports = {
   // A list of paths to modules that run some code to configure or set up the testing framework before each test.
-  setupFilesAfterEnv: ['@testing-library/jest-dom', '<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['@testing-library/jest-dom', '<rootDir>/jest.setup.js', '<rootDir>/test-setup.js'],
 
   // The test environment that will be used for testing
   testEnvironment: 'jsdom',
@@ -12,7 +12,9 @@ module.exports = {
 
   // An array of glob patterns indicating a set of files for which coverage information should be collected
   collectCoverageFrom: [
-    'script.js', // Only collect coverage from the main script file
+    'script.js',
+    'js/**/*.js',
+    '!js/adapters/**/*.js',
   ],
 
   // The directory where Jest should output its coverage files

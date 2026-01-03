@@ -5,14 +5,16 @@
 const fs = require('fs');
 const path = require('path');
 const { FPLTeamManager } = require('../script');
+const { __getMockStorage } = require('../js/storage-module.js');
 
 // Helper to set up the DOM from index.html
 const setupDOM = () => {
     const html = fs.readFileSync(path.resolve(__dirname, '../index.html'), 'utf8');
     document.body.innerHTML = html;
     // Manually instantiate the manager to attach event listeners
-    window.fplManager = new FPLTeamManager();
-    // Initialize UI elements and bind events
+    if (!window.fplManager) {
+        window.fplManager = new FPLTeamManager();
+    }
     window.fplManager.ui.initElements(document);
     window.fplManager.ui.bindEvents({
         onExportWeek: window.fplManager.exportWeekData.bind(window.fplManager)
@@ -23,6 +25,8 @@ describe('Export Functionality', () => {
     beforeEach(() => {
         setupDOM();
         localStorage.clear();
+        const storage = __getMockStorage?.();
+        storage?.reset?.();
         global.URL.createObjectURL = jest.fn(() => 'mock-url');
         global.URL.revokeObjectURL = jest.fn();
     });
@@ -52,7 +56,14 @@ describe('Export Functionality', () => {
                 }
             }
         };
-        await fplManager.storage.setItem(fplManager.storageKey, JSON.stringify(weekData));
+        const storage = __getMockStorage?.();
+        if (storage && typeof storage.setRootData === 'function') {
+            await storage.setRootData(weekData);
+        } else if (typeof fplManager.storage.setRootData === 'function') {
+            await fplManager.storage.setRootData(weekData);
+        } else {
+            throw new Error('No storage implementation with setRootData available for export test.');
+        }
 
         // Create a real anchor element to spy on, but mock its click method
         const link = document.createElement('a');

@@ -1,291 +1,317 @@
-/**
- * Tests for the app initialization module - Mock Implementation
- */
-
-// Mock the FPLTeamManager
-global.FPLTeamManager = jest.fn().mockImplementation(() => ({
-  loadStateFromStorage: jest.fn().mockResolvedValue({}),
-  ui: {
-    showAlert: jest.fn()
-  },
-  // Add any other methods used in the tests
-  someMethod: jest.fn()
-}));
-
-// Mock the storage module
-const mockStorage = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn()
-};
-
-// Mock the app-init module
-jest.mock('../js/app-init.js', () => {
-  return {
-    initializeApp: jest.fn().mockImplementation((options = {}) => {
-      let fplManager;
-      try {
-        fplManager = new (global.FPLTeamManager)();
-      } catch (err) {
-        // mimic real module's error handling behavior
-        console.error('Error initializing app:', err);
-        return { fplManager: undefined, storage: mockStorage, ...options };
+jest.mock('../js/storage-module.js', () => {
+  const makeService = () => ({
+    initialize: jest.fn().mockResolvedValue(),
+    setRootData: jest.fn(),
+    getRootData: jest.fn().mockResolvedValue({
+      currentWeek: 1,
+      weeks: {
+        1: { players: [], captain: null, viceCaptain: null, isReadOnly: false }
       }
-      // Simulate async init calling loadStateFromStorage
-      Promise.resolve().then(() => {
-        fplManager.loadStateFromStorage && fplManager.loadStateFromStorage();
-      });
-
-      // Provide importData method for tests
-      if (!fplManager.importData) {
-        fplManager.importData = jest.fn();
-      }
-
-      // Wire up import button behavior expected by tests
-      const d = (global && global.document) ? global.document : undefined;
-      const importButton = d ? d.getElementById('import-button') : undefined;
-      const importInput = d ? d.getElementById('import-json') : undefined;
-      if (importButton && importInput) {
-        importButton.addEventListener('click', () => {
-          if (!importInput.files || importInput.files.length === 0) {
-            // mimic app behavior
-            const w = (global && global.window) ? global.window : global;
-            w.fplManager = fplManager;
-            fplManager.ui.showAlert('Please select a JSON file to import.');
-          } else {
-            // Simulate reading JSON and calling importData
-            try {
-              const Reader = (global && global.FileReader) ? global.FileReader : undefined;
-              const reader = Reader ? new Reader() : { onload: null, readAsText: () => {} };
-              reader.onload = (e) => {
-                try {
-                  const data = JSON.parse(e.target.result || '{}');
-                  fplManager.importData(data);
-                } catch {}
-              };
-              reader.readAsText(importInput.files[0]);
-            } catch {}
-          }
-        });
-        // Also when button clicked, trigger input.click per test
-        importButton.addEventListener('click', () => {
-          if (typeof importInput.click === 'function') importInput.click();
-        });
-
-        // Listen to change event on input for file import flow expected by tests
-        importInput.addEventListener('change', (e) => {
-          try {
-            const file = (e && e.target && e.target.files && e.target.files[0]) || (importInput.files && importInput.files[0]) || null;
-            if (!file) return;
-            const Reader = (global && global.FileReader) ? global.FileReader : undefined;
-            const reader = Reader ? new Reader() : { onload: null, readAsText: () => {} };
-            reader.onload = (e) => {
-              try {
-                const data = JSON.parse(e.target.result || '{}');
-                fplManager.importData(data);
-              } catch {}
-            };
-            reader.readAsText(file);
-          } catch {}
-        });
-      }
-
-      // Update storage indicator content per tests
-      const storageIndicator = d ? d.getElementById('storage-indicator') : undefined;
-      if (storageIndicator) {
-        const w = (global && global.window) ? global.window : global;
-        const useIndexed = options.useIndexedDB === true || !!(w && w.USE_INDEXED_DB === true);
-        storageIndicator.textContent = `Storage: ${useIndexed ? 'IndexedDB' : 'localStorage'}`;
-      }
-
-      return {
-        fplManager,
-        storage: mockStorage,
-        ...options
-      };
     })
+  });
+
+  const createStorageService = jest.fn().mockImplementation(makeService);
+  const createDefaultRoot = jest.fn(() => ({
+    version: '2.0',
+    currentWeek: 1,
+    weeks: {
+      1: { players: [], captain: null, viceCaptain: null, isReadOnly: false }
+    }
+  }));
+
+  return {
+    __esModule: true,
+    createStorageService,
+    createDefaultRoot
   };
 });
 
-const { initializeApp } = require('../js/app-init');
+jest.mock('../js/fpl-async-patch.js', () => ({
+  patchFPLTeamManagerAsync: jest.fn()
+}));
 
-describe('App Initialization', () => {
-  let appInstance;
-  
-  // Set up DOM
-  beforeEach(() => {
-    document.body.innerHTML = `
-      <div class="app-alert"></div>
-      <header></header>
-      <div>
-        <input id="import-json" type="file">
-        <button id="import-button">Import</button>
+const { initializeApp } = require('../js/app-init.js');
+const { createStorageService } = require('../js/storage-module.js');
+const { FPLTeamManager: MockFPLTeamManager } = require('../script.js');
+const { patchFPLTeamManagerAsync } = require('../js/fpl-async-patch.js');
+
+jest.mock('../script.js', () => {
+  const makeManager = () => ({
+    init: jest.fn().mockResolvedValue(),
+    loadStateFromStorage: jest.fn().mockResolvedValue(),
+    ui: { showAlert: jest.fn() },
+    _getRootData: jest.fn().mockResolvedValue({
+      currentWeek: 1,
+      weeks: {
+        1: { players: [], captain: null, viceCaptain: null, isReadOnly: false }
+      }
+    }),
+    _saveRootData: jest.fn().mockResolvedValue(),
+    _ensureWeekDerivedFields: jest.fn().mockResolvedValue(),
+    updateDisplay: jest.fn().mockResolvedValue()
+  });
+
+  const FPLTeamManager = jest.fn().mockImplementation(makeManager);
+
+  return {
+    __esModule: true,
+    FPLTeamManager
+  };
+});
+
+const storageState = {};
+const mockStorage = {
+  getItem: jest.fn((key) => (key in storageState ? storageState[key] : null)),
+  setItem: jest.fn((key, value) => {
+    storageState[key] = value;
+  }),
+  removeItem: jest.fn((key) => {
+    delete storageState[key];
+  }),
+  clear: jest.fn(() => {
+    Object.keys(storageState).forEach((key) => delete storageState[key]);
+  })
+};
+
+Object.defineProperty(window, 'localStorage', {
+  value: mockStorage,
+  configurable: true
+});
+
+const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+let originalLocation;
+let appInstance;
+
+beforeAll(() => {
+  originalLocation = window.location;
+  delete window.location;
+  window.location = { reload: jest.fn() };
+});
+
+afterAll(() => {
+  window.location = originalLocation;
+});
+
+beforeEach(() => {
+  Object.keys(storageState).forEach((key) => delete storageState[key]);
+  mockStorage.getItem.mockClear();
+  mockStorage.setItem.mockClear();
+  mockStorage.removeItem.mockClear();
+  mockStorage.clear.mockClear();
+
+  createStorageService.mockClear();
+  MockFPLTeamManager.mockClear();
+  patchFPLTeamManagerAsync.mockClear();
+
+  global.fetch = jest.fn().mockResolvedValue({ ok: true });
+
+  document.body.innerHTML = `
+    <div class="app-alert" data-testid="app-alert"></div>
+    <header>
+      <div class="storage-controls" data-testid="storage-controls">
+        <span id="storage-indicator" class="storage-indicator" data-testid="storage-indicator">Storage: localStorage</span>
+        <div class="storage-toggle">
+          <button id="toggle-storage-btn" class="btn btn-secondary" data-testid="toggle-storage-btn" type="button" aria-haspopup="listbox" aria-expanded="false">
+            Change Storage
+          </button>
+          <ul id="storage-options" class="storage-options" data-testid="storage-options" role="listbox" aria-label="Storage backend" hidden>
+            <li role="option" data-backend="localstorage" aria-selected="true">localStorage</li>
+            <li role="option" data-backend="indexeddb" aria-selected="false">IndexedDB</li>
+            <li role="option" data-backend="sqlite" aria-selected="false">SQLite</li>
+          </ul>
+        </div>
       </div>
-    `;
-    
-    // Clear mocks
-    jest.clearAllMocks();
-    
-    // Initialize app for each test
-    appInstance = initializeApp();
-    
-    // Reset window.fplManager
-    window.fplManager = undefined;
-    
-    // Reset feature flag
-    window.USE_INDEXED_DB = false;
+    </header>
+    <main>
+      <div class="controls" data-testid="controls-container"></div>
+    </main>
+  `;
+
+  window.fplManager = undefined;
+  global.fplManager = undefined;
+  window.FPLTeamManager = undefined;
+  global.FPLTeamManager = undefined;
+  window.USE_INDEXED_DB = false;
+  window.ACTIVE_STORAGE_BACKEND = 'localstorage';
+  delete window.fplInitDiagnostics;
+  appInstance = undefined;
+
+  if (typeof window.location.reload?.mockClear === 'function') {
+    window.location.reload.mockClear();
+  }
+});
+
+afterEach(() => {
+  if (typeof global.fetch?.mockRestore === 'function') {
+    global.fetch.mockRestore();
+  }
+});
+
+async function initApp(options = {}) {
+  const manager = await initializeApp(options);
+  appInstance = { fplManager: manager };
+  return manager;
+}
+
+describe('App initialization storage dropdown', () => {
+  test('patches module-exported manager class before instantiation', async () => {
+    await initApp({ storageBackend: 'localstorage' });
+    await flushPromises();
+
+    expect(patchFPLTeamManagerAsync).toHaveBeenCalledWith(MockFPLTeamManager);
   });
-  
-  test('should initialize with localStorage when feature flag is false', async () => {
-    window.USE_INDEXED_DB = false;
-    
-    // Mock the global objects
-    global.localStorage = mockStorage;
-    
-    // Call the initialization
-    const { fplManager } = initializeApp();
-    
-    // Verify FPLTeamManager was instantiated
-    expect(global.FPLTeamManager).toHaveBeenCalled();
-    
-    // Verify loadStateFromStorage was called
-    await Promise.resolve(); // Wait for async operations
-    expect(fplManager.loadStateFromStorage).toHaveBeenCalled();
+
+  test('initializes with sqlite backend and marks option selected', async () => {
+    await initApp({ storageBackend: 'sqlite' });
+    await flushPromises();
+
+    const indicator = document.getElementById('storage-indicator');
+    const optionsList = document.getElementById('storage-options');
+    const sqliteOption = optionsList?.querySelector('li[data-backend="sqlite"]');
+
+    expect(indicator.textContent).toContain('SQLite');
+    expect(sqliteOption.getAttribute('aria-selected')).toBe('true');
+    expect(sqliteOption.classList.contains('is-selected')).toBe(true);
+    expect(MockFPLTeamManager).toHaveBeenCalledTimes(1);
   });
-  
-  test('should initialize with IndexedDB when feature flag is true', async () => {
-    window.USE_INDEXED_DB = true;
-    
-    // Mock IndexedDB
-    global.indexedDB = {
-      open: jest.fn()
+
+  test('storage dropdown persists sqlite selection and triggers reload', async () => {
+    await initApp({ storageBackend: 'localstorage' });
+
+    const toggleBtn = document.getElementById('toggle-storage-btn');
+    const optionsList = document.getElementById('storage-options');
+    const sqliteOption = optionsList.querySelector('[data-backend="sqlite"]');
+
+    toggleBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(optionsList.hidden).toBe(false);
+    expect(toggleBtn.getAttribute('aria-expanded')).toBe('true');
+
+    sqliteOption.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushPromises();
+
+    expect(mockStorage.setItem).toHaveBeenCalledWith('fpl-storage-backend', 'sqlite');
+    expect(optionsList.hidden).toBe(true);
+    expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+    expect(document.getElementById('storage-indicator').textContent).toContain('SQLite');
+    expect(window.location.reload).toHaveBeenCalled();
+  });
+
+  test('storage dropdown closes when clicking outside', async () => {
+    await initApp({ storageBackend: 'indexeddb' });
+
+    const toggleBtn = document.getElementById('toggle-storage-btn');
+    const optionsList = document.getElementById('storage-options');
+
+    toggleBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(optionsList.hidden).toBe(false);
+
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushPromises();
+
+    expect(optionsList.hidden).toBe(true);
+    expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  test('elevates storage controls so dropdown sits above main controls', async () => {
+    await initApp({ storageBackend: 'localstorage' });
+
+    const header = document.querySelector('header');
+    const controls = document.querySelector('.controls');
+
+    expect(header?.dataset.layer).toBe('storage-top');
+    expect(controls?.dataset.layer).toBe('primary-controls');
+  });
+
+  test('disables sqlite option and falls back when health check fails during init', async () => {
+    global.fetch.mockResolvedValueOnce({ ok: false });
+
+    await initApp({ storageBackend: 'sqlite' });
+    await flushPromises();
+
+    const indicator = document.getElementById('storage-indicator');
+    const sqliteOption = document.querySelector('[data-backend="sqlite"]');
+
+    expect(sqliteOption.getAttribute('aria-disabled')).toBe('true');
+    expect(sqliteOption.classList.contains('is-disabled')).toBe(true);
+    expect(indicator.textContent).toContain('localStorage');
+    expect(mockStorage.setItem).toHaveBeenCalledWith('fpl-storage-backend', 'localstorage');
+  });
+
+  test('handles sqlite selection failure gracefully when toggled from menu', async () => {
+    await initApp({ storageBackend: 'localstorage' });
+
+    global.fetch.mockResolvedValueOnce({ ok: false });
+
+    const toggleBtn = document.getElementById('toggle-storage-btn');
+    const optionsList = document.getElementById('storage-options');
+    const sqliteOption = optionsList.querySelector('[data-backend="sqlite"]');
+
+    toggleBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(optionsList.hidden).toBe(false);
+
+    sqliteOption.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushPromises();
+
+    expect(sqliteOption.getAttribute('aria-disabled')).toBe('true');
+    expect(sqliteOption.classList.contains('is-disabled')).toBe(true);
+    expect(optionsList.hidden).toBe(true);
+    expect(window.location.reload).not.toHaveBeenCalled();
+  });
+});
+
+describe('IndexedDB fallback resilience', () => {
+  test('falls back to localStorage when IndexedDB initialization stalls and records diagnostics', async () => {
+    jest.useFakeTimers();
+
+    const stalledService = {
+      initialize: jest.fn(() => new Promise(() => {})),
+      getRootData: jest.fn(),
+      setRootData: jest.fn(),
+      teardown: jest.fn()
     };
-    
-    // Call the initialization
-    const { fplManager } = initializeApp();
-    
-    // Verify FPLTeamManager was instantiated
-    expect(global.FPLTeamManager).toHaveBeenCalled();
-    
-    // Verify loadStateFromStorage was called
-    await Promise.resolve(); // Wait for async operations
-    expect(fplManager.loadStateFromStorage).toHaveBeenCalled();
-  });
-  
-  test('should handle initialization errors gracefully', async () => {
-    // Force an error during initialization
-    const error = new Error('Initialization failed');
-    global.FPLTeamManager.mockImplementationOnce(() => {
-      throw error;
-    });
-    
-    // Mock console.error to verify error handling
-    const originalError = console.error;
-    console.error = jest.fn();
-    
-    // Call the initialization
-    const { fplManager } = initializeApp();
-    
-    // Verify error was handled
-    expect(console.error).toHaveBeenCalledWith('Error initializing app:', error);
-    
-    // Restore console.error
-    console.error = originalError;
-  });
-  
-  test('should set up event listeners for import functionality', () => {
-    // Get the import button
-    const importButton = document.getElementById('import-button');
-    const importInput = document.getElementById('import-json');
-    
-    // Verify input click was triggered when button is clicked
-    const inputClickSpy = jest.spyOn(importInput, 'click');
-    importButton.click();
-    expect(inputClickSpy).toHaveBeenCalled();
-  });
-  
-  test('should handle file import', () => {
-    // Mock FileReader
-    const mockFileReader = {
-      readAsText: jest.fn(),
-      result: JSON.stringify({ test: 'data' }),
-      onload: null
-    };
-    
-    global.FileReader = jest.fn(() => mockFileReader);
-    
-    // Get the import input
-    const importInput = document.getElementById('import-json');
-    
-    // Create a mock file
-    const file = new File(['{}'], 'test.json', { type: 'application/json' });
-    
-    // Trigger file selection
-    const event = new Event('change');
-    Object.defineProperty(event, 'target', {
-      value: { files: [file] }
-    });
-    
-    // Add a spy to verify the import function
-    const importSpy = jest.spyOn(appInstance.fplManager, 'importData');
-    
-    // Trigger the change event
-    importInput.dispatchEvent(event);
-    
-    // Simulate FileReader onload
-    mockFileReader.onload({ target: { result: '{}' } });
-    
-    // Verify the import function was called
-    expect(importSpy).toHaveBeenCalledWith({});
-  });
-  
-  test('should add storage indicator to the UI', async () => {
-    // Mock the DOM elements
-    document.body.innerHTML = `
-      <div id="app">
-        <div id="storage-indicator"></div>
-      </div>
-    `;
-    
-    // Call the initialization
-    const { fplManager } = initializeApp();
-    
-    // Get the storage indicator
-    const storageIndicator = document.getElementById('storage-indicator');
-    
-    // Verify the storage indicator was updated
-    expect(storageIndicator.textContent).toContain('Storage: localStorage');
-  });
-  
-  test('should update storage indicator when storage type changes', async () => {
-    // Mock the DOM elements
-    document.body.innerHTML = `
-      <div id="app">
-        <div id="storage-indicator"></div>
-      </div>
-    `;
-    
-    // Call the initialization with IndexedDB
+
+    createStorageService.mockImplementationOnce(() => stalledService);
+
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => {});
+
+    window.ACTIVE_STORAGE_BACKEND = 'indexeddb';
     window.USE_INDEXED_DB = true;
-    global.indexedDB = { open: jest.fn() };
-    
-    const { fplManager } = initializeApp();
-    
-    // Get the storage indicator
-    const storageIndicator = document.getElementById('storage-indicator');
-    
-    // Verify the storage indicator was updated
-    expect(storageIndicator.textContent).toContain('Storage: IndexedDB');
-  });
-  
-  test('should set up import button handler', async () => {
-    await initializeApp();
-    
-    const importButton = document.getElementById('import-button');
-    expect(importButton).not.toBeNull();
-    
-    // Simulate a click without a file selected
-    importButton.click();
-    expect(window.fplManager.ui.showAlert).toHaveBeenCalledWith('Please select a JSON file to import.');
+
+    try {
+      const initPromise = initApp({ storageBackend: 'indexeddb', storageInitTimeoutMs: 50 });
+
+      await Promise.resolve();
+      jest.advanceTimersByTime(50);
+      await flushPromises();
+      await flushPromises();
+
+      const manager = await initPromise;
+
+      expect(manager).toBeDefined();
+      expect(createStorageService).toHaveBeenNthCalledWith(1, expect.objectContaining({ backend: 'indexeddb' }));
+      expect(createStorageService).toHaveBeenNthCalledWith(2, expect.objectContaining({ backend: 'localstorage' }));
+      expect(MockFPLTeamManager).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('IndexedDB initialization timed out'));
+      expect(window.fplInitDiagnostics).toBeDefined();
+      expect(window.fplInitDiagnostics.events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            stage: 'storage',
+            type: 'fallback',
+            from: 'indexeddb',
+            to: 'localstorage',
+            reason: 'timeout'
+          })
+        ])
+      );
+    } finally {
+      warnSpy.mockRestore();
+      errorSpy.mockRestore();
+      infoSpy.mockRestore();
+      jest.useRealTimers();
+    }
   });
 });

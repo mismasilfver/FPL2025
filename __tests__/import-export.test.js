@@ -38,20 +38,30 @@ global.URL.revokeObjectURL = jest.fn();
 
 describe('Import/Export Functionality', () => {
   beforeEach(() => {
-    // Create a mock document body for testing
-    document.body.innerHTML = '';
+    // Use shared DOM setup to ensure required elements/templates exist
     jest.clearAllMocks();
+    if (typeof global.setupDOM === 'function') {
+      global.setupDOM();
+    } else {
+      document.body.innerHTML = '';
+    }
   });
 
   describe('exportToJSON', () => {
     test('should create a download link with the correct filename', () => {
+      const realCreateElement = document.createElement.bind(document);
       // Mock document.createElement and appendChild
       const mockLink = {
         href: '',
         download: '',
         click: jest.fn()
       };
-      document.createElement = jest.fn().mockReturnValue(mockLink);
+      document.createElement = jest.fn((tagName, options) => {
+        if (tagName === 'a') {
+          return mockLink;
+        }
+        return realCreateElement(tagName, options);
+      });
       document.body.appendChild = jest.fn();
       document.body.removeChild = jest.fn();
       
@@ -68,6 +78,8 @@ describe('Import/Export Functionality', () => {
       expect(URL.revokeObjectURL).toHaveBeenCalled();
       expect(document.body.appendChild).toHaveBeenCalledWith(mockLink);
       expect(document.body.removeChild).toHaveBeenCalledWith(mockLink);
+
+      document.createElement = realCreateElement;
     });
   });
 

@@ -5,6 +5,7 @@ global.TextDecoder = TextDecoder;
 const { JSDOM } = require('jsdom');
 const fs = require('fs');
 const path = require('path');
+const { patchFPLTeamManagerAsync } = require('./js/fpl-async-patch.js');
 
 // Load the index.html file to be used as the base for our JSDOM environment
 const html = fs.readFileSync(path.resolve(__dirname, './index.html'), 'utf8');
@@ -34,6 +35,9 @@ const createDOM = () => {
       // Initialize FPLTeamManager for backward compatibility
       const { FPLTeamManager, UIManager } = require('./script');
       const uiManager = new UIManager();
+
+      // Ensure async-compatible methods in test environment as well
+      patchFPLTeamManagerAsync(FPLTeamManager);
       
       // Create shared storage for both async and sync access
       let store = {};
@@ -55,8 +59,36 @@ const createDOM = () => {
       // Mock localStorage on window for tests that access it directly
       window.localStorage = mockLocalStorage;
 
+      if (!document.getElementById('player-row-template')) {
+        const template = document.createElement('template');
+        template.id = 'player-row-template';
+        template.innerHTML = `
+          <tr class="player-row">
+            <td class="col-name"></td>
+            <td class="col-position"></td>
+            <td class="col-team"></td>
+            <td class="col-price"></td>
+            <td class="col-status"></td>
+            <td class="col-have"></td>
+            <td class="col-captain"></td>
+            <td class="col-vice"></td>
+            <td class="col-notes"></td>
+            <td class="col-actions"></td>
+          </tr>
+        `;
+        document.body.appendChild(template);
+      }
+
       // Create storage adapter that uses the same store
       const storageAdapter = {
+        getRootData: jest.fn(async () => {
+          const raw = store['fpl-team-data'];
+          return raw ? JSON.parse(raw) : null;
+        }),
+        setRootData: jest.fn(async (root) => {
+          store['fpl-team-data'] = JSON.stringify(root);
+          return root;
+        }),
         getItem: jest.fn((key) => Promise.resolve(store[key])),
         setItem: jest.fn((key, value) => {
           store[key] = value;

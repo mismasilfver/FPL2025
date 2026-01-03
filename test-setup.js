@@ -43,11 +43,15 @@ const { MockStorageService } = require('./__tests__/test-utils');
 // Create a single, stateful instance that can be shared across tests
 const mockStorageInstance = new MockStorageService();
 
-// Mock the storage module to use and expose our instance
-jest.mock('./js/storage-module.js', () => ({
-  createStorageService: jest.fn(() => mockStorageInstance),
-  __getMockStorage: () => mockStorageInstance, // Helper to access the mock in tests
-}));
+// Mock the storage module to use and expose our instance while keeping helpers
+jest.mock('./js/storage-module.js', () => {
+  const actual = jest.requireActual('./js/storage-module.js');
+  return {
+    ...actual,
+    createStorageService: jest.fn(() => mockStorageInstance),
+    __getMockStorage: () => mockStorageInstance, // Helper to access the mock in tests
+  };
+});
 
 // Helper function to create required DOM elements
 function setupDOM() {
@@ -59,49 +63,37 @@ function setupDOM() {
     document.body.appendChild(container);
   }
 
-  // Create week controls
-  let weekControls = document.querySelector('.week-controls');
-  if (!weekControls) {
-    weekControls = document.createElement('div');
-    weekControls.className = 'week-controls';
-    weekControls.setAttribute('data-testid', 'week-controls');
-    container.appendChild(weekControls);
+  // Always rebuild week controls to avoid stale nodes
+  let weekControls = container.querySelector('.week-controls');
+  if (weekControls) {
+    weekControls.remove();
   }
+  weekControls = document.createElement('div');
+  weekControls.className = 'week-controls';
+  weekControls.setAttribute('data-testid', 'week-controls');
+  container.appendChild(weekControls);
 
-  // Create week indicator
-  let weekIndicator = document.querySelector('.week-indicator');
-  if (!weekIndicator) {
-    weekIndicator = document.createElement('div');
-    weekIndicator.className = 'week-indicator';
-    weekIndicator.setAttribute('data-testid', 'week-indicator');
-    weekControls.appendChild(weekIndicator);
-  }
+  const weekIndicator = document.createElement('div');
+  weekIndicator.className = 'week-indicator';
+  weekIndicator.setAttribute('data-testid', 'week-indicator');
+  weekControls.appendChild(weekIndicator);
 
-  // Create week label
-  let weekLabel = document.getElementById('week-label');
-  if (!weekLabel) {
-    weekLabel = document.createElement('span');
-    weekLabel.id = 'week-label';
-    weekLabel.setAttribute('data-testid', 'week-label');
-    weekLabel.textContent = 'Week 1';
-    weekIndicator.appendChild(weekLabel);
-  }
+  const weekLabel = document.createElement('span');
+  weekLabel.id = 'week-label';
+  weekLabel.setAttribute('data-testid', 'week-label');
+  weekLabel.textContent = 'Week 1';
+  weekIndicator.appendChild(weekLabel);
 
-  // Create read-only badge
-  let readOnlyBadge = document.getElementById('read-only-badge');
-  if (!readOnlyBadge) {
-    readOnlyBadge = document.createElement('span');
-    readOnlyBadge.id = 'read-only-badge';
-    readOnlyBadge.className = 'readonly-badge';
-    readOnlyBadge.setAttribute('data-testid', 'read-only-badge');
-    readOnlyBadge.style.display = 'none';
-    readOnlyBadge.setAttribute('aria-hidden', 'true');
-    readOnlyBadge.textContent = 'Read-only';
-    weekIndicator.appendChild(document.createTextNode(' '));
-    weekIndicator.appendChild(readOnlyBadge);
-  }
+  const readOnlyBadge = document.createElement('span');
+  readOnlyBadge.id = 'week-readonly-badge';
+  readOnlyBadge.className = 'readonly-badge';
+  readOnlyBadge.setAttribute('data-testid', 'read-only-badge');
+  readOnlyBadge.style.display = 'none';
+  readOnlyBadge.setAttribute('aria-hidden', 'true');
+  readOnlyBadge.textContent = 'Read-only';
+  weekIndicator.appendChild(document.createTextNode(' '));
+  weekIndicator.appendChild(readOnlyBadge);
 
-  // Create navigation buttons
   const buttons = [
     { id: 'prev-week-btn', text: '◀ Previous', testId: 'prev-week-btn' },
     { id: 'next-week-btn', text: 'Next ▶', testId: 'next-week-btn' },
@@ -110,14 +102,11 @@ function setupDOM() {
   ];
 
   buttons.forEach(({ id, text, testId }) => {
-    let btn = document.getElementById(id);
-    if (!btn) {
-      btn = document.createElement('button');
-      btn.id = id;
-      btn.setAttribute('data-testid', testId);
-      btn.textContent = text;
-      weekControls.appendChild(btn);
-    }
+    const btn = document.createElement('button');
+    btn.id = id;
+    btn.setAttribute('data-testid', testId);
+    btn.textContent = text;
+    weekControls.appendChild(btn);
   });
 
   // Create players container
@@ -135,6 +124,27 @@ function setupDOM() {
     table.appendChild(thead);
     table.appendChild(tbody);
     playersContainer.appendChild(table);
+  }
+
+  // Ensure player row template exists
+  if (!document.getElementById('player-row-template')) {
+    const template = document.createElement('template');
+    template.id = 'player-row-template';
+    template.innerHTML = `
+      <tr class="player-row">
+        <td class="col-name"></td>
+        <td class="col-position"></td>
+        <td class="col-team"></td>
+        <td class="col-price"></td>
+        <td class="col-status"></td>
+        <td class="col-have"></td>
+        <td class="col-captain"></td>
+        <td class="col-vice"></td>
+        <td class="col-notes"></td>
+        <td class="col-actions"></td>
+      </tr>
+    `;
+    container.appendChild(template);
   }
 
   // Create player form modal
