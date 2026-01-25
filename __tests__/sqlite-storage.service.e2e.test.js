@@ -86,8 +86,10 @@ describe('SQLiteStorageService end-to-end (HTTP server)', () => {
 
     await expect(service.setRootData(payload)).rejects.toMatchObject({
       message: 'Internal server error',
-      status: 500,
-      details: 'database exploded'
+      context: {
+        status: 500,
+        details: 'database exploded'
+      }
     });
 
     spy.mockRestore();

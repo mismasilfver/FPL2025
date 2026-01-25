@@ -1,6 +1,7 @@
 import UIManager from './js/ui-manager.js';
 import { createStorageService, createDefaultRoot } from './js/storage-module.js';
 import { WeekModel } from './js/models/week-model.js';
+import { AppError } from './js/utils/app-error.js';
 
 // Global debug flag for this module
 const DEBUG = false;
@@ -24,7 +25,7 @@ export class FPLTeamManager {
             try {
                 await this.storage.initialize();
             } catch (error) {
-                console.error('Failed to initialize storage service:', error);
+                throw new AppError('Failed to initialize storage service', { code: 'STORAGE_INIT_FAILURE', context: { originalError: error } });
             }
         }
 
@@ -68,8 +69,7 @@ export class FPLTeamManager {
             await this.updateDisplay();
             if (DEBUG) console.log('updateDisplay completed');
         } catch (error) {
-            console.error('Error in updateDisplay:', error);
-            throw error;
+            throw new AppError('Error in updateDisplay', { code: 'UI_UPDATE_FAILURE', context: { originalError: error } });
         }
     }
 
@@ -117,7 +117,7 @@ export class FPLTeamManager {
 
     async openModal(playerId = null) {
         if (await this.isCurrentWeekReadOnly()) {
-            alert('This week is read-only. Create a new week to make changes.');
+            this.ui.showAlert('This week is read-only. Create a new week to make changes.');
             return;
         }
         const root = await this._getRootData();
@@ -155,7 +155,7 @@ export class FPLTeamManager {
         const wasInTeam = playerBeingEdited ? playerBeingEdited.have : false;
 
         if (playerData.have && !wasInTeam && teamSize >= 15) {
-            alert('You can only have 15 players in your team.');
+            this.ui.showAlert('You can only have 15 players in your team.');
             return;
         }
 
@@ -236,7 +236,7 @@ export class FPLTeamManager {
         const player = workingWeek.players.find(p => p.id === playerId);
         if (player) {
             if (!player.have && workingWeek.players.filter(p => p.have).length >= 15) {
-                alert('You can only have 15 players in your team.');
+                this.ui.showAlert('You can only have 15 players in your team.');
                 return;
             }
             player.have = !player.have;
@@ -253,7 +253,7 @@ export class FPLTeamManager {
         const currentWeek = root.weeks[root.currentWeek];
         const player = currentWeek.players.find(p => p.id === playerId);
         if (player && !player.have) {
-            alert('Player must be in the team to be captain.');
+            this.ui.showAlert('Player must be in the team to be captain.');
             return;
         }
 
@@ -275,7 +275,7 @@ export class FPLTeamManager {
         const currentWeek = root.weeks[root.currentWeek];
         const player = currentWeek.players.find(p => p.id === playerId);
         if (player && !player.have) {
-            alert('Player must be in the team to be vice-captain.');
+            this.ui.showAlert('Player must be in the team to be vice-captain.');
             return;
         }
 
@@ -363,7 +363,7 @@ export class FPLTeamManager {
             try {
                 root = await this.storage.getRootData();
             } catch (error) {
-                console.error('Failed to load root data from storage service:', error);
+                throw new AppError('Failed to load root data from storage service', { code: 'STORAGE_ROOT_LOAD_FAILURE', context: { originalError: error } });
                 root = null;
             }
         } else {
@@ -377,7 +377,7 @@ export class FPLTeamManager {
             try {
                 root = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
             } catch (error) {
-                console.error('Failed to parse root data, returning default.', error);
+                throw new AppError('Failed to parse root data', { code: 'STORAGE_PARSE_FAILURE', recoverable: true, context: { originalError: error } });
                 const defaults = createDefaultRoot();
                 await this._setRootData(defaults);
                 return defaults;
@@ -464,7 +464,7 @@ export class FPLTeamManager {
         const snapshot = this._computeTeamSnapshot(existingWeek.players || []);
         root.weeks[wn] = {
             ...snapshot,
-            players: existingWeek.players,
+            players: WeekModel.clone(existingWeek.players || []),
             captain: existingWeek.captain,
             viceCaptain: existingWeek.viceCaptain,
             isReadOnly: existingWeek.isReadOnly,
@@ -492,9 +492,9 @@ export class FPLTeamManager {
         }
 
         const newWeekNumber = currentWeekNumber + 1;
-        const clonedWeek = this._cloneWeekData(snapshotForClone);
-        clonedWeek.isReadOnly = false;
-        root.weeks[newWeekNumber] = clonedWeek;
+        const newWeek = this._cloneWeekData(snapshotForClone);
+        newWeek.isReadOnly = false;
+        root.weeks[newWeekNumber] = newWeek;
 
         // Recompute derived fields for the new week as well
         await this._ensureWeekDerivedFields(root, newWeekNumber);
