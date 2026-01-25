@@ -41,7 +41,7 @@ describe('Storage API happy path scenarios', () => {
       players: [],
       teamStats: {
         totalValue: 0,
-        totalPlayers: 0
+        playerCount: 0
       }
     });
   });
@@ -56,7 +56,7 @@ describe('Storage API happy path scenarios', () => {
           weekNumber: 2,
           players: [{ id: 'p2' }],
           teamMembers: [{ playerId: 'p2', addedAt: 1 }],
-          teamStats: { totalValue: 12.5, totalPlayers: 2 }
+          teamStats: { totalValue: 12.5, playerCount: 2 }
         }
       }
     };
@@ -79,7 +79,7 @@ describe('Storage API happy path scenarios', () => {
   test('GET /api/storage/weeks lists snapshots in order', async () => {
     saveWeek(2, {
       ...createDefaultWeek(2),
-      teamStats: { totalValue: 14, totalPlayers: 2 }
+      teamStats: { totalValue: 14, playerCount: 2 }
     });
 
     const response = await request(app).get('/api/storage/weeks');
@@ -110,7 +110,7 @@ describe('Storage API happy path scenarios', () => {
         weekNumber: 4,
         payload: {
           players: [{ id: 'p4' }],
-          teamStats: { totalValue: 15, totalPlayers: 2 }
+          teamStats: { totalValue: 15, playerCount: 2 }
         }
       })
       .set('Content-Type', 'application/json');
@@ -132,7 +132,7 @@ describe('Storage API happy path scenarios', () => {
       .put('/api/storage/weeks/4')
       .send({
         players: [{ id: 'p4', position: 'midfield' }],
-        teamStats: { totalValue: 16, totalPlayers: 2 }
+        teamStats: { totalValue: 16, playerCount: 2 }
       })
       .set('Content-Type', 'application/json');
 

@@ -3,6 +3,7 @@
  */
 
 import { StorageServiceDB } from './storage-db.js';
+import { WeekModel } from './models/week-model.js';
 
 const DEFAULT_STORAGE_KEY = 'fpl-team-data';
 const DEFAULT_SQLITE_BASE_URL = '/api/storage';
@@ -12,19 +13,7 @@ export function createDefaultRoot() {
     version: '2.0',
     currentWeek: 1,
     weeks: {
-      1: {
-        players: [],
-        captain: null,
-        viceCaptain: null,
-        teamMembers: [],
-        teamStats: {
-          totalValue: 0,
-          playerCount: 0,
-          updatedDate: new Date().toISOString()
-        },
-        totalTeamCost: 0,
-        isReadOnly: false
-      }
+      1: WeekModel.createDefault(1)
     }
   };
 }
@@ -204,7 +193,7 @@ function normalizeRoot(root) {
 
   normalized.weeks = Object.entries(weeks).reduce((acc, [weekNumber, payload]) => {
     const key = String(weekNumber);
-    acc[key] = normalizeWeek(payload);
+    acc[key] = WeekModel.normalize(payload, Number(weekNumber));
     return acc;
   }, {});
 
@@ -213,35 +202,6 @@ function normalizeRoot(root) {
     normalized.weeks = defaults.weeks;
     normalized.currentWeek = defaults.currentWeek;
   }
-
-  return normalized;
-}
-
-function normalizeWeek(week) {
-  if (!week || typeof week !== 'object') {
-    return {
-      players: [],
-      captain: null,
-      viceCaptain: null,
-      teamMembers: [],
-      teamStats: { totalValue: 0, playerCount: 0, updatedDate: new Date().toISOString() },
-      totalTeamCost: 0,
-      isReadOnly: false
-    };
-  }
-
-  const normalized = { ...week };
-  normalized.players = Array.isArray(normalized.players) ? normalized.players : [];
-  normalized.captain = normalized.captain ?? null;
-  normalized.viceCaptain = normalized.viceCaptain ?? null;
-  normalized.teamMembers = Array.isArray(normalized.teamMembers) ? normalized.teamMembers : [];
-  normalized.teamStats = normalized.teamStats && typeof normalized.teamStats === 'object'
-    ? { ...normalized.teamStats }
-    : { totalValue: 0, playerCount: 0, updatedDate: new Date().toISOString() };
-  normalized.totalTeamCost = Number.isFinite(normalized.totalTeamCost)
-    ? normalized.totalTeamCost
-    : normalized.teamStats.totalValue || 0;
-  normalized.isReadOnly = Boolean(normalized.isReadOnly);
 
   return normalized;
 }
