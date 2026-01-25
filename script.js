@@ -1,5 +1,6 @@
 import UIManager from './js/ui-manager.js';
 import { createStorageService, createDefaultRoot } from './js/storage-module.js';
+import { WeekModel } from './js/models/week-model.js';
 
 // Global debug flag for this module
 const DEBUG = false;
@@ -177,6 +178,7 @@ export class FPLTeamManager {
         const player = {
             id: Date.now().toString(),
             ...playerData,
+            addedAt: currentWeekNumber
         };
         workingWeek.players.push(player);
 
@@ -446,42 +448,11 @@ export class FPLTeamManager {
     }
 
     _computeTeamSnapshot(players) {
-        // Minimal teamMembers shape expected by tests: [{ addedAt, playerId }]
-        const inTeam = (players || []).filter(p => p.have);
-        const teamMembers = inTeam.map(p => ({
-            addedAt: p.addedAt || p.id, // use existing timestamp-like id if not present
-            playerId: p.id
-        }));
-        const totalValue = inTeam.reduce((s, p) => s + (Number(p.price) || 0), 0);
-        return {
-            teamMembers,
-            teamStats: {
-                totalValue,
-                playerCount: inTeam.length,
-                updatedDate: new Date().toISOString()
-            },
-            totalTeamCost: totalValue
-        };
+        return WeekModel.computeTeamSnapshot(players);
     }
 
     _cloneWeekData(week) {
-        const snapshot = JSON.parse(JSON.stringify(week || {}));
-        const players = Array.isArray(snapshot.players) ? snapshot.players.map(player => ({ ...player })) : [];
-        const teamMembers = Array.isArray(snapshot.teamMembers) ? snapshot.teamMembers.map(member => ({ ...member })) : [];
-        const teamStats = snapshot.teamStats && typeof snapshot.teamStats === 'object'
-            ? { ...snapshot.teamStats }
-            : { totalValue: 0, playerCount: 0, updatedDate: new Date().toISOString() };
-
-        return {
-            players,
-            captain: snapshot.captain ?? null,
-            viceCaptain: snapshot.viceCaptain ?? null,
-            isReadOnly: !!snapshot.isReadOnly,
-            teamMembers,
-            teamStats,
-            totalTeamCost: typeof snapshot.totalTeamCost === 'number' ? snapshot.totalTeamCost : 0,
-            notes: typeof snapshot.notes !== 'undefined' ? snapshot.notes : '',
-        };
+        return WeekModel.clone(week);
     }
 
     // Ensure derived fields on a specific week are up-to-date based on its players
@@ -490,15 +461,15 @@ export class FPLTeamManager {
         const existingWeek = root.weeks[wn];
         if (!existingWeek) return;
 
-        const workingWeek = this._cloneWeekData(existingWeek);
-        const { teamMembers, teamStats, totalTeamCost } = this._computeTeamSnapshot(existingWeek.players || []);
-
-        workingWeek.teamMembers = teamMembers;
-        workingWeek.teamStats = teamStats;
-        // Mirror total cost to a dedicated field as expected by tests
-        workingWeek.totalTeamCost = totalTeamCost;
-
-        root.weeks[wn] = workingWeek;
+        const snapshot = this._computeTeamSnapshot(existingWeek.players || []);
+        root.weeks[wn] = {
+            ...snapshot,
+            players: existingWeek.players,
+            captain: existingWeek.captain,
+            viceCaptain: existingWeek.viceCaptain,
+            isReadOnly: existingWeek.isReadOnly,
+            notes: existingWeek.notes
+        };
     }
 
     async createNewWeek() {
