@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 
 const { initializeSchema } = require('./database');
 const storageRouter = require('./routes/storage');
+const fplRouter = require('./routes/fpl');
 
 // Load environment variables from .env if present
 const envPath = path.resolve(__dirname, '..', '.env');
@@ -21,6 +22,7 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/api/storage', storageRouter);
+app.use('/api/fpl', fplRouter);
 
 function startServer(port = PORT, options = {}) {
   initializeSchema(options);
