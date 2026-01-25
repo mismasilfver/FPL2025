@@ -4,6 +4,8 @@
 
 import { StorageServiceDB } from './storage-db.js';
 import { WeekModel } from './models/week-model.js';
+import { AppError } from './utils/app-error.js';
+import { handleAppError } from './utils/error-handler.js';
 
 const DEFAULT_STORAGE_KEY = 'fpl-team-data';
 const DEFAULT_SQLITE_BASE_URL = '/api/storage';
@@ -47,7 +49,11 @@ class LocalStorageService {
       const parsed = JSON.parse(raw);
       return normalizeRoot(parsed);
     } catch (error) {
-      console.error('[storage] Failed to parse persisted root, resetting to default.', error);
+      handleAppError(new AppError('Failed to parse persisted root, resetting to default.', {
+        code: 'STORAGE_PARSE_ERROR',
+        recoverable: true,
+        context: { originalError: error }
+      }));
       const root = createDefaultRoot();
       this.storage.setItem(this.storageKey, JSON.stringify(root));
       return root;
@@ -214,15 +220,15 @@ async function parseResponse(response) {
     try {
       data = JSON.parse(text);
     } catch (error) {
-      throw new Error(`Failed to parse JSON response: ${error.message}`);
+      throw new AppError(`Failed to parse JSON response: ${error.message}`, { code: 'JSON_PARSE_ERROR', context: { originalError: error } });
     }
   }
 
   if (!response.ok) {
-    const error = new Error(data?.message || response.statusText || 'Request failed');
-    error.status = response.status;
-    error.details = data?.details;
-    throw error;
+    throw new AppError(data?.message || response.statusText || 'Request failed', {
+      code: 'HTTP_ERROR',
+      context: { status: response.status, details: data?.details }
+    });
   }
 
   return data;

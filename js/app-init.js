@@ -7,6 +7,15 @@ import { createStorageService } from './storage-module.js';
 import { exportToJSON, importFromJSON } from './import-export.js';
 import { patchFPLTeamManagerAsync } from './fpl-async-patch.js';
 import * as ScriptModule from '../script.js';
+import { handleAppError } from './utils/error-handler.js';
+
+window.addEventListener('error', (event) => {
+  handleAppError(event.error || new Error('Unknown error from error event'));
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  handleAppError(event.reason || new Error('Unknown reason for unhandled rejection'));
+});
 
 const DEFAULT_STORAGE_INIT_TIMEOUT_MS = 2500;
 
