@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
+const { WeekModel } = require('../js/models/week-model.js');
 
 const defaultOptions = {
   fileName: 'fpl_data.db',
@@ -14,28 +15,15 @@ const DEFAULT_WEEK_NUMBER = 1;
 let dbInstance = null;
 
 function createDefaultWeek(weekNumber = DEFAULT_WEEK_NUMBER) {
-  return {
-    weekNumber,
-    players: [],
-    captain: null,
-    viceCaptain: null,
-    notes: '',
-    isReadOnly: false,
-    teamMembers: [],
-    teamStats: {
-      totalValue: 0,
-      totalPlayers: 0
-    }
-  };
+  return WeekModel.createDefault(weekNumber);
 }
 
 function createDefaultRoot() {
-  const defaultWeek = createDefaultWeek(DEFAULT_WEEK_NUMBER);
   return {
     version: '2.0',
     currentWeek: DEFAULT_WEEK_NUMBER,
     weeks: {
-      [DEFAULT_WEEK_NUMBER]: defaultWeek
+      [DEFAULT_WEEK_NUMBER]: createDefaultWeek(DEFAULT_WEEK_NUMBER)
     }
   };
 }
@@ -200,36 +188,9 @@ function normalizeWeeks(weeks) {
   for (const [key, value] of Object.entries(weeks)) {
     const weekNumber = Number(key);
     if (!Number.isInteger(weekNumber) || weekNumber <= 0) continue;
-    normalized[weekNumber] = normalizeWeekPayload(weekNumber, value);
+    normalized[weekNumber] = WeekModel.normalize(value, weekNumber);
   }
   return normalized;
-}
-
-function normalizeWeekPayload(weekNumber, payload = {}) {
-  const base = { ...(payload || {}) };
-  base.weekNumber = weekNumber;
-  base.players = Array.isArray(base.players) ? base.players : [];
-  base.teamMembers = Array.isArray(base.teamMembers) ? base.teamMembers : [];
-  base.captain = base.captain ?? null;
-  base.viceCaptain = base.viceCaptain ?? null;
-  base.notes = typeof base.notes === 'string' ? base.notes : '';
-  base.isReadOnly = Boolean(base.isReadOnly);
-  base.teamStats = normalizeTeamStats(base.teamStats);
-  return base;
-}
-
-function normalizeTeamStats(stats) {
-  if (stats && typeof stats === 'object' && !Array.isArray(stats)) {
-    const copy = { ...stats };
-    copy.totalValue = Number.isFinite(copy.totalValue) ? copy.totalValue : 0;
-    copy.totalPlayers = Number.isFinite(copy.totalPlayers) ? copy.totalPlayers : 0;
-    return copy;
-  }
-
-  return {
-    totalValue: 0,
-    totalPlayers: 0
-  };
 }
 
 function coerceWeekNumber(value) {
@@ -301,7 +262,7 @@ function listWeeks() {
   const rows = db.prepare('SELECT week_number, payload FROM weeks ORDER BY week_number ASC').all();
 
   return rows.map(({ week_number: weekNumber, payload }) => {
-    return normalizeWeekPayload(weekNumber, safeParseJSON(payload, {}));
+    return WeekModel.normalize(safeParseJSON(payload, {}), weekNumber);
   });
 }
 
@@ -312,13 +273,13 @@ function getWeek(weekNumber) {
 
   if (!row) return null;
 
-  return normalizeWeekPayload(normalizedNumber, safeParseJSON(row.payload, {}));
+  return WeekModel.normalize(safeParseJSON(row.payload, {}), normalizedNumber);
 }
 
 function saveWeek(weekNumber, payload = {}) {
   const db = getDatabase();
   const normalizedNumber = coerceWeekNumber(weekNumber);
-  const normalizedWeek = normalizeWeekPayload(normalizedNumber, payload);
+  const normalizedWeek = WeekModel.normalize(payload, normalizedNumber);
 
   const transaction = db.transaction(() => {
     upsertWeek(db, normalizedNumber, normalizedWeek);
