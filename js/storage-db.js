@@ -3,6 +3,8 @@
  * Provides the same API as the localStorage-based StorageService
  * but uses IndexedDB for storage
  */
+import { WeekModel } from './models/week-model.js';
+
 export class StorageServiceDB {
   constructor(options = {}) {
     const {
@@ -95,18 +97,15 @@ export class StorageServiceDB {
       currentWeek: 1
     });
     
+    const defaultWeek = WeekModel.createDefault(1);
     tx.objectStore('weeks').put({
-      weekNumber: 1,
-      captain: null,
-      viceCaptain: null,
-      totalTeamCost: 0,
-      teamStats: {
-        totalValue: 0,
-        playerCount: 0,
-        createdDate: new Date().toISOString()
-      },
-      isReadOnly: false,
-      playersJson: JSON.stringify([])
+      weekNumber: defaultWeek.weekNumber,
+      captain: defaultWeek.captain,
+      viceCaptain: defaultWeek.viceCaptain,
+      totalTeamCost: defaultWeek.totalTeamCost,
+      teamStats: defaultWeek.teamStats,
+      isReadOnly: defaultWeek.isReadOnly,
+      playersJson: JSON.stringify(defaultWeek.players)
     });
     
     return new Promise((resolve, reject) => {
@@ -171,18 +170,12 @@ export class StorageServiceDB {
       // Get team members for this week
       const teamMembers = await this._getByIndex('teamMembers', 'by_week', wk.weekNumber);
       
-      weeks[wk.weekNumber] = {
+      const weekPayload = {
+        ...wk,
         players,
-        captain: wk.captain,
-        viceCaptain: wk.viceCaptain,
-        teamMembers: teamMembers.map(m => ({ 
-          playerId: m.playerId, 
-          addedAt: m.addedAt 
-        })),
-        totalTeamCost: wk.totalTeamCost,
-        teamStats: wk.teamStats,
-        isReadOnly: !!wk.isReadOnly
+        teamMembers: teamMembers.map(m => ({ playerId: m.playerId, addedAt: m.addedAt }))
       };
+      weeks[wk.weekNumber] = WeekModel.normalize(weekPayload, wk.weekNumber);
     }
     
     return { version: root.version, currentWeek: root.currentWeek, weeks };
@@ -193,24 +186,8 @@ export class StorageServiceDB {
     weekToSave = Number(weekToSave);
     currentWeek = Number(currentWeek);
     
-    // Compute minimal teamMembers + total cost
-    const teamMembers = (players || [])
-      .filter(p => p.have)
-      .map(p => ({ 
-        weekNumber: weekToSave,
-        playerId: p.id, 
-        addedAt: weekToSave 
-      }));
-      
-    const totalTeamCost = (players || [])
-      .filter(p => p.have)
-      .reduce((s, p) => s + (Number(p.price) || 0), 0);
-      
-    const teamStats = {
-      totalValue: totalTeamCost,
-      playerCount: teamMembers.length,
-      updatedDate: new Date().toISOString()
-    };
+    const { teamMembers, teamStats, totalTeamCost } = WeekModel.computeTeamSnapshot(players || [], weekToSave);
+    const dbTeamMembers = teamMembers.map(m => ({ ...m, weekNumber: weekToSave }));
 
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(['root', 'weeks', 'teamMembers'], 'readwrite');
@@ -247,7 +224,7 @@ export class StorageServiceDB {
       };
       
       // Add new team members
-      for (const member of teamMembers) {
+      for (const member of dbTeamMembers) {
         membersStore.put(member);
       }
       
@@ -284,19 +261,12 @@ export class StorageServiceDB {
     const players = JSON.parse(wk.playersJson || '[]');
     const teamMembers = await this._getByIndex('teamMembers', 'by_week', weekNumber);
     
-    return {
-      players,
-      captain: wk.captain || null,
-      viceCaptain: wk.viceCaptain || null,
-      teamMembers: teamMembers.map(m => ({ 
-        playerId: m.playerId, 
-        addedAt: m.addedAt 
-      })),
-      teamStats: wk.teamStats || { 
-        totalValue: 0, 
-        playerCount: teamMembers.length 
-      }
+    const weekPayload = {
+        ...wk,
+        players,
+        teamMembers: teamMembers.map(m => ({ playerId: m.playerId, addedAt: m.addedAt }))
     };
+    return WeekModel.normalize(weekPayload, weekNumber);
   }
 
   async importFromJSON(jsonData) {
@@ -380,67 +350,46 @@ export class StorageServiceDB {
       throw new TypeError('Root payload must be an object for IndexedDB storage');
     }
 
-    const payload = JSON.parse(JSON.stringify(root));
-    const version = payload.version || '2.0';
-    const currentWeek = Number.isInteger(payload.currentWeek) && payload.currentWeek > 0
-      ? payload.currentWeek
-      : 1;
-    const weeks = payload.weeks && typeof payload.weeks === 'object' ? payload.weeks : {};
+    const normalizedRoot = { ...root };
+    normalizedRoot.version = root.version || '2.0';
+    normalizedRoot.currentWeek = Number.isInteger(root.currentWeek) && root.currentWeek > 0 ? root.currentWeek : 1;
+    normalizedRoot.weeks = Object.entries(root.weeks || {}).reduce((acc, [key, value]) => {
+        const weekNumber = Number(key);
+        if (Number.isInteger(weekNumber) && weekNumber > 0) {
+            acc[weekNumber] = WeekModel.normalize(value, weekNumber);
+        }
+        return acc;
+    }, {});
 
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(['root', 'weeks', 'teamMembers'], 'readwrite');
+        const tx = this.db.transaction(['root', 'weeks', 'teamMembers'], 'readwrite');
 
-      tx.objectStore('root').put({
-        id: 'singleton',
-        version,
-        currentWeek
-      });
+        tx.objectStore('root').put({ id: 'singleton', version: normalizedRoot.version, currentWeek: normalizedRoot.currentWeek });
 
-      const weeksStore = tx.objectStore('weeks');
-      const membersStore = tx.objectStore('teamMembers');
+        const weeksStore = tx.objectStore('weeks');
+        const membersStore = tx.objectStore('teamMembers');
 
-      weeksStore.clear();
-      membersStore.clear();
+        weeksStore.clear();
+        membersStore.clear();
 
-      for (const [weekKey, weekValue] of Object.entries(weeks)) {
-        const weekNumber = Number(weekKey);
-        if (!Number.isInteger(weekNumber) || weekNumber <= 0) continue;
+        for (const [weekNumber, weekData] of Object.entries(normalizedRoot.weeks)) {
+            weeksStore.put({
+                weekNumber: weekData.weekNumber,
+                captain: weekData.captain,
+                viceCaptain: weekData.viceCaptain,
+                totalTeamCost: weekData.totalTeamCost,
+                teamStats: weekData.teamStats,
+                isReadOnly: weekData.isReadOnly,
+                playersJson: JSON.stringify(weekData.players)
+            });
 
-        const players = Array.isArray(weekValue.players) ? weekValue.players : [];
-        const teamMembers = Array.isArray(weekValue.teamMembers) ? weekValue.teamMembers : [];
-        const totalTeamCost = Number.isFinite(weekValue.totalTeamCost)
-          ? weekValue.totalTeamCost
-          : Number(weekValue.teamStats?.totalValue) || 0;
-        const teamStats = weekValue.teamStats && typeof weekValue.teamStats === 'object'
-          ? { ...weekValue.teamStats }
-          : {
-              totalValue: totalTeamCost,
-              playerCount: teamMembers.length,
-              updatedDate: new Date().toISOString()
-            };
-
-        weeksStore.put({
-          weekNumber,
-          captain: weekValue.captain || null,
-          viceCaptain: weekValue.viceCaptain || null,
-          totalTeamCost,
-          teamStats,
-          isReadOnly: !!weekValue.isReadOnly,
-          playersJson: JSON.stringify(players)
-        });
-
-        for (const member of teamMembers) {
-          if (!member || typeof member !== 'object') continue;
-          membersStore.put({
-            weekNumber,
-            playerId: member.playerId,
-            addedAt: Number.isFinite(member.addedAt) ? member.addedAt : weekNumber
-          });
+            for (const member of weekData.teamMembers) {
+                membersStore.put({ ...member, weekNumber: weekData.weekNumber });
+            }
         }
-      }
 
-      tx.oncomplete = () => resolve(payload);
-      tx.onerror = (e) => reject(new Error(`Failed to persist root payload: ${e.target.error}`));
+        tx.oncomplete = () => resolve(normalizedRoot);
+        tx.onerror = (e) => reject(new Error(`Failed to persist root payload: ${e.target.error}`));
     });
   }
 }
