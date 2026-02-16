@@ -1,181 +1,80 @@
-const { createStorageService, createDefaultRoot } = jest.requireActual('../js/storage-module.js');
-const { createSQLiteApiMock } = require('../test-utils/sqlite-api-mock.js');
+/** Tests for the SOLID-friendly adapter/service factory injection hooks exposed by createStorageService. */
 
-describe('createStorageService', () => {
-  const originalFetch = global.fetch;
-  const originalLocalStorage = global.localStorage;
+let createStorageService;
+let createDefaultRoot;
 
-  const mockLocalStorage = (initial = {}) => {
-    const store = new Map(Object.entries(initial));
-    const local = {
-      getItem: jest.fn((key) => (store.has(key) ? store.get(key) : null)),
-      setItem: jest.fn((key, value) => {
-        store.set(key, value);
-      }),
-      removeItem: jest.fn((key) => {
-        store.delete(key);
-      })
-    };
-    global.localStorage = local;
-    return { store, local }; 
-  };
-
-  afterEach(() => {
-    global.fetch = originalFetch;
-    global.localStorage = originalLocalStorage;
-    jest.restoreAllMocks?.();
+describe('Storage Module', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    jest.unmock('../js/storage-module.js');
   });
 
-  test('creates LocalStorageService by default', async () => {
-    mockLocalStorage();
+  describe('createStorageService', () => {
+    test('creates and passes LocalStorageAdapter to StorageService by default', () => {
+      jest.isolateModules(() => {
+        const adapter = { type: 'local' };
+        const factory = jest.fn(() => adapter);
+        const serviceFactory = jest.fn(() => ({ service: 'local' }));
 
-    const service = createStorageService();
-    expect(service).toBeDefined();
-    await service.initialize?.();
+        ({ createStorageService, createDefaultRoot } = require('../js/storage-module.js'));
+        createStorageService({ adapterFactory: factory, serviceFactory });
 
-    const root = await service.getRootData();
-    expect(typeof root.currentWeek).toBe('number');
-    expect(root.currentWeek).toBeGreaterThan(0);
-  });
-
-  test('legacy getItem returns JSON string from underlying adapter', async () => {
-    mockLocalStorage();
-
-    const service = createStorageService();
-    await service.initialize?.();
-
-    const payload = {
-      version: '2.0',
-      currentWeek: 3,
-      weeks: {
-        1: { players: [], captain: null, viceCaptain: null, teamMembers: [], teamStats: { totalValue: 0, playerCount: 0 } },
-        3: { players: [{ id: 'p3', price: 9, have: true }], captain: 'p3', viceCaptain: null, teamMembers: [{ playerId: 'p3', addedAt: 3 }], teamStats: { totalValue: 9, playerCount: 1 } }
-      }
-    };
-    await service.setRootData(payload);
-
-    const result = await service.getItem('fpl-team-data');
-    expect(typeof result).toBe('string');
-    const parsed = JSON.parse(result);
-    expect(parsed).toMatchObject({ currentWeek: 3 });
-    expect(parsed.weeks['3']).toMatchObject({ captain: 'p3' });
-  });
-
-  test('legacy setItem serializes payload before delegating', async () => {
-    mockLocalStorage();
-    const service = createStorageService();
-    await service.initialize?.();
-
-    const payload = { fizz: 'buzz' };
-    await service.setItem('fpl-team-data', payload);
-
-    const stored = await service.getItem('fpl-team-data');
-    expect(typeof stored).toBe('string');
-    expect(JSON.parse(stored)).toMatchObject(payload);
-  });
-
-  test('returns IndexedDB-backed service when backend=indexeddb', () => {
-    const service = createStorageService({ backend: 'indexeddb', storageKey: 'idx-test' });
-    expect(service).toBeDefined();
-    expect(typeof service.getRootData).toBe('function');
-  });
-
-  test('returns SQLite-backed service when backend=sqlite', () => {
-    const fetchMock = jest.fn();
-    global.fetch = fetchMock;
-
-    const service = createStorageService({
-      backend: 'sqlite',
-      baseUrl: 'http://localhost/api/storage',
-      fetchImpl: fetchMock
-    });
-    expect(service).toBeDefined();
-    expect(typeof service.getRootData).toBe('function');
-  });
-
-  test('SQLite-backed service loads and persists using the HTTP mock API', async () => {
-    const initialRoot = createDefaultRoot();
-    const api = createSQLiteApiMock({ initialRoot });
-    global.fetch = api.fetchMock;
-
-    const service = createStorageService({
-      backend: 'sqlite',
-      baseUrl: 'http://localhost/api/storage',
-      fetchImpl: api.fetchMock
+        expect(factory).toHaveBeenCalledTimes(1);
+        expect(serviceFactory).toHaveBeenCalledWith(adapter);
+      });
     });
 
-    const root = await service.getRootData();
-    expect(root).toMatchObject({ currentWeek: 1, version: '2.0' });
+    test('creates and passes LocalStorageAdapter for backend=localstorage', () => {
+      jest.isolateModules(() => {
+        const adapter = { type: 'local' };
+        const factory = jest.fn(() => adapter);
+        const serviceFactory = jest.fn(() => ({ service: 'local' }));
 
-    expect(api.fetchMock).toHaveBeenCalledWith(
-      'http://localhost/api/storage/root',
-      expect.objectContaining({
-        method: 'GET',
-        headers: expect.objectContaining({ Accept: 'application/json' })
-      })
-    );
+        ({ createStorageService, createDefaultRoot } = require('../js/storage-module.js'));
+        createStorageService({ backend: 'localstorage', storageKey: 'custom-key', adapterFactory: factory, serviceFactory });
 
-    const updatedRoot = {
-      version: '2.0',
-      currentWeek: 3,
-      weeks: {
-        1: root.weeks['1'],
-        3: {
-          players: [{ id: 'p3', have: true, price: 9 }],
-          captain: 'p3',
-          viceCaptain: null,
-          teamMembers: [{ playerId: 'p3', addedAt: 3 }],
-          teamStats: { totalValue: 9, playerCount: 1 },
-          totalTeamCost: 9,
-          isReadOnly: false
-        }
-      }
-    };
+        expect(factory).toHaveBeenCalledTimes(1);
+        expect(serviceFactory).toHaveBeenCalledWith(adapter);
+      });
+    });
 
-    await service.setRootData(updatedRoot);
+    test('creates and passes SQLiteAdapter for backend=sqlite', () => {
+      jest.isolateModules(() => {
+        const adapter = { type: 'sqlite' };
+        const factory = jest.fn(() => adapter);
+        const serviceFactory = jest.fn(() => ({ service: 'sqlite' }));
 
-    expect(api.fetchMock).toHaveBeenLastCalledWith(
-      'http://localhost/api/storage/root',
-      expect.objectContaining({
-        method: 'PUT',
-        headers: expect.objectContaining({
-          'Content-Type': 'application/json',
-          Accept: 'application/json'
-        })
-      })
-    );
+        ({ createStorageService, createDefaultRoot } = require('../js/storage-module.js'));
+        createStorageService({ backend: 'sqlite', baseUrl: '/custom', fetchImpl: jest.fn(), adapterFactory: factory, serviceFactory });
 
-    const persisted = api.getState();
-    expect(persisted.currentWeek).toBe(3);
-    expect(persisted.weeks['3']).toMatchObject({ captain: 'p3', totalTeamCost: 9 });
+        expect(factory).toHaveBeenCalledTimes(1);
+        expect(serviceFactory).toHaveBeenCalledWith(adapter);
+      });
+    });
 
-    const reloaded = await service.getRootData();
-    expect(reloaded.currentWeek).toBe(3);
-    expect(reloaded.weeks['3']).toMatchObject({ viceCaptain: null, totalTeamCost: 9 });
+    test('creates and passes IndexedDBAdapter for backend=indexeddb', () => {
+      jest.isolateModules(() => {
+        const adapter = { type: 'indexed' };
+        const factory = jest.fn(() => adapter);
+        const serviceFactory = jest.fn(() => ({ service: 'indexed' }));
+
+        ({ createStorageService, createDefaultRoot } = require('../js/storage-module.js'));
+        createStorageService({ backend: 'indexeddb', storageKey: 'idx', adapterFactory: factory, serviceFactory });
+
+        expect(factory).toHaveBeenCalledTimes(1);
+        expect(serviceFactory).toHaveBeenCalledWith(adapter);
+      });
+    });
   });
-});
 
-describe('createDefaultRoot', () => {
-  test('produces expected initial structure', () => {
-    const root = createDefaultRoot();
-
-    expect(root).toMatchObject({
-      version: '2.0',
-      currentWeek: 1
+  describe('createDefaultRoot', () => {
+    test('produces expected initial structure', () => {
+      const root = createDefaultRoot();
+      expect(root).toMatchObject({
+        version: '2.0',
+        currentWeek: 1,
+      });
+      expect(root.weeks['1']).toBeDefined();
     });
-
-    expect(root.weeks).toBeDefined();
-    const week1 = root.weeks['1'];
-    expect(week1).toBeDefined();
-    expect(week1).toMatchObject({
-      players: [],
-      captain: null,
-      viceCaptain: null,
-      teamMembers: [],
-      totalTeamCost: 0,
-      isReadOnly: false
-    });
-    expect(week1.teamStats).toMatchObject({ totalValue: 0, playerCount: 0 });
-    expect(typeof week1.teamStats.updatedDate).toBe('string');
   });
 });

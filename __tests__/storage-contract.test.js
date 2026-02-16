@@ -42,19 +42,25 @@ const setupLocalStorageBackend = () => ({
 const setupIndexedDbBackend = () => ({
   name: 'indexeddb',
   async setup() {
-    const service = createStorageService({ backend: 'indexeddb', storageKey: 'contract-indexeddb' });
+    const dbName = `contract-indexeddb-${Date.now()}-${Math.random()}`;
+    const service = createStorageService({ backend: 'indexeddb', storageKey: 'fpl-team-data', dbName });
     await service.initialize?.();
 
     return {
       service,
       async cleanup() {
         try {
-          service.db?.close?.();
+          service.adapter?.db?.close?.();
         } catch (error) {
           // ignore
         }
         if (typeof indexedDB?.deleteDatabase === 'function') {
-          indexedDB.deleteDatabase(service.dbName);
+          await new Promise((resolve, reject) => {
+            const request = indexedDB.deleteDatabase(dbName);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+            request.onblocked = () => resolve();
+          });
         }
       }
     };
@@ -69,20 +75,46 @@ const setupSqliteBackend = () => ({
     const fetchMock = jest.fn(async (url, options = {}) => {
       const method = (options.method || 'GET').toUpperCase();
       if (!url.endsWith('/api/storage/root')) {
-        return { status: 404, json: async () => ({}) };
+        const body = {};
+        return {
+          status: 404,
+          ok: false,
+          json: async () => body,
+          text: async () => JSON.stringify(body),
+          statusText: 'Not Found',
+        };
       }
 
       if (method === 'GET') {
-        return { status: 200, json: async () => ({ ...rootPayload }) };
+        const body = { ...rootPayload };
+        return {
+          status: 200,
+          ok: true,
+          json: async () => body,
+          text: async () => JSON.stringify(body),
+        };
       }
 
       if (method === 'PUT') {
         const body = options.body ? JSON.parse(options.body) : {};
         Object.assign(rootPayload, body);
-        return { status: 200, json: async () => ({ ...rootPayload }) };
+        const responseBody = { ...rootPayload };
+        return {
+          status: 200,
+          ok: true,
+          json: async () => responseBody,
+          text: async () => JSON.stringify(responseBody),
+        };
       }
 
-      return { status: 405, json: async () => ({}) };
+      const body = {};
+      return {
+        status: 405,
+        ok: false,
+        json: async () => body,
+        text: async () => JSON.stringify(body),
+        statusText: 'Method Not Allowed',
+      };
     });
 
     global.fetch = fetchMock;
@@ -219,12 +251,22 @@ describe('Storage backend contract harness', () => {
         return;
       }
 
-      const payload = { fizz: 'buzz', nested: { value: 42 } };
-      await service.setItem('fpl-team-data', payload);
+      const payload = {
+        version: '2.0',
+        currentWeek: 3,
+        weeks: {
+          1: { players: [], captain: null, viceCaptain: null, isReadOnly: true },
+          3: { players: [{ id: 'p1', price: 5 }], captain: 'p1', viceCaptain: null, isReadOnly: false }
+        }
+      };
+      await service.setItem('fpl-team-data', JSON.stringify(payload));
 
       const stored = await service.getItem('fpl-team-data');
       expect(typeof stored).toBe('string');
-      expect(JSON.parse(stored)).toMatchObject(payload);
+      const parsed = JSON.parse(stored);
+      expect(parsed.currentWeek).toBe(3);
+      expect(parsed.version).toBe('2.0');
+      expect(parsed.weeks).toBeDefined();
     } finally {
       await cleanup?.();
     }

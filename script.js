@@ -2,6 +2,9 @@ import UIManager from './js/ui-manager.js';
 import { createStorageService, createDefaultRoot } from './js/storage-module.js';
 import { WeekModel } from './js/models/week-model.js';
 import { AppError } from './js/utils/app-error.js';
+import PlayerService from './js/services/player-service.js';
+import WeekService from './js/services/week-service.js';
+import CaptaincyService from './js/services/captaincy-service.js';
 
 // Global debug flag for this module
 const DEBUG = false;
@@ -10,6 +13,9 @@ export class FPLTeamManager {
     constructor({ ui, storage } = {}) {
         this.ui = ui || new UIManager();
         this.storage = storage || createStorageService({ backend: 'localstorage' });
+        this.playerService = new PlayerService(this.storage);
+        this.weekService = new WeekService(this.storage);
+        this.captaincyService = new CaptaincyService(this.storage);
         this.storageKey = 'fpl-team-data'; // Centralize storage key
         this._supportsRootApi = false;
         this._storageReady = this._initializeStorage();
@@ -37,20 +43,17 @@ export class FPLTeamManager {
 
     async getCaptainId() {
         const root = await this._getRootData();
-        const week = root.weeks[root.currentWeek] || {};
-        return week.captain;
+        return this.captaincyService.getCaptainId(root);
     }
 
     async getViceCaptainId() {
         const root = await this._getRootData();
-        const week = root.weeks[root.currentWeek] || {};
-        return week.viceCaptain;
+        return this.captaincyService.getViceCaptainId(root);
     }
 
     async getPlayers() {
         const root = await this._getRootData();
-        const week = root.weeks[root.currentWeek] || {};
-        return week.players || [];
+        return this.playerService.getPlayers(root);
     }
 
     async calculateTotalCost() {
@@ -170,125 +173,71 @@ export class FPLTeamManager {
 
     async addPlayer(playerData) {
         if (await this.isCurrentWeekReadOnly()) return;
-        const root = await this._getRootData();
-        const currentWeekNumber = root.currentWeek;
-        const existingWeek = root.weeks[currentWeekNumber] || { players: [], captain: null, viceCaptain: null };
-        const workingWeek = this._cloneWeekData(existingWeek);
-
-        const player = {
-            id: Date.now().toString(),
-            ...playerData,
-            addedAt: currentWeekNumber
-        };
-        workingWeek.players.push(player);
-
-        root.weeks[currentWeekNumber] = workingWeek;
-
-        await this._ensureWeekDerivedFields(root, currentWeekNumber);
+        let root = await this._getRootData();
+        root = await this.playerService.addPlayer(root, playerData);
+        await this._ensureWeekDerivedFields(root, root.currentWeek);
         await this._saveRootData(root);
         await this.updateDisplay();
     }
 
     async updatePlayer(playerId, playerData) {
         if (await this.isCurrentWeekReadOnly()) return;
-        const root = await this._getRootData();
-        const currentWeekNumber = root.currentWeek;
-        const existingWeek = root.weeks[currentWeekNumber] || { players: [], captain: null, viceCaptain: null };
-        const workingWeek = this._cloneWeekData(existingWeek);
-        const playerIndex = workingWeek.players.findIndex(p => p.id === playerId);
-        if (playerIndex !== -1) {
-            workingWeek.players[playerIndex] = { ...workingWeek.players[playerIndex], ...playerData };
-            root.weeks[currentWeekNumber] = workingWeek;
-            await this._ensureWeekDerivedFields(root, currentWeekNumber);
-            await this._saveRootData(root);
-            await this.updateDisplay();
-        }
+        let root = await this._getRootData();
+        root = await this.playerService.updatePlayer(root, playerId, playerData);
+        await this._ensureWeekDerivedFields(root, root.currentWeek);
+        await this._saveRootData(root);
+        await this.updateDisplay();
     }
 
     async deletePlayer(playerId) {
         if (await this.isCurrentWeekReadOnly()) return;
-        
-        // Ask for confirmation before deleting
+
         if (!confirm('Are you sure you want to delete this player?')) {
             return;
         }
-        
-        const root = await this._getRootData();
-        const currentWeekNumber = root.currentWeek;
-        const existingWeek = root.weeks[currentWeekNumber] || { players: [], captain: null, viceCaptain: null };
-        const workingWeek = this._cloneWeekData(existingWeek);
-        workingWeek.players = workingWeek.players.filter(p => p.id !== playerId);
-        // Clear captain/vice-captain if they were the deleted player
-        if (workingWeek.captain === playerId) workingWeek.captain = null;
-        if (workingWeek.viceCaptain === playerId) workingWeek.viceCaptain = null;
-        root.weeks[currentWeekNumber] = workingWeek;
-        await this._ensureWeekDerivedFields(root, currentWeekNumber);
+
+        let root = await this._getRootData();
+        root = await this.playerService.deletePlayer(root, playerId);
+        await this._ensureWeekDerivedFields(root, root.currentWeek);
         await this._saveRootData(root);
         await this.updateDisplay();
     }
 
     async toggleHave(playerId) {
         if (await this.isCurrentWeekReadOnly()) return;
-        const root = await this._getRootData();
-        const currentWeekNumber = root.currentWeek;
-        const existingWeek = root.weeks[currentWeekNumber] || { players: [], captain: null, viceCaptain: null };
-        const workingWeek = this._cloneWeekData(existingWeek);
-        const player = workingWeek.players.find(p => p.id === playerId);
-        if (player) {
-            if (!player.have && workingWeek.players.filter(p => p.have).length >= 15) {
-                this.ui.showAlert('You can only have 15 players in your team.');
-                return;
-            }
-            player.have = !player.have;
-            root.weeks[currentWeekNumber] = workingWeek;
-            await this._ensureWeekDerivedFields(root, currentWeekNumber);
+        let root = await this._getRootData();
+        try {
+            root = await this.playerService.toggleHave(root, playerId);
+            await this._ensureWeekDerivedFields(root, root.currentWeek);
             await this._saveRootData(root);
             await this.updateDisplay();
+        } catch (error) {
+            this.ui.showAlert(error.message);
         }
     }
 
     async setCaptain(playerId) {
         if (await this.isCurrentWeekReadOnly()) return;
-        const root = await this._getRootData();
-        const currentWeek = root.weeks[root.currentWeek];
-        const player = currentWeek.players.find(p => p.id === playerId);
-        if (player && !player.have) {
-            this.ui.showAlert('Player must be in the team to be captain.');
-            return;
+        let root = await this._getRootData();
+        try {
+            root = this.captaincyService.setCaptain(root, playerId);
+            await this._saveRootData(root);
+            await this.updateDisplay();
+        } catch (error) {
+            this.ui.showAlert(error.message);
         }
-
-        if (currentWeek.captain === playerId) {
-            currentWeek.captain = null;
-        } else {
-            currentWeek.captain = playerId;
-            if (currentWeek.viceCaptain === playerId) {
-                currentWeek.viceCaptain = null;
-            }
-        }
-        await this._saveRootData(root);
-        await this.updateDisplay();
     }
 
     async setViceCaptain(playerId) {
         if (await this.isCurrentWeekReadOnly()) return;
-        const root = await this._getRootData();
-        const currentWeek = root.weeks[root.currentWeek];
-        const player = currentWeek.players.find(p => p.id === playerId);
-        if (player && !player.have) {
-            this.ui.showAlert('Player must be in the team to be vice-captain.');
-            return;
+        let root = await this._getRootData();
+        try {
+            root = this.captaincyService.setViceCaptain(root, playerId);
+            await this._saveRootData(root);
+            await this.updateDisplay();
+        } catch (error) {
+            this.ui.showAlert(error.message);
         }
-
-        if (currentWeek.viceCaptain === playerId) {
-            currentWeek.viceCaptain = null;
-        } else {
-            currentWeek.viceCaptain = playerId;
-            if (currentWeek.captain === playerId) {
-                currentWeek.captain = null;
-            }
-        }
-        await this._saveRootData(root);
-        await this.updateDisplay();
     }
 
     async updateDisplay() {
@@ -447,120 +396,63 @@ export class FPLTeamManager {
         return this.storage.setItem(this.storageKey, JSON.stringify(root));
     }
 
-    _computeTeamSnapshot(players) {
-        return WeekModel.computeTeamSnapshot(players);
-    }
-
-    _cloneWeekData(week) {
-        return WeekModel.clone(week);
-    }
 
     // Ensure derived fields on a specific week are up-to-date based on its players
     async _ensureWeekDerivedFields(root, weekNumber) {
-        const wn = String(weekNumber);
-        const existingWeek = root.weeks[wn];
-        if (!existingWeek) return;
-
-        const snapshot = this._computeTeamSnapshot(existingWeek.players || []);
-        root.weeks[wn] = {
-            ...snapshot,
-            players: WeekModel.clone(existingWeek.players || []),
-            captain: existingWeek.captain,
-            viceCaptain: existingWeek.viceCaptain,
-            isReadOnly: existingWeek.isReadOnly,
-            notes: existingWeek.notes
-        };
+        return this.weekService._ensureWeekDerivedFields(root, weekNumber);
     }
 
     async createNewWeek() {
-        const root = await this._getRootData();
-        const currentWeekNumber = root.currentWeek;
-
-        const currentWeekPayload = root.weeks[currentWeekNumber] || { players: [], captain: null, viceCaptain: null };
-        const snapshotForClone = this._cloneWeekData(currentWeekPayload);
-
-        if (root.weeks[currentWeekNumber]) {
-            await this._ensureWeekDerivedFields(root, currentWeekNumber);
-
-            const frozenWeek = this._cloneWeekData(root.weeks[currentWeekNumber]);
-            frozenWeek.isReadOnly = true;
-            root.weeks[currentWeekNumber] = frozenWeek;
-
-            if (typeof Object.freeze === 'function') {
-                Object.freeze(root.weeks[currentWeekNumber]);
-            }
-        }
-
-        const newWeekNumber = currentWeekNumber + 1;
-        const newWeek = this._cloneWeekData(snapshotForClone);
-        newWeek.isReadOnly = false;
-        root.weeks[newWeekNumber] = newWeek;
-
-        // Recompute derived fields for the new week as well
-        await this._ensureWeekDerivedFields(root, newWeekNumber);
-
-        root.currentWeek = newWeekNumber;
+        let root = await this._getRootData();
+        root = this.weekService.createNewWeek(root);
         await this._saveRootData(root);
         await this.updateDisplay();
     }
 
     async goToWeek(weekNumber) {
-        const root = await this._getRootData();
-        if (!root.weeks[weekNumber]) return;
-
-        root.currentWeek = Number(weekNumber);
+        let root = await this._getRootData();
+        root = this.weekService.goToWeek(root, weekNumber);
         await this._saveRootData(root);
         await this.updateDisplay();
     }
 
     async nextWeek() {
-        const root = await this._getRootData();
-        const maxWeek = Math.max(...Object.keys(root.weeks).map(n => Number(n)));
-        const target = Math.min(root.currentWeek + 1, maxWeek);
-        await this.goToWeek(target);
+        let root = await this._getRootData();
+        root = this.weekService.nextWeek(root);
+        await this._saveRootData(root);
+        await this.updateDisplay();
     }
 
     async prevWeek() {
-        const root = await this._getRootData();
-        const target = Math.max(1, root.currentWeek - 1);
-        await this.goToWeek(target);
+        let root = await this._getRootData();
+        root = this.weekService.prevWeek(root);
+        await this._saveRootData(root);
+        await this.updateDisplay();
     }
 
     async getWeekCount() {
         const root = await this._getRootData();
-        if (!root || !root.weeks) return 1;
-        return Object.keys(root.weeks).length || 1;
+        return this.weekService.getWeekCount(root);
     }
 
     async getCurrentWeekNumber() {
         const root = await this._getRootData();
-        return root.currentWeek || 1;
+        return this.weekService.getCurrentWeekNumber(root);
     }
 
     async getWeekSnapshot(weekNumber) {
         const root = await this._getRootData();
-        const wn = String(weekNumber || root.currentWeek);
-        const wk = root.weeks[wn] || {};
-        return JSON.parse(JSON.stringify({
-            players: wk.players || [],
-            captain: wk.captain || null,
-            viceCaptain: wk.viceCaptain || null,
-            isReadOnly: wk.isReadOnly || false,
-            teamMembers: wk.teamMembers || [],
-            teamStats: wk.teamStats || { totalValue: 0, playerCount: 0 }
-        }));
+        return this.weekService.getWeekSnapshot(root, weekNumber);
     }
 
     async isWeekReadOnly(weekNumber) {
         const root = await this._getRootData();
-        const week = root.weeks[weekNumber] || {};
-        return !!week.isReadOnly;
+        return this.weekService.isWeekReadOnly(root, weekNumber);
     }
 
     async isCurrentWeekReadOnly() {
         const root = await this._getRootData();
-        const week = root.weeks[root.currentWeek] || {};
-        return !!week.isReadOnly;
+        return this.weekService.isCurrentWeekReadOnly(root);
     }
 
     // Backward compatibility methods for legacy tests

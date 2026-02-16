@@ -37,22 +37,6 @@ const localStorageMock = (() => {
 
 global.localStorage = localStorageMock;
 
-// Import the mock storage class we created
-const { MockStorageService } = require('./__tests__/test-utils');
-
-// Create a single, stateful instance that can be shared across tests
-const mockStorageInstance = new MockStorageService();
-
-// Mock the storage module to use and expose our instance while keeping helpers
-jest.mock('./js/storage-module.js', () => {
-  const actual = jest.requireActual('./js/storage-module.js');
-  return {
-    ...actual,
-    createStorageService: jest.fn(() => mockStorageInstance),
-    __getMockStorage: () => mockStorageInstance, // Helper to access the mock in tests
-  };
-});
-
 // Helper function to create required DOM elements
 function setupDOM() {
   // Create container
