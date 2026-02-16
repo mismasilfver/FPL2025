@@ -361,8 +361,14 @@ export default class UIManager {
                 span.setAttribute('data-testid', `remove-from-team-${player.id}`);
                 span.setAttribute('data-action', 'toggle-have');
                 span.setAttribute('data-player-id', player.id);
-                span.style.cursor = 'pointer';
-                span.title = 'Click to remove from team';
+                if (isReadOnly) {
+                    span.classList.add('disabled');
+                    span.style.cursor = 'not-allowed';
+                    span.title = 'This week is read-only';
+                } else {
+                    span.style.cursor = 'pointer';
+                    span.title = 'Click to remove from team';
+                }
                 span.textContent = '✓';
                 haveCell.appendChild(span);
             } else {

@@ -63,7 +63,14 @@ async function createSQLiteTestServer(options = {}) {
   }
 
   async function teardown() {
-    await new Promise((resolve) => server.close(resolve));
+    // Force close all connections to prevent open handles
+    await new Promise((resolve, reject) => {
+      server.closeAllConnections?.(); // Node 18.2+
+      server.close((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
     database.closeDatabase();
   }
 
