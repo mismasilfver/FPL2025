@@ -16,31 +16,35 @@
  */
 export async function addPlayer(page, playerData) {
   // Click add player button
-  await page.click('[data-testid="add-player-button"], #add-player-btn, button:has-text("Add Player")');
+  await page.click('[data-testid="add-player-button"], #add-player-btn');
+  
+  // Wait for modal to appear
+  await page.waitForSelector('#player-modal, .modal', { state: 'visible' });
   
   // Fill player name
-  await page.fill('[data-testid="player-name-input"], [name="playerName"], input[placeholder*="name"]', playerData.name);
+  await page.fill('[data-testid="player-name-input"], #player-name', playerData.name);
   
   // Select position
-  await page.selectOption('[data-testid="position-select"], [name="position"], select:has-option("goalkeeper")', playerData.position);
+  await page.selectOption('[data-testid="player-position-select"], #player-position', playerData.position);
   
   // Fill price
-  await page.fill('[data-testid="price-input"], [name="price"], input[type="number"]', String(playerData.price));
+  await page.fill('[data-testid="player-price-input"], #player-price', String(playerData.price));
   
   // Fill team if provided
   if (playerData.team) {
-    await page.fill('[data-testid="team-input"], [name="team"]', playerData.team);
+    await page.fill('[data-testid="player-team-input"], #player-team', playerData.team);
   }
   
-  // Set owned status if false
+  // Set "have" status if true (checked by default, so only uncheck if false)
   if (playerData.isOwned === false) {
-    await page.uncheck('[data-testid="have-checkbox"], [name="have"], input[type="checkbox"]');
+    await page.uncheck('[data-testid="player-have-checkbox"], #player-have');
   }
   
   // Submit the form
-  await page.click('[data-testid="submit-player"], [type="submit"], button:has-text("Save")');
+  await page.click('[data-testid="save-player-button"], button[type="submit"]');
   
-  // Wait for modal to close or success indicator
+  // Wait for modal to close
+  await page.waitForSelector('#player-modal, .modal', { state: 'hidden' }).catch(() => {});
   await page.waitForTimeout(300);
 }
 
@@ -50,7 +54,7 @@ export async function addPlayer(page, playerData) {
  * @returns {Promise<number>} Number of player rows
  */
 export async function getPlayerCount(page) {
-  return page.locator('.player-row, [data-testid="player-row"], tr.player').count();
+  return page.locator('#players-tbody tr.player-row, .player-row').count();
 }
 
 /**
@@ -60,7 +64,7 @@ export async function getPlayerCount(page) {
  * @returns {Promise<import('@playwright/test').Locator>} Locator for the player row
  */
 export async function getPlayerRow(page, playerName) {
-  return page.locator('.player-row, [data-testid="player-row"]', { hasText: playerName });
+  return page.locator('#players-tbody tr.player-row', { hasText: playerName });
 }
 
 /**
@@ -70,14 +74,9 @@ export async function getPlayerRow(page, playerName) {
  */
 export async function deletePlayer(page, playerName) {
   const row = await getPlayerRow(page, playerName);
-  await row.locator('[data-testid="delete-player"], button:has-text("Delete"), .delete-btn').click();
+  await row.locator('.delete-btn, button:has-text("Delete"), [data-testid="delete-player"]').click();
   
-  // Confirm deletion if confirmation dialog appears
-  const confirmButton = page.locator('[data-testid="confirm-delete"], button:has-text("Confirm"), .confirm-btn');
-  if (await confirmButton.isVisible().catch(() => false)) {
-    await confirmButton.click();
-  }
-  
+  // Wait for row to disappear
   await page.waitForTimeout(300);
 }
 
@@ -89,24 +88,30 @@ export async function deletePlayer(page, playerName) {
  */
 export async function updatePlayer(page, playerName, updates) {
   const row = await getPlayerRow(page, playerName);
-  await row.locator('[data-testid="edit-player"], button:has-text("Edit"), .edit-btn').click();
+  await row.locator('.edit-btn, button:has-text("Edit"), [data-testid="edit-player"]').click();
+  
+  // Wait for modal
+  await page.waitForSelector('#player-modal, .modal', { state: 'visible' });
   
   // Update fields
   if (updates.name) {
-    await page.fill('[data-testid="player-name-input"], [name="playerName"]', updates.name);
+    await page.fill('[data-testid="player-name-input"], #player-name', updates.name);
   }
   if (updates.price !== undefined) {
-    await page.fill('[data-testid="price-input"], [name="price"]', String(updates.price));
+    await page.fill('[data-testid="player-price-input"], #player-price', String(updates.price));
   }
   if (updates.team) {
-    await page.fill('[data-testid="team-input"], [name="team"]', updates.team);
+    await page.fill('[data-testid="player-team-input"], #player-team', updates.team);
   }
   if (updates.position) {
-    await page.selectOption('[data-testid="position-select"], [name="position"]', updates.position);
+    await page.selectOption('[data-testid="player-position-select"], #player-position', updates.position);
   }
   
   // Submit
-  await page.click('[data-testid="submit-player"], [type="submit"], button:has-text("Save")');
+  await page.click('[data-testid="save-player-button"], button[type="submit"]');
+  
+  // Wait for modal to close
+  await page.waitForSelector('#player-modal, .modal', { state: 'hidden' }).catch(() => {});
   await page.waitForTimeout(300);
 }
 
@@ -117,7 +122,8 @@ export async function updatePlayer(page, playerName, updates) {
  */
 export async function togglePlayerOwned(page, playerName) {
   const row = await getPlayerRow(page, playerName);
-  await row.locator('[data-testid="have-checkbox"], input[type="checkbox"]').click();
+  // The have checkbox is in the col-have cell
+  await row.locator('.col-have input[type="checkbox"], td:nth-child(6) input[type="checkbox"]').click();
 }
 
 /**
@@ -129,9 +135,10 @@ export async function togglePlayerOwned(page, playerName) {
 export async function setCaptainStatus(page, playerName, status) {
   const row = await getPlayerRow(page, playerName);
   const buttonSelector = status === 'captain' 
-    ? '[data-testid="set-captain"], button:has-text("C")'
-    : '[data-testid="set-vice"], button:has-text("VC")';
+    ? '.captain-btn, [data-testid="captain-btn"], button:has-text("C")'
+    : '.vice-btn, [data-testid="vice-btn"], button:has-text("VC")';
   await row.locator(buttonSelector).click();
+  await page.waitForTimeout(200);
 }
 
 /**
@@ -139,7 +146,7 @@ export async function setCaptainStatus(page, playerName, status) {
  * @param {import('@playwright/test').Page} page - Playwright page object
  */
 export async function createNewWeek(page) {
-  await page.click('[data-testid="create-week"], button:has-text("New Week"), #create-week-btn');
+  await page.click('[data-testid="create-week-btn"], #create-week-btn');
   await page.waitForTimeout(500);
 }
 
@@ -149,8 +156,20 @@ export async function createNewWeek(page) {
  * @param {number} weekNumber - Week number to navigate to
  */
 export async function navigateToWeek(page, weekNumber) {
-  await page.click(`[data-testid="week-${weekNumber}"], button:has-text("Week ${weekNumber}"), .week-tab:nth-child(${weekNumber})`);
-  await page.waitForTimeout(300);
+  // Check if we need to go forward or backward
+  const currentWeek = await getCurrentWeekNumber(page);
+  
+  while (currentWeek < weekNumber) {
+    await page.click('[data-testid="next-week-btn"], #next-week-btn');
+    await page.waitForTimeout(300);
+    currentWeek++;
+  }
+  
+  while (currentWeek > weekNumber) {
+    await page.click('[data-testid="prev-week-btn"], #prev-week-btn');
+    await page.waitForTimeout(300);
+    currentWeek--;
+  }
 }
 
 /**
@@ -159,7 +178,7 @@ export async function navigateToWeek(page, weekNumber) {
  * @returns {Promise<number>} Current week number
  */
 export async function getCurrentWeekNumber(page) {
-  const text = await page.locator('[data-testid="current-week"], .current-week-indicator').textContent();
+  const text = await page.locator('[data-testid="week-label"], #week-label').textContent();
   const match = text?.match(/Week (\d+)/);
   return match ? parseInt(match[1], 10) : 1;
 }
@@ -170,9 +189,8 @@ export async function getCurrentWeekNumber(page) {
  * @returns {Promise<boolean>} True if read-only
  */
 export async function isReadOnlyMode(page) {
-  const indicator = await page.locator('[data-testid="readonly-indicator"], .readonly-badge, .read-only').isVisible().catch(() => false);
-  const addButtonDisabled = await page.locator('[data-testid="add-player-button"]').isDisabled().catch(() => false);
-  return indicator || addButtonDisabled;
+  const badge = await page.locator('[data-testid="week-readonly-badge"], #week-readonly-badge').isVisible();
+  return badge;
 }
 
 /**

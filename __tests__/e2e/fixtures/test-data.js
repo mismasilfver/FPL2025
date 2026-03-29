@@ -8,19 +8,19 @@ export const testPlayers = [
   { name: 'Alisson Becker', position: 'goalkeeper', price: 5.5, team: 'Liverpool' },
   { name: 'David Raya', position: 'goalkeeper', price: 5.0, team: 'Arsenal' },
   
-  // Defenders (5)
-  { name: 'Trent Alexander-Arnold', position: 'defender', price: 7.5, team: 'Liverpool' },
-  { name: 'William Saliba', position: 'defender', price: 6.0, team: 'Arsenal' },
-  { name: 'Reece James', position: 'defender', price: 5.5, team: 'Chelsea' },
-  { name: 'Virgil van Dijk', position: 'defender', price: 6.5, team: 'Liverpool' },
-  { name: 'Ruben Dias', position: 'defender', price: 5.5, team: 'Man City' },
+  // Defenders (5) - Note: HTML uses 'defence' not 'defender'
+  { name: 'Trent Alexander-Arnold', position: 'defence', price: 7.5, team: 'Liverpool' },
+  { name: 'William Saliba', position: 'defence', price: 6.0, team: 'Arsenal' },
+  { name: 'Reece James', position: 'defence', price: 5.5, team: 'Chelsea' },
+  { name: 'Virgil van Dijk', position: 'defence', price: 6.5, team: 'Liverpool' },
+  { name: 'Ruben Dias', position: 'defence', price: 5.5, team: 'Man City' },
   
-  // Midfielders (5)
-  { name: 'Mohamed Salah', position: 'midfielder', price: 11.0, team: 'Liverpool' },
-  { name: 'Bukayo Saka', position: 'midfielder', price: 9.5, team: 'Arsenal' },
-  { name: 'Martin Odegaard', position: 'midfielder', price: 8.0, team: 'Arsenal' },
-  { name: 'Kevin De Bruyne', position: 'midfielder', price: 9.0, team: 'Man City' },
-  { name: 'Bruno Fernandes', position: 'midfielder', price: 8.5, team: 'Man United' },
+  // Midfielders (5) - Note: HTML uses 'midfield' not 'midfielder'
+  { name: 'Mohamed Salah', position: 'midfield', price: 11.0, team: 'Liverpool' },
+  { name: 'Bukayo Saka', position: 'midfield', price: 9.5, team: 'Arsenal' },
+  { name: 'Martin Odegaard', position: 'midfield', price: 8.0, team: 'Arsenal' },
+  { name: 'Kevin De Bruyne', position: 'midfield', price: 9.0, team: 'Man City' },
+  { name: 'Bruno Fernandes', position: 'midfield', price: 8.5, team: 'Man United' },
   
   // Forwards (3)
   { name: 'Erling Haaland', position: 'forward', price: 12.5, team: 'Man City' },
@@ -34,8 +34,8 @@ export const testPlayers = [
  */
 export const buildFullSquad = () => {
   const goalkeepers = testPlayers.filter(p => p.position === 'goalkeeper').slice(0, 2);
-  const defenders = testPlayers.filter(p => p.position === 'defender').slice(0, 5);
-  const midfielders = testPlayers.filter(p => p.position === 'midfielder').slice(0, 5);
+  const defenders = testPlayers.filter(p => p.position === 'defence').slice(0, 5);
+  const midfielders = testPlayers.filter(p => p.position === 'midfield').slice(0, 5);
   const forwards = testPlayers.filter(p => p.position === 'forward').slice(0, 3);
   
   return [...goalkeepers, ...defenders, ...midfielders, ...forwards];
@@ -43,13 +43,13 @@ export const buildFullSquad = () => {
 
 /**
  * Build a minimal squad for quick testing
- * @returns {Array} Array of 3 player objects (1 per position type)
+ * @returns {Array} Array of 4 player objects (1 per position type)
  */
 export const buildMinimalSquad = () => {
   return [
     testPlayers.find(p => p.position === 'goalkeeper'),
-    testPlayers.find(p => p.position === 'defender'),
-    testPlayers.find(p => p.position === 'midfielder'),
+    testPlayers.find(p => p.position === 'defence'),
+    testPlayers.find(p => p.position === 'midfield'),
     testPlayers.find(p => p.position === 'forward'),
   ].filter(Boolean);
 };
@@ -60,5 +60,11 @@ export const buildMinimalSquad = () => {
  * @returns {Object|null} Player object or null
  */
 export const getPlayerByPosition = (position) => {
-  return testPlayers.find(p => p.position === position) || null;
+  // Map common position names to HTML values
+  const positionMap = {
+    'defender': 'defence',
+    'midfielder': 'midfield',
+  };
+  const mappedPosition = positionMap[position] || position;
+  return testPlayers.find(p => p.position === mappedPosition) || null;
 };

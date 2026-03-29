@@ -11,13 +11,15 @@ const STORAGE_BACKEND_KEY = 'fpl-storage-backend';
  * @param {string} backend - Backend name: 'localStorage', 'indexeddb', or 'sqlite'
  */
 export async function setStorageBackend(page, backend) {
-  await page.evaluate((key, value) => {
+  // Set the backend in localStorage using full URL navigation
+  await page.evaluate(({ key, value }) => {
     localStorage.setItem(key, value);
-  }, STORAGE_BACKEND_KEY, backend);
+  }, { key: STORAGE_BACKEND_KEY, value: backend });
   
-  // Reload page to apply new backend
-  await page.reload();
+  // Navigate to full URL instead of reload to ensure proper origin
+  await page.goto('http://localhost:3000/');
   await page.waitForLoadState('networkidle');
+  await waitForStorageReady(page);
 }
 
 /**
@@ -26,9 +28,9 @@ export async function setStorageBackend(page, backend) {
  * @returns {Promise<string>} Current backend name
  */
 export async function getStorageBackend(page) {
-  return page.evaluate((key) => {
+  return page.evaluate(({ key }) => {
     return localStorage.getItem(key) || 'localStorage';
-  }, STORAGE_BACKEND_KEY);
+  }, { key: STORAGE_BACKEND_KEY });
 }
 
 /**
@@ -55,12 +57,8 @@ export async function clearStorage(page) {
  */
 export async function waitForStorageReady(page, timeout = 5000) {
   // Wait for the app to signal it's ready
-  // This can be checked by looking for a specific element or data attribute
-  await page.waitForSelector('[data-testid="app-ready"]', { timeout })
-    .catch(() => {
-      // Fallback: wait for main content area to be visible
-      return page.waitForSelector('#squad-container, .squad-container', { timeout });
-    });
+  // Look for week indicator which is always present
+  await page.waitForSelector('[data-testid="week-indicator"], .week-indicator, .container', { timeout });
 }
 
 /**
@@ -69,9 +67,13 @@ export async function waitForStorageReady(page, timeout = 5000) {
  * @param {string} backend - Backend to use
  */
 export async function resetAppWithBackend(page, backend) {
+  // First navigate to ensure we have a valid page context
+  await page.goto('http://localhost:3000/');
+  await page.waitForLoadState('networkidle');
+  
+  // Now clear storage and set backend
   await clearStorage(page);
   await setStorageBackend(page, backend);
-  await waitForStorageReady(page);
 }
 
 /**
