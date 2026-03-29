@@ -5,6 +5,7 @@ import { AppError } from './js/utils/app-error.js';
 import PlayerService from './js/services/player-service.js';
 import WeekService from './js/services/week-service.js';
 import CaptaincyService from './js/services/captaincy-service.js';
+import LegacyCompatibilityLayer from './js/services/legacy-compatibility-layer.js';
 
 // Global debug flag for this module
 const DEBUG = false;
@@ -16,10 +17,10 @@ export class FPLTeamManager {
         this.playerService = new PlayerService(this.storage);
         this.weekService = new WeekService(this.storage);
         this.captaincyService = new CaptaincyService(this.storage);
-        this.storageKey = 'fpl-team-data'; // Centralize storage key
+        this.legacyLayer = new LegacyCompatibilityLayer('fpl-team-data');
+        this.storageKey = 'fpl-team-data';
         this._supportsRootApi = false;
         this._storageReady = this._initializeStorage();
-        // State is now managed directly via storage, not in-memory properties.
     }
 
     async _initializeStorage() {
@@ -457,90 +458,52 @@ export class FPLTeamManager {
 
     // Backward compatibility methods for legacy tests
     async loadStateFromStorage() {
-        // Legacy method - delegate to init
-        return await this.init();
+        return this.legacyLayer.loadStateFromStorage();
     }
 
-    // Synchronous helper methods for backward compatibility
-    _getRootDataSync() {
-        try {
-            const data = localStorage.getItem('fpl-team-data');
-            return data ? JSON.parse(data) : { currentWeek: 1, weeks: { 1: { players: [], captain: null, viceCaptain: null, isReadOnly: false } } };
-        } catch (e) {
-            return { currentWeek: 1, weeks: { 1: { players: [], captain: null, viceCaptain: null, isReadOnly: false } } };
-        }
-    }
-
-    _saveRootDataSync(root) {
-        try {
-            localStorage.setItem('fpl-team-data', JSON.stringify(root));
-        } catch (e) {
-            console.warn('Failed to save data synchronously:', e);
-        }
-    }
-
-    // Legacy players getter/setter for backward compatibility
+    // Legacy getters/setters delegated to LegacyCompatibilityLayer
     get players() {
-        const root = this._getRootDataSync();
-        return root?.weeks?.[root.currentWeek]?.players || [];
+        return this.legacyLayer.players;
     }
 
     set players(value) {
-        const root = this._getRootDataSync();
-        if (!root.weeks[root.currentWeek]) {
-            root.weeks[root.currentWeek] = { players: [], captain: null, viceCaptain: null, isReadOnly: false };
-        }
-        root.weeks[root.currentWeek].players = value;
-        this._saveRootDataSync(root);
+        this.legacyLayer.players = value;
     }
 
-    // Legacy captain getter/setter for backward compatibility
     get captain() {
-        const root = this._getRootDataSync();
-        return root?.weeks?.[root.currentWeek]?.captain || null;
+        return this.legacyLayer.captain;
     }
 
     set captain(value) {
-        const root = this._getRootDataSync();
-        if (!root.weeks[root.currentWeek]) {
-            root.weeks[root.currentWeek] = { players: [], captain: null, viceCaptain: null, isReadOnly: false };
-        }
-        root.weeks[root.currentWeek].captain = value;
-        this._saveRootDataSync(root);
+        this.legacyLayer.captain = value;
     }
 
-    // Legacy viceCaptain getter/setter for backward compatibility
     get viceCaptain() {
-        const root = this._getRootDataSync();
-        return root?.weeks?.[root.currentWeek]?.viceCaptain || null;
+        return this.legacyLayer.viceCaptain;
     }
 
     set viceCaptain(value) {
-        const root = this._getRootDataSync();
-        if (!root.weeks[root.currentWeek]) {
-            root.weeks[root.currentWeek] = { players: [], captain: null, viceCaptain: null, isReadOnly: false };
-        }
-        root.weeks[root.currentWeek].viceCaptain = value;
-        this._saveRootDataSync(root);
+        this.legacyLayer.viceCaptain = value;
     }
 
-    // Legacy currentWeek getter/setter for backward compatibility
     get currentWeek() {
-        const root = this._getRootDataSync();
-        return root?.currentWeek || 1;
+        return this.legacyLayer.currentWeek;
     }
 
     set currentWeek(value) {
-        const root = this._getRootDataSync();
-        root.currentWeek = value;
-        this._saveRootDataSync(root);
+        this.legacyLayer.currentWeek = value;
     }
 
-    // Legacy method for mocking in tests
+    _getRootDataSync() {
+        return this.legacyLayer._getRootDataSync();
+    }
+
+    _saveRootDataSync(root) {
+        this.legacyLayer._saveRootDataSync(root);
+    }
+
     _isReadOnlyCurrentWeek() {
-        const root = this._getRootDataSync();
-        const week = root?.weeks?.[root.currentWeek] || {};
-        return !!week.isReadOnly;
+        return this.legacyLayer._isReadOnlyCurrentWeek();
     }
 }
 
