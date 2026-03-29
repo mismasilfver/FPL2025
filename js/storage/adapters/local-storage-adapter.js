@@ -51,4 +51,10 @@ export class LocalStorageAdapter {
     const toStore = typeof value === 'string' ? value : JSON.stringify(value);
     this.storage.setItem(key, toStore);
   }
+
+  async close() {
+    // LocalStorageAdapter uses browser localStorage - no connection to close
+    // Method exists for contract compliance
+    return Promise.resolve();
+  }
 }

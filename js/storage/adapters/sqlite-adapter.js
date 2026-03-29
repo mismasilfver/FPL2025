@@ -71,4 +71,10 @@ export class SQLiteAdapter {
     const payload = typeof value === 'string' ? JSON.parse(value) : value;
     await this.setRootData(payload);
   }
+
+  async close() {
+    // SQLiteAdapter uses HTTP fetch - no persistent connection to close
+    // Method exists for contract compliance
+    return Promise.resolve();
+  }
 }
