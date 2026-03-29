@@ -21,6 +21,23 @@ class StorageService {
   async setItem(key, value) {
     return this.adapter.setItem(key, value);
   }
+
+  async initialize() {
+    if (typeof this.adapter.initialize === 'function') {
+      return this.adapter.initialize();
+    }
+  }
+
+  async close() {
+    if (typeof this.adapter.close === 'function') {
+      return this.adapter.close();
+    }
+  }
 }
 
 export default StorageService;
+
+// CommonJS compatibility
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = StorageService;
+}
