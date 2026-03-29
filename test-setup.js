@@ -7,16 +7,20 @@ global.TextDecoder = TextDecoder;
 
 const { JSDOM } = require('jsdom');
 
-// Set up the DOM environment
-const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-  url: 'http://localhost',
-  pretendToBeVisual: true,
-});
+let ownedDom = null;
 
-// Set up global variables
-global.window = dom.window;
-global.document = dom.window.document;
-global.navigator = dom.window.navigator;
+// Reuse Jest's jsdom environment when available.
+// Only create our own JSDOM for node-environment tests that still rely on setupDOM.
+if (typeof global.window === 'undefined' || typeof global.document === 'undefined') {
+  ownedDom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
+    url: 'http://localhost',
+    pretendToBeVisual: true,
+  });
+
+  global.window = ownedDom.window;
+  global.document = ownedDom.window.document;
+  global.navigator = ownedDom.window.navigator;
+}
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -248,3 +252,10 @@ beforeEach(() => {
 
 // Make the setup function available globally for individual test files
 global.setupDOM = setupDOM;
+
+afterAll(() => {
+  if (ownedDom && ownedDom.window && typeof ownedDom.window.close === 'function') {
+    ownedDom.window.close();
+    ownedDom = null;
+  }
+});

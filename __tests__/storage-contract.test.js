@@ -50,7 +50,11 @@ const setupIndexedDbBackend = () => ({
       service,
       async cleanup() {
         try {
-          service.adapter?.db?.close?.();
+          if (service.adapter && typeof service.adapter.close === 'function') {
+            await service.adapter.close();
+          } else if (service.adapter?.db?.close) {
+            service.adapter.db.close();
+          }
         } catch (error) {
           // ignore
         }

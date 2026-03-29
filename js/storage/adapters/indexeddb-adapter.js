@@ -281,6 +281,18 @@ export class IndexedDBAdapter {
     });
   }
 
+  async close() {
+    try {
+      await this.initialized;
+    } catch (e) {
+      // Ignore initialization errors during close
+    }
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
+  }
+
   // Legacy KV facade support
   async getItem(key) {
     if (key !== this.storageKey) return null;
