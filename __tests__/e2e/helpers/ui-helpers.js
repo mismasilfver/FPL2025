@@ -78,29 +78,23 @@ export async function getPlayerRow(page, playerName) {
  * @param {string} playerName - Name of the player to delete
  */
 export async function deletePlayer(page, playerName) {
-  // Capture console errors
-  const consoleErrors = [];
-  page.on('console', msg => {
-    if (msg.type() === 'error') {
-      consoleErrors.push(msg.text());
+  // Set up dialog handler to accept confirm
+  page.on('dialog', async dialog => {
+    if (dialog.type() === 'confirm') {
+      await dialog.accept();
+    } else {
+      await dialog.dismiss();
     }
   });
   
   const row = await getPlayerRow(page, playerName);
-  // Use data-action attribute to find delete button
   const deleteBtn = row.locator('[data-action="delete"], button:has-text("Delete")').first();
   
-  // Wait for button to be ready and click
-  await deleteBtn.waitFor({ state: 'visible' });
+  // Click delete (will trigger confirm dialog)
   await deleteBtn.click();
   
-  // Wait for delete to process
+  // Wait for delete to process and UI to update
   await page.waitForTimeout(1000);
-  
-  // Log any console errors
-  if (consoleErrors.length > 0) {
-    console.log('Console errors during delete:', consoleErrors);
-  }
   
   // Reload to ensure UI reflects deletion
   await page.reload();
