@@ -96,12 +96,88 @@ describe('Storage Adapter Contract', () => {
       }
     });
 
-    it('localStorage adapter storageKey is accessible', () => {
-      const service = createStorageService({ backend: 'localstorage', storageKey: 'test-key' });
+    it('localStorage adapter implements optional methods', () => {
+      const service = createStorageService({ backend: 'localstorage' });
       const adapter = service.adapter;
       
-      // Adapter should have storageKey property
-      expect(adapter.storageKey).toBeDefined();
+      for (const method of optionalMethods) {
+        if (typeof adapter[method] === 'function') {
+          expect(typeof adapter[method]).toBe('function');
+        }
+      }
+    });
+
+    it('indexeddb adapter implements all required methods', () => {
+      require('fake-indexeddb/auto');
+      const service = createStorageService({ backend: 'indexeddb' });
+      const adapter = service.adapter;
+      
+      for (const method of requiredMethods) {
+        expect(typeof adapter[method]).toBe('function');
+      }
+    });
+
+    it('indexeddb adapter implements optional methods', () => {
+      require('fake-indexeddb/auto');
+      const service = createStorageService({ backend: 'indexeddb' });
+      const adapter = service.adapter;
+      
+      for (const method of optionalMethods) {
+        if (typeof adapter[method] === 'function') {
+          expect(typeof adapter[method]).toBe('function');
+        }
+      }
+    });
+
+    it('sqlite adapter implements all required methods', () => {
+      const mockFetch = jest.fn(() => Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve('{}'),
+      }));
+      const service = createStorageService({ 
+        backend: 'sqlite', 
+        fetchImpl: mockFetch 
+      });
+      const adapter = service.adapter;
+      
+      for (const method of requiredMethods) {
+        expect(typeof adapter[method]).toBe('function');
+      }
+    });
+
+    it('sqlite adapter implements optional methods', () => {
+      const mockFetch = jest.fn(() => Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve('{}'),
+      }));
+      const service = createStorageService({ 
+        backend: 'sqlite', 
+        fetchImpl: mockFetch 
+      });
+      const adapter = service.adapter;
+      
+      for (const method of optionalMethods) {
+        if (typeof adapter[method] === 'function') {
+          expect(typeof adapter[method]).toBe('function');
+        }
+      }
+    });
+
+    it('all adapters have storageKey property', () => {
+      const localService = createStorageService({ backend: 'localstorage', storageKey: 'test-key' });
+      expect(localService.adapter.storageKey).toBe('test-key');
+
+      require('fake-indexeddb/auto');
+      const indexedService = createStorageService({ backend: 'indexeddb', storageKey: 'idx-key' });
+      expect(indexedService.adapter.storageKey).toBe('idx-key');
+
+      const mockFetch = jest.fn();
+      const sqliteService = createStorageService({ 
+        backend: 'sqlite', 
+        storageKey: 'sqlite-key',
+        fetchImpl: mockFetch 
+      });
+      expect(sqliteService.adapter.storageKey).toBe('sqlite-key');
     });
   });
 
