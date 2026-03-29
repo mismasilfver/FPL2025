@@ -5,7 +5,7 @@
 
 import { test, expect } from '@playwright/test';
 import { resetAppWithBackend } from '../helpers/storage-helpers.js';
-import { addPlayer, setCaptainStatus } from '../helpers/ui-helpers.js';
+import { addPlayer, setCaptainStatus, togglePlayerOwned } from '../helpers/ui-helpers.js';
 import { expectCaptainStatus, expectErrorMessage } from '../helpers/assertions.js';
 import { buildMinimalSquad } from '../fixtures/test-data.js';
 
@@ -25,11 +25,12 @@ for (const backend of BACKENDS) {
       }
       
       const captain = players[0];
+      // Ensure player is in team (have=true)
+      await togglePlayerOwned(page, captain.name);
       await setCaptainStatus(page, captain.name, 'captain');
       
-      // Check for captain indicator - could be visual badge or class
-      const row = page.locator('.player-row, [data-testid="player-row"]', { hasText: captain.name });
-      await expect(row.locator('.captain-badge, [data-testid="captain-badge"], .is-captain')).toBeVisible();
+      // Check captain info at top of page shows the player
+      await expect(page.locator('#captain-info, [data-testid="captain-info"]')).toContainText(captain.name);
     });
 
     test('can set vice-captain on owned player', async ({ page }) => {
@@ -40,11 +41,12 @@ for (const backend of BACKENDS) {
       }
       
       const viceCaptain = players[1];
+      // Ensure player is in team
+      await togglePlayerOwned(page, viceCaptain.name);
       await setCaptainStatus(page, viceCaptain.name, 'viceCaptain');
       
-      // Check for vice-captain indicator
-      const row = page.locator('.player-row, [data-testid="player-row"]', { hasText: viceCaptain.name });
-      await expect(row.locator('.vice-badge, [data-testid="vice-badge"], .is-vice-captain')).toBeVisible();
+      // Check vice-captain info at top of page
+      await expect(page.locator('#vice-captain-info, [data-testid="vice-captain-info"]')).toContainText(viceCaptain.name);
     });
 
     test('captain selection persists after reload', async ({ page }) => {
@@ -55,15 +57,16 @@ for (const backend of BACKENDS) {
       }
       
       const captain = players[0];
+      // Ensure player is in team
+      await togglePlayerOwned(page, captain.name);
       await setCaptainStatus(page, captain.name, 'captain');
       
       // Reload
       await page.reload();
       await page.waitForLoadState('networkidle');
       
-      // Verify captain status persists
-      const row = page.locator('.player-row, [data-testid="player-row"]', { hasText: captain.name });
-      await expect(row.locator('.captain-badge, [data-testid="captain-badge"], .is-captain')).toBeVisible();
+      // Verify captain info persists
+      await expect(page.locator('#captain-info, [data-testid="captain-info"]')).toContainText(captain.name);
     });
 
     test('vice-captain selection persists after reload', async ({ page }) => {
@@ -74,15 +77,16 @@ for (const backend of BACKENDS) {
       }
       
       const viceCaptain = players[1];
+      // Ensure player is in team
+      await togglePlayerOwned(page, viceCaptain.name);
       await setCaptainStatus(page, viceCaptain.name, 'viceCaptain');
       
       // Reload
       await page.reload();
       await page.waitForLoadState('networkidle');
       
-      // Verify vice-captain status persists
-      const row = page.locator('.player-row, [data-testid="player-row"]', { hasText: viceCaptain.name });
-      await expect(row.locator('.vice-badge, [data-testid="vice-badge"], .is-vice-captain')).toBeVisible();
+      // Verify vice-captain info persists
+      await expect(page.locator('#vice-captain-info, [data-testid="vice-captain-info"]')).toContainText(viceCaptain.name);
     });
 
     test('switching captain removes captain from previous player', async ({ page }) => {
@@ -96,19 +100,18 @@ for (const backend of BACKENDS) {
       const captain2 = players[1];
       
       // Set first captain
+      await togglePlayerOwned(page, captain1.name);
       await setCaptainStatus(page, captain1.name, 'captain');
       
       // Switch to second captain
+      await togglePlayerOwned(page, captain2.name);
       await setCaptainStatus(page, captain2.name, 'captain');
       
-      // Verify new captain has badge
-      const row2 = page.locator('.player-row, [data-testid="player-row"]', { hasText: captain2.name });
-      await expect(row2.locator('.captain-badge, [data-testid="captain-badge"], .is-captain')).toBeVisible();
+      // Verify new captain in info
+      await expect(page.locator('#captain-info, [data-testid="captain-info"]')).toContainText(captain2.name);
       
-      // Verify old captain no longer has badge
-      const row1 = page.locator('.player-row, [data-testid="player-row"]', { hasText: captain1.name });
-      const hasBadge = await row1.locator('.captain-badge, [data-testid="captain-badge"], .is-captain').isVisible().catch(() => false);
-      expect(hasBadge).toBe(false);
+      // Verify old captain no longer in info
+      await expect(page.locator('#captain-info, [data-testid="captain-info"]')).not.toContainText(captain1.name);
     });
 
     test('can have both captain and vice-captain simultaneously', async ({ page }) => {
@@ -121,15 +124,14 @@ for (const backend of BACKENDS) {
       const captain = players[0];
       const viceCaptain = players[1];
       
+      await togglePlayerOwned(page, captain.name);
       await setCaptainStatus(page, captain.name, 'captain');
+      await togglePlayerOwned(page, viceCaptain.name);
       await setCaptainStatus(page, viceCaptain.name, 'viceCaptain');
       
-      // Verify both have their respective badges
-      const captainRow = page.locator('.player-row, [data-testid="player-row"]', { hasText: captain.name });
-      await expect(captainRow.locator('.captain-badge, [data-testid="captain-badge"], .is-captain')).toBeVisible();
-      
-      const viceRow = page.locator('.player-row, [data-testid="player-row"]', { hasText: viceCaptain.name });
-      await expect(viceRow.locator('.vice-badge, [data-testid="vice-badge"], .is-vice-captain')).toBeVisible();
+      // Verify both in captain info
+      await expect(page.locator('#captain-info, [data-testid="captain-info"]')).toContainText(captain.name);
+      await expect(page.locator('#vice-captain-info, [data-testid="vice-captain-info"]')).toContainText(viceCaptain.name);
     });
 
     test('captain and vice-captain can be same player', async ({ page }) => {
@@ -142,15 +144,14 @@ for (const backend of BACKENDS) {
       const captain = players[0];
       
       // Set as captain first
+      await togglePlayerOwned(page, captain.name);
       await setCaptainStatus(page, captain.name, 'captain');
       
-      // Set same player as vice-captain (should replace captain or show both)
+      // Set same player as vice-captain
       await setCaptainStatus(page, captain.name, 'viceCaptain');
       
-      // Verify player exists and has at least one badge
-      const row = page.locator('.player-row, [data-testid="player-row"]', { hasText: captain.name });
-      const hasAnyBadge = await row.locator('.captain-badge, .vice-badge, [data-testid="captain-badge"], [data-testid="vice-badge"]').isVisible();
-      expect(hasAnyBadge).toBe(true);
+      // Verify vice-captain in info
+      await expect(page.locator('#vice-captain-info, [data-testid="vice-captain-info"]')).toContainText(captain.name);
     });
   });
 }

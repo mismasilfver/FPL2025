@@ -157,9 +157,9 @@ export async function togglePlayerOwned(page, playerName) {
 export async function setCaptainStatus(page, playerName, status) {
   const row = await getPlayerRow(page, playerName);
   const buttonSelector = status === 'captain' 
-    ? '.captain-btn, [data-testid="captain-btn"], button:has-text("C")'
-    : '.vice-btn, [data-testid="vice-btn"], button:has-text("VC")';
-  await row.locator(buttonSelector).click();
+    ? 'button:has-text("C"):not(:has-text("VC"))'
+    : 'button:has-text("VC")';
+  await row.locator(buttonSelector).first().click();
   await page.waitForTimeout(200);
 }
 
