@@ -7,16 +7,20 @@ global.TextDecoder = TextDecoder;
 
 const { JSDOM } = require('jsdom');
 
-// Set up the DOM environment
-const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-  url: 'http://localhost',
-  pretendToBeVisual: true,
-});
+let ownedDom = null;
 
-// Set up global variables
-global.window = dom.window;
-global.document = dom.window.document;
-global.navigator = dom.window.navigator;
+// Reuse Jest's jsdom environment when available.
+// Only create our own JSDOM for node-environment tests that still rely on setupDOM.
+if (typeof global.window === 'undefined' || typeof global.document === 'undefined') {
+  ownedDom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
+    url: 'http://localhost',
+    pretendToBeVisual: true,
+  });
+
+  global.window = ownedDom.window;
+  global.document = ownedDom.window.document;
+  global.navigator = ownedDom.window.navigator;
+}
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -36,22 +40,6 @@ const localStorageMock = (() => {
 })();
 
 global.localStorage = localStorageMock;
-
-// Import the mock storage class we created
-const { MockStorageService } = require('./__tests__/test-utils');
-
-// Create a single, stateful instance that can be shared across tests
-const mockStorageInstance = new MockStorageService();
-
-// Mock the storage module to use and expose our instance while keeping helpers
-jest.mock('./js/storage-module.js', () => {
-  const actual = jest.requireActual('./js/storage-module.js');
-  return {
-    ...actual,
-    createStorageService: jest.fn(() => mockStorageInstance),
-    __getMockStorage: () => mockStorageInstance, // Helper to access the mock in tests
-  };
-});
 
 // Helper function to create required DOM elements
 function setupDOM() {
@@ -264,3 +252,10 @@ beforeEach(() => {
 
 // Make the setup function available globally for individual test files
 global.setupDOM = setupDOM;
+
+afterAll(() => {
+  if (ownedDom && ownedDom.window && typeof ownedDom.window.close === 'function') {
+    ownedDom.window.close();
+    ownedDom = null;
+  }
+});

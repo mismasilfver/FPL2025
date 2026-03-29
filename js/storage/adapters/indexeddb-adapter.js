@@ -1,11 +1,6 @@
-/**
- * IndexedDB implementation of the StorageService interface
- * Provides the same API as the localStorage-based StorageService
- * but uses IndexedDB for storage
- */
-import { WeekModel } from './models/week-model.js';
+import { WeekModel } from '../../models/week-model.js';
 
-export class StorageServiceDB {
+export class IndexedDBAdapter {
   constructor(options = {}) {
     const {
       dbName = 'fpl2025',
@@ -45,7 +40,6 @@ export class StorageServiceDB {
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
         
-        // Create object stores if they don't exist
         if (!db.objectStoreNames.contains('root')) {
           db.createObjectStore('root', { keyPath: 'id' });
         }
@@ -88,7 +82,6 @@ export class StorageServiceDB {
     const rootData = await this._getStoreItemDirect('root', 'singleton');
     if (rootData) return;
     
-    // Initialize with empty data
     const tx = this.db.transaction(['root', 'weeks'], 'readwrite');
     
     tx.objectStore('root').put({
@@ -114,7 +107,6 @@ export class StorageServiceDB {
     });
   }
 
-  // Helper: Get a single item from a store
   async _getStoreItem(storeName, key) {
     await this.initialized;
     await this.dbReady;
@@ -128,7 +120,6 @@ export class StorageServiceDB {
     });
   }
 
-  // Helper: Get all items from a store
   async _getAllStoreItems(storeName) {
     await this.initialized;
     await this.dbReady;
@@ -142,7 +133,6 @@ export class StorageServiceDB {
     });
   }
 
-  // Helper: Get items by index
   async _getByIndex(storeName, indexName, key) {
     await this.initialized;
     await this.dbReady;
@@ -167,7 +157,6 @@ export class StorageServiceDB {
     for (const wk of weekRows) {
       const players = JSON.parse(wk.playersJson || '[]');
       
-      // Get team members for this week
       const teamMembers = await this._getByIndex('teamMembers', 'by_week', wk.weekNumber);
       
       const weekPayload = {
@@ -192,7 +181,6 @@ export class StorageServiceDB {
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(['root', 'weeks', 'teamMembers'], 'readwrite');
       
-      // Update week data
       tx.objectStore('weeks').put({
         weekNumber: weekToSave,
         captain: captain || null,
@@ -203,14 +191,12 @@ export class StorageServiceDB {
         playersJson: JSON.stringify(players || [])
       });
       
-      // Update root data
       tx.objectStore('root').put({
         id: 'singleton',
         version: '2.0',
         currentWeek
       });
       
-      // Delete existing team members for this week
       const membersStore = tx.objectStore('teamMembers');
       const index = membersStore.index('by_week');
       const request = index.openCursor(IDBKeyRange.only(weekToSave));
@@ -223,110 +209,12 @@ export class StorageServiceDB {
         }
       };
       
-      // Add new team members
       for (const member of dbTeamMembers) {
         membersStore.put(member);
       }
       
       tx.oncomplete = () => resolve();
       tx.onerror = (e) => reject(new Error(`Transaction error: ${e.target.error}`));
-    });
-  }
-
-  async getWeekCount() {
-    await this.initialized;
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction('weeks', 'readonly');
-      const store = tx.objectStore('weeks');
-      const countRequest = store.count();
-      
-      countRequest.onsuccess = () => resolve(countRequest.result);
-      countRequest.onerror = () => reject(new Error('Error counting weeks'));
-    });
-  }
-
-  async getWeekSnapshot(weekNumber) {
-    await this.initialized;
-    weekNumber = Number(weekNumber);
-    
-    const wk = await this._getStoreItem('weeks', weekNumber);
-    if (!wk) return { 
-      players: [], 
-      captain: null, 
-      viceCaptain: null, 
-      teamMembers: [], 
-      teamStats: { totalValue: 0, playerCount: 0 } 
-    };
-    
-    const players = JSON.parse(wk.playersJson || '[]');
-    const teamMembers = await this._getByIndex('teamMembers', 'by_week', weekNumber);
-    
-    const weekPayload = {
-        ...wk,
-        players,
-        teamMembers: teamMembers.map(m => ({ playerId: m.playerId, addedAt: m.addedAt }))
-    };
-    return WeekModel.normalize(weekPayload, weekNumber);
-  }
-
-  async importFromJSON(jsonData) {
-    await this.initialized;
-    
-    // Parse if string
-    const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
-    
-    // Validate structure
-    if (!data || !data.weeks || typeof data.weeks !== 'object') {
-      throw new Error('Invalid JSON format: missing weeks object');
-    }
-    
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(['root', 'weeks', 'teamMembers'], 'readwrite');
-      
-      // Clear existing data
-      tx.objectStore('weeks').clear();
-      tx.objectStore('teamMembers').clear();
-      
-      // Set root data
-      tx.objectStore('root').put({ 
-        id: 'singleton', 
-        version: data.version || '2.0', 
-        currentWeek: Number(data.currentWeek || 1) 
-      });
-      
-      // Import weeks
-      for (const key of Object.keys(data.weeks)) {
-        const wNum = Number(key);
-        const wk = data.weeks[key] || {};
-        
-        // Store week
-        tx.objectStore('weeks').put({
-          weekNumber: wNum,
-          captain: wk.captain || null,
-          viceCaptain: wk.viceCaptain || null,
-          totalTeamCost: wk.totalTeamCost || (wk.teamStats?.totalValue || 0),
-          teamStats: wk.teamStats || { 
-            totalValue: 0, 
-            playerCount: 0,
-            updatedDate: new Date().toISOString()
-          },
-          isReadOnly: !!wk.isReadOnly,
-          playersJson: JSON.stringify(wk.players || [])
-        });
-        
-        // Store team members
-        const members = Array.isArray(wk.teamMembers) ? wk.teamMembers : [];
-        for (const m of members) {
-          tx.objectStore('teamMembers').put({ 
-            weekNumber: wNum, 
-            playerId: m.playerId, 
-            addedAt: Number(m.addedAt || wNum) 
-          });
-        }
-      }
-      
-      tx.oncomplete = () => resolve(true);
-      tx.onerror = (e) => reject(new Error(`Import failed: ${e.target.error}`));
     });
   }
 
@@ -391,5 +279,30 @@ export class StorageServiceDB {
         tx.oncomplete = () => resolve(normalizedRoot);
         tx.onerror = (e) => reject(new Error(`Failed to persist root payload: ${e.target.error}`));
     });
+  }
+
+  async close() {
+    try {
+      await this.initialized;
+    } catch (e) {
+      // Ignore initialization errors during close
+    }
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
+  }
+
+  // Legacy KV facade support
+  async getItem(key) {
+    if (key !== this.storageKey) return null;
+    const root = await this.getRootData();
+    return JSON.stringify(root);
+  }
+
+  async setItem(key, value) {
+    if (key !== this.storageKey) return;
+    const payload = typeof value === 'string' ? JSON.parse(value) : value;
+    return this.setRootData(payload);
   }
 }

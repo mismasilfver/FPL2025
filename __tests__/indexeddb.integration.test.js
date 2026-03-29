@@ -4,21 +4,23 @@ require('fake-indexeddb/auto');
 describe('IndexedDB storage integration', () => {
   let service;
   let storageKey;
+  let dbName;
 
   beforeEach(async () => {
     storageKey = `test-${Date.now()}-${Math.random()}`;
-    service = createStorageService({ backend: 'indexeddb', storageKey });
+    dbName = `fpl2025-${Date.now()}-${Math.random()}`;
+    service = createStorageService({ backend: 'indexeddb', storageKey, dbName });
     if (typeof service.initialize === 'function') {
       await service.initialize();
     }
   });
 
   afterEach(async () => {
-    if (service && service.db && typeof service.db.close === 'function') {
-      service.db.close();
+    if (service?.adapter?.db && typeof service.adapter.db.close === 'function') {
+      service.adapter.db.close();
     }
     await new Promise((resolve, reject) => {
-      const request = indexedDB.deleteDatabase('fpl2025');
+      const request = indexedDB.deleteDatabase(dbName || 'fpl2025');
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
       request.onblocked = () => resolve();
