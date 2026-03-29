@@ -126,3 +126,47 @@ beforeAll(() => {
     jest.spyOn(global, 'confirm').mockImplementation(() => true);
   }
 });
+
+// Global cleanup after all tests in a file complete
+afterAll(async () => {
+  // Close any IndexedDB connections
+  if (typeof indexedDB !== 'undefined' && indexedDB.databases) {
+    try {
+      const databases = await indexedDB.databases();
+      for (const db of databases) {
+        if (db.name) {
+          const deleteRequest = indexedDB.deleteDatabase(db.name);
+          await new Promise((resolve) => {
+            deleteRequest.onsuccess = () => resolve();
+            deleteRequest.onerror = () => resolve(); // Resolve even on error
+            deleteRequest.onblocked = () => resolve();
+          });
+        }
+      }
+    } catch (error) {
+      // Ignore errors during cleanup
+    }
+  }
+
+  // Give a small delay for async operations to complete
+  await new Promise(resolve => setTimeout(resolve, 50));
+
+  if (process.env.JEST_HANDLE_DEBUG === '1' && typeof process._getActiveHandles === 'function') {
+    const handles = process
+      ._getActiveHandles()
+      .filter((handle) => {
+        const name = handle?.constructor?.name;
+        // Ignore stdio handles
+        return name !== 'WriteStream' && name !== 'ReadStream' && name !== 'TTY';
+      })
+      .map((handle) => handle?.constructor?.name || 'UnknownHandle');
+
+    if (handles.length > 0) {
+      const testPath = typeof expect?.getState === 'function'
+        ? expect.getState().testPath
+        : 'unknown-test-file';
+      // eslint-disable-next-line no-console
+      console.log(`[jest-handle-debug] ${testPath} -> ${handles.join(', ')}`);
+    }
+  }
+});
