@@ -6,6 +6,7 @@ import PlayerService from './js/services/player-service.js';
 import WeekService from './js/services/week-service.js';
 import CaptaincyService from './js/services/captaincy-service.js';
 import LegacyCompatibilityLayer from './js/services/legacy-compatibility-layer.js';
+import MigrationService from './js/services/migration-service.js';
 
 // Global debug flag for this module
 const DEBUG = false;
@@ -18,6 +19,7 @@ export class FPLTeamManager {
         this.weekService = new WeekService(this.storage);
         this.captaincyService = new CaptaincyService(this.storage);
         this.legacyLayer = new LegacyCompatibilityLayer('fpl-team-data');
+        this.migrationService = new MigrationService();
         this.storageKey = 'fpl-team-data';
         this._supportsRootApi = false;
         this._storageReady = this._initializeStorage();
@@ -334,50 +336,14 @@ export class FPLTeamManager {
             }
         }
 
-        if (!root || typeof root !== 'object') {
-            const defaults = createDefaultRoot();
-            await this._setRootData(defaults);
-            return defaults;
-        }
-
-        // Detect legacy shape: { week, players, captain, viceCaptain }
-        const isLegacy = !root.weeks && (Array.isArray(root.players) || typeof root.week !== 'undefined');
-        if (isLegacy) {
-            const legacyWeek = Number(root.week) || 1;
-            const migrated = {
-                version: '2.0',
-                currentWeek: legacyWeek,
-                weeks: {
-                    [legacyWeek]: {
-                        players: Array.isArray(root.players) ? root.players : [],
-                        captain: root.captain || null,
-                        viceCaptain: root.viceCaptain || null,
-                        isReadOnly: false
-                    }
-                }
-            };
-            await this._ensureWeekDerivedFields(migrated, legacyWeek);
+        // Migrate data if needed (v1→v2, missing fields, etc.)
+        const migrated = this.migrationService.migrateIfNeeded(root);
+        
+        // Save if migration produced changes
+        if (migrated !== root || migrated._mutated) {
+            delete migrated._mutated;
             await this._setRootData(migrated);
             return migrated;
-        }
-
-        if (root && root.weeks) {
-            const weekKeys = Object.keys(root.weeks);
-            let mutated = false;
-            for (const wk of weekKeys) {
-                const weekObj = root.weeks[wk];
-                if (weekObj && (!Array.isArray(weekObj.teamMembers) || !weekObj.teamStats || typeof weekObj.totalTeamCost === 'undefined')) {
-                    await this._ensureWeekDerivedFields(root, wk);
-                    mutated = true;
-                }
-            }
-            if (!root.version) {
-                root.version = '2.0';
-                mutated = true;
-            }
-            if (mutated) {
-                await this._setRootData(root);
-            }
         }
 
         return root;

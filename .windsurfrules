@@ -1,0 +1,53 @@
+# Repository Agent Instructions
+
+## Conventional Commits Style Guide
+
+All commits MUST follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+### Format
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Types
+- **feat**: A new feature
+- **fix**: A bug fix
+- **docs**: Documentation only changes
+- **style**: Changes that don't affect code meaning (formatting, semicolons, etc)
+- **refactor**: Code change that neither fixes a bug nor adds a feature
+- **perf**: Performance improvement
+- **test**: Adding or correcting tests
+- **chore**: Changes to build process or auxiliary tools
+
+### Scope (optional but recommended)
+Use scope to indicate the area of change:
+- `service` - Business logic services
+- `model` - Data models
+- `ui` - UI components/managers
+- `test` - Test files
+- `storage` - Storage adapters
+- `api` - API endpoints
+
+### Examples
+```
+feat(service): add player filtering by position
+
+fix(storage): handle IndexedDB connection errors
+
+refactor(model): extract Week normalization to WeekModel
+
+test(service): add integration tests for PlayerService
+
+docs(readme): update installation instructions
+```
+
+### Rules
+1. Use lowercase for type and scope
+2. Use imperative mood in description ("add" not "added")
+3. No period at end of description
+4. Body should explain WHAT and WHY, not HOW
+5. Breaking changes must be indicated with `!` or `BREAKING CHANGE` footer
