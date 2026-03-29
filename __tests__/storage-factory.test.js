@@ -1,54 +1,61 @@
-/**
- * Tests for the storage factory module - Mock Implementation
- */
+let createStorageService;
 
-// Mock the storage module while preserving actual exports
-jest.mock('../js/storage-module.js', () => {
-  const actual = jest.requireActual('../js/storage-module.js');
-  class MockStorageService {
-    constructor(options = {}) {
-      this.storageKey = options.storageKey || 'fpl-team-data';
-      this.useIndexedDB = false;
-    }
-  }
-
-  class MockStorageServiceDB {
-    constructor(options = {}) {
-      this.storageKey = options.storageKey || 'fpl-team-data';
-      this.useIndexedDB = true;
-    }
-  }
-
-  return {
-    ...actual,
-    createStorageService: (options = {}) => {
-      return options.useIndexedDB 
-        ? new MockStorageServiceDB(options) 
-        : new MockStorageService(options);
-    }
-  };
-});
-
-const { createStorageService } = require('../js/storage-module');
-
-describe('Storage Factory', () => {
-  test('should create localStorage-based StorageService when useIndexedDB is false', () => {
-    const storage = createStorageService({ useIndexedDB: false });
-    expect(storage.useIndexedDB).toBe(false);
+describe('Storage factory injection', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    jest.unmock('../js/storage-module.js');
   });
 
-  test('should create IndexedDB-based StorageServiceDB when useIndexedDB is true', () => {
-    const storage = createStorageService({ useIndexedDB: true });
-    expect(storage.useIndexedDB).toBe(true);
+  test('uses localstorage adapter by default', () => {
+    jest.isolateModules(() => {
+      const adapter = { backend: 'localstorage' };
+      const adapterFactory = jest.fn(() => adapter);
+      const serviceFactory = jest.fn(() => ({ type: 'service' }));
+
+      ({ createStorageService } = require('../js/storage-module.js'));
+      createStorageService({ adapterFactory, serviceFactory });
+
+      expect(adapterFactory).toHaveBeenCalledWith(expect.objectContaining({ backend: 'localstorage' }));
+      expect(serviceFactory).toHaveBeenCalledWith(adapter);
+    });
   });
 
-  test('should use default storageKey if not provided', () => {
-    const storage = createStorageService({ useIndexedDB: false });
-    expect(storage.storageKey).toBe('fpl-team-data');
+  test('passes backend-specific options to sqlite adapter', () => {
+    jest.isolateModules(() => {
+      const adapter = { backend: 'sqlite' };
+      const adapterFactory = jest.fn(() => adapter);
+      const serviceFactory = jest.fn(() => ({ type: 'service' }));
+
+      ({ createStorageService } = require('../js/storage-module.js'));
+      createStorageService({
+        backend: 'sqlite',
+        baseUrl: '/api/custom',
+        fetchImpl: jest.fn(),
+        adapterFactory,
+        serviceFactory,
+      });
+
+      expect(adapterFactory).toHaveBeenCalledWith(expect.objectContaining({ backend: 'sqlite', baseUrl: '/api/custom' }));
+      expect(serviceFactory).toHaveBeenCalledWith(adapter);
+    });
   });
 
-  test('should use provided storageKey', () => {
-    const storage = createStorageService({ useIndexedDB: false, storageKey: 'custom-key' });
-    expect(storage.storageKey).toBe('custom-key');
+  test('uses provided storageKey for indexeddb backend', () => {
+    jest.isolateModules(() => {
+      const adapter = { backend: 'indexeddb' };
+      const adapterFactory = jest.fn(() => adapter);
+      const serviceFactory = jest.fn(() => ({ type: 'service' }));
+
+      ({ createStorageService } = require('../js/storage-module.js'));
+      createStorageService({
+        backend: 'indexeddb',
+        storageKey: 'custom-key',
+        adapterFactory,
+        serviceFactory,
+      });
+
+      expect(adapterFactory).toHaveBeenCalledWith(expect.objectContaining({ backend: 'indexeddb', storageKey: 'custom-key' }));
+      expect(serviceFactory).toHaveBeenCalledWith(adapter);
+    });
   });
 });

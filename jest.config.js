@@ -2,6 +2,9 @@ module.exports = {
   // A list of paths to modules that run some code to configure or set up the testing framework before each test.
   setupFilesAfterEnv: ['@testing-library/jest-dom', '<rootDir>/jest.setup.js', '<rootDir>/test-setup.js'],
 
+  // Global teardown to clean up resources after all tests complete
+  globalTeardown: '<rootDir>/jest.teardown.js',
+
   // The test environment that will be used for testing
   testEnvironment: 'jsdom',
   
