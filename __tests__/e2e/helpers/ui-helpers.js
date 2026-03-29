@@ -3,6 +3,8 @@
  * Provides common UI interactions for the FPL application
  */
 
+import { waitForStorageReady } from './storage-helpers.js';
+
 /**
  * Add a player to the team
  * @param {import('@playwright/test').Page} page - Playwright page object
@@ -64,7 +66,10 @@ export async function getPlayerCount(page) {
  * @returns {Promise<import('@playwright/test').Locator>} Locator for the player row
  */
 export async function getPlayerRow(page, playerName) {
-  return page.locator('#players-tbody tr.player-row', { hasText: playerName });
+  // Find row where first cell has exact player name
+  return page.locator('#players-tbody tr.player-row', {
+    has: page.locator('td:first-child, td.col-name').and(page.locator(`:text-is("${playerName}")`))
+  });
 }
 
 /**
@@ -73,11 +78,34 @@ export async function getPlayerRow(page, playerName) {
  * @param {string} playerName - Name of the player to delete
  */
 export async function deletePlayer(page, playerName) {
-  const row = await getPlayerRow(page, playerName);
-  await row.locator('.delete-btn, button:has-text("Delete"), [data-testid="delete-player"]').click();
+  // Capture console errors
+  const consoleErrors = [];
+  page.on('console', msg => {
+    if (msg.type() === 'error') {
+      consoleErrors.push(msg.text());
+    }
+  });
   
-  // Wait for row to disappear
-  await page.waitForTimeout(300);
+  const row = await getPlayerRow(page, playerName);
+  // Use data-action attribute to find delete button
+  const deleteBtn = row.locator('[data-action="delete"], button:has-text("Delete")').first();
+  
+  // Wait for button to be ready and click
+  await deleteBtn.waitFor({ state: 'visible' });
+  await deleteBtn.click();
+  
+  // Wait for delete to process
+  await page.waitForTimeout(1000);
+  
+  // Log any console errors
+  if (consoleErrors.length > 0) {
+    console.log('Console errors during delete:', consoleErrors);
+  }
+  
+  // Reload to ensure UI reflects deletion
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  await waitForStorageReady(page);
 }
 
 /**
@@ -122,8 +150,8 @@ export async function updatePlayer(page, playerName, updates) {
  */
 export async function togglePlayerOwned(page, playerName) {
   const row = await getPlayerRow(page, playerName);
-  // The have checkbox is in the col-have cell
-  await row.locator('.col-have input[type="checkbox"], td:nth-child(6) input[type="checkbox"]').click();
+  // The have toggle is a + button in the col-have cell (6th column)
+  await row.locator('td:nth-child(6) button, td.col-have button, button:has-text("+")').first().click();
 }
 
 /**

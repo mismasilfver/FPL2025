@@ -31,7 +31,7 @@ export async function expectPlayerNotExists(page, playerName) {
  * @param {number} expectedCount - Expected number of players
  */
 export async function expectPlayerCount(page, expectedCount) {
-  const rows = page.locator('.player-row, [data-testid="player-row"]');
+  const rows = page.locator('#players-tbody tr.player-row');
   await expect(rows).toHaveCount(expectedCount);
 }
 

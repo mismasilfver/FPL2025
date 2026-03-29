@@ -1,0 +1,87 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - heading "🏆 My Fantasy Premier League 2025/2026" [level=1] [ref=e4]
+    - generic [ref=e5]:
+      - generic [ref=e6]: "In Team: 0/15"
+      - generic [ref=e7]: "Total Value: £0.0m"
+    - generic [ref=e8]:
+      - button "Previous week" [disabled] [ref=e9]: ◀ Prev
+      - generic [ref=e11]: Week 1
+      - button "Next week" [disabled] [ref=e12]: Next ▶
+      - button "+ Create New Week" [ref=e13] [cursor=pointer]
+    - generic [ref=e14]:
+      - generic [ref=e15]: "Storage: IndexedDB"
+      - generic [ref=e16]:
+        - button "Change Storage" [ref=e17] [cursor=pointer]
+        - text: •
+  - generic [ref=e18]:
+    - button "+ Add Player" [ref=e19] [cursor=pointer]
+    - generic [ref=e20]:
+      - button "Choose File" [ref=e21]
+      - button "Import JSON" [ref=e22] [cursor=pointer]
+    - generic [ref=e23]:
+      - generic [ref=e24]: "Filter by Position:"
+      - combobox "Filter by Position:" [ref=e25]:
+        - option "All Positions" [selected]
+        - option "Goalkeeper"
+        - option "Defence"
+        - option "Midfield"
+        - option "Forward"
+    - generic [ref=e27] [cursor=pointer]:
+      - checkbox "Show \"Have\" only" [ref=e28]
+      - text: Show "Have" only
+  - generic [ref=e29]:
+    - heading "Captaincy" [level=3] [ref=e30]
+    - generic [ref=e31]:
+      - generic [ref=e32]: "Captain: None selected"
+      - generic [ref=e33]: "Vice Captain: None selected"
+  - table [ref=e35]:
+    - rowgroup [ref=e36]:
+      - row "Name Position Team Price (£m) Status Have Captain Vice Notes Actions" [ref=e37]:
+        - columnheader "Name" [ref=e38]
+        - columnheader "Position" [ref=e39]
+        - columnheader "Team" [ref=e40]
+        - columnheader "Price (£m)" [ref=e41]
+        - columnheader "Status" [ref=e42]
+        - columnheader "Have" [ref=e43]
+        - columnheader "Captain" [ref=e44]
+        - columnheader "Vice" [ref=e45]
+        - columnheader "Notes" [ref=e46]
+        - columnheader "Actions" [ref=e47]
+    - rowgroup [ref=e48]:
+      - row "Erling Haaland Forward Man City £12.5m + C VC Edit Delete" [ref=e49]:
+        - cell "Erling Haaland" [ref=e50]
+        - cell "Forward" [ref=e51]
+        - cell "Man City" [ref=e52]
+        - cell "£12.5m" [ref=e53]
+        - cell [ref=e54]
+        - cell "+" [ref=e55]:
+          - button "+" [ref=e56] [cursor=pointer]
+        - cell "C" [ref=e57]:
+          - button "C" [ref=e58] [cursor=pointer]
+        - cell "VC" [ref=e59]:
+          - button "VC" [ref=e60] [cursor=pointer]
+        - cell "Click to expand notes" [ref=e61] [cursor=pointer]
+        - cell "Edit Delete" [ref=e62]:
+          - button "Edit" [ref=e63] [cursor=pointer]
+          - button "Delete" [ref=e64] [cursor=pointer]
+      - row "Mohamed Salah Midfield Liverpool £11.0m + C VC Edit Delete" [ref=e65]:
+        - cell "Mohamed Salah" [ref=e66]
+        - cell "Midfield" [ref=e67]
+        - cell "Liverpool" [ref=e68]
+        - cell "£11.0m" [ref=e69]
+        - cell [ref=e70]
+        - cell "+" [ref=e71]:
+          - button "+" [ref=e72] [cursor=pointer]
+        - cell "C" [ref=e73]:
+          - button "C" [ref=e74] [cursor=pointer]
+        - cell "VC" [ref=e75]:
+          - button "VC" [ref=e76] [cursor=pointer]
+        - cell "Click to expand notes" [ref=e77] [cursor=pointer]
+        - cell "Edit Delete" [ref=e78]:
+          - button "Edit" [ref=e79] [cursor=pointer]
+          - button "Delete" [ref=e80] [cursor=pointer]
+```

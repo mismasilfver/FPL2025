@@ -38,16 +38,28 @@ export async function getStorageBackend(page) {
  * @param {import('@playwright/test').Page} page - Playwright page object
  */
 export async function clearStorage(page) {
+  // Clear localStorage and sessionStorage
   await page.evaluate(() => {
-    // Clear localStorage
     localStorage.clear();
-    
-    // Clear sessionStorage
     sessionStorage.clear();
-    
-    // Note: IndexedDB clearing would require more complex logic
-    // and is handled by reloading with fresh storage backend
   });
+  
+  // Clear SQLite backend data if active
+  try {
+    await page.evaluate(async () => {
+      const backend = localStorage.getItem('fpl-storage-backend') || 'localStorage';
+      if (backend === 'sqlite') {
+        // Reset SQLite storage via PUT with empty default data
+        await fetch('/api/storage/root', { 
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ players: [], weeks: [], meta: { currentWeek: 1 } })
+        }).catch(() => {});
+      }
+    });
+  } catch (e) {
+    // Ignore errors
+  }
 }
 
 /**
@@ -71,9 +83,18 @@ export async function resetAppWithBackend(page, backend) {
   await page.goto('http://localhost:3000/');
   await page.waitForLoadState('networkidle');
   
-  // Now clear storage and set backend
+  // Set the backend preference BEFORE clearing
+  await page.evaluate(({ key, value }) => {
+    localStorage.setItem(key, value);
+  }, { key: STORAGE_BACKEND_KEY, value: backend });
+  
+  // Now clear storage (this will detect SQLite and reset it)
   await clearStorage(page);
-  await setStorageBackend(page, backend);
+  
+  // Navigate again to apply the backend with clean data
+  await page.goto('http://localhost:3000/');
+  await page.waitForLoadState('networkidle');
+  await waitForStorageReady(page);
 }
 
 /**
