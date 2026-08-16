@@ -1,4 +1,5 @@
 import { AppError } from '../../utils/app-error.js';
+import { BaseStorageAdapter } from './base-storage-adapter.js';
 
 async function parseResponse(response) {
   const text = await response.text();
@@ -22,11 +23,11 @@ async function parseResponse(response) {
   return data;
 }
 
-export class SQLiteAdapter {
+export class SQLiteAdapter extends BaseStorageAdapter {
   constructor({ baseUrl = '/api/storage', fetchImpl, storageKey = 'fpl-team-data' } = {}) {
+    super({ storageKey });
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.fetch = fetchImpl || (typeof window !== 'undefined' ? window.fetch.bind(window) : null);
-    this.storageKey = storageKey;
 
     if (typeof this.fetch !== 'function') {
       throw new Error('SQLiteAdapter requires a fetch implementation.');
@@ -58,23 +59,5 @@ export class SQLiteAdapter {
     });
     await parseResponse(response);
     return root;
-  }
-
-  async getItem(key) {
-    if (key !== this.storageKey) return null;
-    const root = await this.getRootData();
-    return JSON.stringify(root);
-  }
-
-  async setItem(key, value) {
-    if (key !== this.storageKey) return;
-    const payload = typeof value === 'string' ? JSON.parse(value) : value;
-    await this.setRootData(payload);
-  }
-
-  async close() {
-    // SQLiteAdapter uses HTTP fetch - no persistent connection to close
-    // Method exists for contract compliance
-    return Promise.resolve();
   }
 }

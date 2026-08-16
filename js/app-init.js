@@ -18,6 +18,7 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 const DEFAULT_STORAGE_INIT_TIMEOUT_MS = 2500;
+const STORAGE_BACKEND_PREFERENCE_KEY = 'fpl-storage-backend';
 
 /**
  * Initialize the application with the appropriate storage backend
@@ -103,30 +104,17 @@ async function createInitializedStorageService({ backend, useIndexedDB, storageK
       });
     }
 
-    const service = safeCreateStorageService({ backend: resolvedBackend, storageKey });
-    recordInitEvent({ stage: 'storage', type: 'attempt', backend: resolvedBackend });
-
-    const result = await initializeWithTimeout(service, timeoutMs, resolvedBackend);
-
-    if (result.status === 'error') {
-      recordInitEvent({
-        stage: 'storage',
-        type: 'error',
-        backend: resolvedBackend,
-        error: result.error?.message
-      });
-      throw result.error;
-    }
-
-    recordInitEvent({
-      stage: 'storage',
-      type: 'success',
+    const { service, result } = await attemptBackendInitialization({
       backend: resolvedBackend,
-      elapsedMs: result.elapsedMs
+      storageKey,
+      timeoutMs
     });
 
-    setRuntimeBackendFlags(resolvedBackend);
-    console.info(`[app-init] Storage backend ready: ${resolvedBackend}`);
+    if (result.status === 'error') {
+      throwInitError(resolvedBackend, result.error);
+    }
+
+    commitReadyBackend(resolvedBackend, result.elapsedMs);
 
     return {
       service,
@@ -138,20 +126,14 @@ async function createInitializedStorageService({ backend, useIndexedDB, storageK
   }
 
   const primaryBackend = 'indexeddb';
-  const service = safeCreateStorageService({ backend: primaryBackend, storageKey });
-  recordInitEvent({ stage: 'storage', type: 'attempt', backend: primaryBackend });
-
-  const result = await initializeWithTimeout(service, timeoutMs, primaryBackend);
+  const { service, result } = await attemptBackendInitialization({
+    backend: primaryBackend,
+    storageKey,
+    timeoutMs
+  });
 
   if (result.status === 'success' || result.status === 'skipped') {
-    recordInitEvent({
-      stage: 'storage',
-      type: 'success',
-      backend: primaryBackend,
-      elapsedMs: result.elapsedMs
-    });
-    setRuntimeBackendFlags(primaryBackend);
-    console.info(`[app-init] Storage backend ready: ${primaryBackend}`);
+    commitReadyBackend(primaryBackend, result.elapsedMs);
     return { service, backend: primaryBackend, fallbackInfo: undefined };
   }
 
@@ -199,29 +181,17 @@ async function createInitializedStorageService({ backend, useIndexedDB, storageK
   persistActiveBackendPreference(fallbackBackend);
   setRuntimeBackendFlags(fallbackBackend);
 
-  const fallbackService = safeCreateStorageService({ backend: fallbackBackend, storageKey });
-  recordInitEvent({ stage: 'storage', type: 'attempt', backend: fallbackBackend });
-
-  const fallbackResult = await initializeWithTimeout(fallbackService, timeoutMs, fallbackBackend);
-
-  if (fallbackResult.status === 'error') {
-    recordInitEvent({
-      stage: 'storage',
-      type: 'error',
-      backend: fallbackBackend,
-      error: fallbackResult.error?.message
-    });
-    throw fallbackResult.error;
-  }
-
-  recordInitEvent({
-    stage: 'storage',
-    type: 'success',
+  const { service: fallbackService, result: fallbackResult } = await attemptBackendInitialization({
     backend: fallbackBackend,
-    elapsedMs: fallbackResult.elapsedMs
+    storageKey,
+    timeoutMs
   });
 
-  console.info(`[app-init] Storage backend ready: ${fallbackBackend}`);
+  if (fallbackResult.status === 'error') {
+    throwInitError(fallbackBackend, fallbackResult.error);
+  }
+
+  commitReadyBackend(fallbackBackend, fallbackResult.elapsedMs);
 
   const fallbackInfo = {
     message: fallbackReason === 'timeout'
@@ -234,6 +204,31 @@ async function createInitializedStorageService({ backend, useIndexedDB, storageK
     backend: fallbackBackend,
     fallbackInfo
   };
+}
+
+/**
+ * Creates a storage service for `backend` and awaits its initialization,
+ * recording the attempt in the init diagnostics.
+ */
+async function attemptBackendInitialization({ backend, storageKey, timeoutMs }) {
+  const service = safeCreateStorageService({ backend, storageKey });
+  recordInitEvent({ stage: 'storage', type: 'attempt', backend });
+
+  return {
+    service,
+    result: await initializeWithTimeout(service, timeoutMs, backend)
+  };
+}
+
+function commitReadyBackend(backend, elapsedMs) {
+  recordInitEvent({ stage: 'storage', type: 'success', backend, elapsedMs });
+  setRuntimeBackendFlags(backend);
+  console.info(`[app-init] Storage backend ready: ${backend}`);
+}
+
+function throwInitError(backend, error) {
+  recordInitEvent({ stage: 'storage', type: 'error', backend, error: error?.message });
+  throw error;
 }
 
 function safeCreateStorageService(options) {
@@ -332,11 +327,11 @@ function persistActiveBackendPreference(backend) {
   try {
     const storage = typeof window !== 'undefined' ? window.localStorage : undefined;
     if (storage) {
-      storage.setItem('fpl-storage-backend', backend);
+      storage.setItem(STORAGE_BACKEND_PREFERENCE_KEY, backend);
       recordInitEvent({ stage: 'storage', type: 'preference-persisted', backend });
     }
   } catch (error) {
-    console.error('Failed to persist fallback backend preference:', error);
+    console.error('Failed to persist storage backend preference:', error);
     recordInitEvent({
       stage: 'storage',
       type: 'preference-error',
@@ -431,28 +426,27 @@ async function syncStorageOptionsState(activeBackend) {
         toggleBtn.setAttribute('data-warning', 'sqlite-unavailable');
       }
       window.fplManager?.ui?.showAlert?.('SQLite backend is unavailable. Falling back to localStorage.');
-      const storage = window.localStorage;
-      try {
-        if (storage) {
-          storage.setItem('fpl-storage-backend', 'localstorage');
-        }
-      } catch (error) {
-        console.error('Failed to persist fallback backend preference:', error);
-      }
-      window.ACTIVE_STORAGE_BACKEND = 'localstorage';
-      window.USE_INDEXED_DB = false;
+      persistActiveBackendPreference('localstorage');
+      setRuntimeBackendFlags('localstorage');
       updateStorageIndicator('localstorage');
       return;
     }
   }
 
-  const options = Array.from(optionsList.querySelectorAll('[role="option"]'));
-  options.forEach((option) => {
+  markSelectedStorageOption(optionsList, activeBackend, { enableSqlite: true });
+}
+
+/**
+ * Reflects `activeBackend` on the backend option list, optionally clearing the
+ * disabled state applied when the SQLite API was unreachable.
+ */
+function markSelectedStorageOption(optionsList, activeBackend, { enableSqlite = false } = {}) {
+  optionsList.querySelectorAll('[role="option"]').forEach((option) => {
     const backend = option.getAttribute('data-backend');
     const isActive = backend === activeBackend;
     option.setAttribute('aria-selected', isActive ? 'true' : 'false');
     option.classList.toggle('is-selected', isActive);
-    if (backend === 'sqlite') {
+    if (enableSqlite && backend === 'sqlite') {
       option.removeAttribute('aria-disabled');
       option.classList.remove('is-disabled');
     }
@@ -480,12 +474,7 @@ function updateStorageIndicator(activeBackend) {
   }
 
   if (optionsList) {
-    const options = Array.from(optionsList.querySelectorAll('[role="option"]'));
-    options.forEach((option) => {
-      const isActive = option.getAttribute('data-backend') === activeBackend;
-      option.setAttribute('aria-selected', isActive ? 'true' : 'false');
-      option.classList.toggle('is-selected', isActive);
-    });
+    markSelectedStorageOption(optionsList, activeBackend);
   }
 }
 
@@ -495,8 +484,6 @@ function setupStorageToggle() {
   const optionsList = document.getElementById('storage-options');
 
   if (!toggleBtn || !optionsList) return;
-
-  const storage = window.localStorage;
 
   const closeMenu = () => {
     optionsList.hidden = true;
@@ -551,13 +538,7 @@ function setupStorageToggle() {
       }
     }
 
-    try {
-      if (storage) {
-        storage.setItem('fpl-storage-backend', nextBackend);
-      }
-    } catch (error) {
-      console.error('Failed to persist storage backend preference:', error);
-    }
+    persistActiveBackendPreference(nextBackend);
 
     closeMenu();
     updateStorageIndicator(nextBackend);
