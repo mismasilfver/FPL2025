@@ -17,9 +17,12 @@ class CaptaincyService {
   }
 
   setCaptain(root, playerId) {
-    const currentWeek = root.weeks[root.currentWeek];
+    const currentWeek = this._requireCurrentWeek(root);
     const player = currentWeek.players.find(p => p.id === playerId);
-    if (player && !player.have) {
+    if (!player) {
+      throw new Error(`Player ${playerId} was not found in week ${root.currentWeek}.`);
+    }
+    if (!player.have) {
       throw new Error('Player must be in the team to be captain.');
     }
 
@@ -35,9 +38,12 @@ class CaptaincyService {
   }
 
   setViceCaptain(root, playerId) {
-    const currentWeek = root.weeks[root.currentWeek];
+    const currentWeek = this._requireCurrentWeek(root);
     const player = currentWeek.players.find(p => p.id === playerId);
-    if (player && !player.have) {
+    if (!player) {
+      throw new Error(`Player ${playerId} was not found in week ${root.currentWeek}.`);
+    }
+    if (!player.have) {
       throw new Error('Player must be in the team to be vice-captain.');
     }
 
@@ -50,6 +56,14 @@ class CaptaincyService {
       }
     }
     return root;
+  }
+
+  _requireCurrentWeek(root) {
+    const currentWeek = root?.weeks?.[root?.currentWeek];
+    if (!currentWeek || !Array.isArray(currentWeek.players)) {
+      throw new Error(`Week ${root?.currentWeek} could not be read from stored data.`);
+    }
+    return currentWeek;
   }
 }
 

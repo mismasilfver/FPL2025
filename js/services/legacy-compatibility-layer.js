@@ -1,3 +1,5 @@
+import { handleAppError } from '../utils/error-handler.js';
+
 /**
  * LegacyCompatibilityLayer provides backward compatibility for legacy code
  * that accesses player data through synchronous getter/setters.
@@ -24,7 +26,8 @@ export class LegacyCompatibilityLayer {
         return this._createDefaultRoot();
       }
       return JSON.parse(data);
-    } catch (e) {
+    } catch (error) {
+      console.warn('Failed to read stored data synchronously; using defaults:', error);
       return this._createDefaultRoot();
     }
   }
@@ -39,8 +42,8 @@ export class LegacyCompatibilityLayer {
         return;
       }
       localStorage.setItem(this.storageKey, JSON.stringify(root));
-    } catch (e) {
-      console.warn('Failed to save data synchronously:', e);
+    } catch (error) {
+      handleAppError(error, { userMessage: 'Your changes could not be saved to this browser.' });
     }
   }
 

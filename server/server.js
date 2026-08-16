@@ -24,11 +24,26 @@ app.get('/health', (_req, res) => {
 app.use('/api/storage', storageRouter);
 app.use('/api/fpl', fplRouter);
 
+// Fallback error handler for routes that do not define their own
+app.use((error, _req, res, _next) => {
+  console.error('Unhandled server error:', error);
+  res.status(500).json({ error: error.message || 'Internal server error' });
+});
+
 function startServer(port = PORT, options = {}) {
   initializeSchema(options);
-  return app.listen(port, () => {
+  const server = app.listen(port, () => {
     console.log(`SQLite storage server running on http://localhost:${port}`);
   });
+
+  server.on('error', (error) => {
+    console.error(`Failed to start SQLite storage server on port ${port}:`, error);
+    if (require.main === module) {
+      process.exitCode = 1;
+    }
+  });
+
+  return server;
 }
 
 if (require.main === module) {

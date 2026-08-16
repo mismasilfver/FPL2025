@@ -7,6 +7,7 @@ import WeekService from './js/services/week-service.js';
 import CaptaincyService from './js/services/captaincy-service.js';
 import LegacyCompatibilityLayer from './js/services/legacy-compatibility-layer.js';
 import MigrationService from './js/services/migration-service.js';
+import { handleAppError } from './js/utils/error-handler.js';
 
 // Global debug flag for this module
 const DEBUG = false;
@@ -103,22 +104,39 @@ export class FPLTeamManager {
 
     bindEvents() {
         this.ui.bindEvents({
-            onAddPlayer: this.openModal.bind(this),
+            onAddPlayer: () => this._runUserAction(() => this.openModal(), 'Failed to open the player form.'),
             onModalClose: this.closeModal.bind(this),
             onFormSubmit: this.handleFormSubmit.bind(this),
-            onPositionFilterChange: this.updateDisplay.bind(this),
-            onHaveFilterChange: this.updateDisplay.bind(this),
+            onPositionFilterChange: () => this._runUserAction(() => this.updateDisplay(), 'Failed to refresh the player list.'),
+            onHaveFilterChange: () => this._runUserAction(() => this.updateDisplay(), 'Failed to refresh the player list.'),
             onEscapeKey: () => this.closeModal(),
-            onPrevWeek: async () => await this.prevWeek(),
-            onNextWeek: async () => await this.nextWeek(),
-            onCreateWeek: async () => await this.createNewWeek(),
-            onExportWeek: this.exportWeekData.bind(this),
+            onPrevWeek: () => this._runUserAction(() => this.prevWeek(), 'Failed to open the previous week.'),
+            onNextWeek: () => this._runUserAction(() => this.nextWeek(), 'Failed to open the next week.'),
+            onCreateWeek: () => this._runUserAction(() => this.createNewWeek(), 'Failed to create a new week.'),
+            onExportWeek: () => this._runUserAction(() => this.exportWeekData(), 'Failed to export this week.'),
             onToggleHave: (id) => this.toggleHave(id),
-            onEdit: (id) => this.openModal(id),
+            onEdit: (id) => this._runUserAction(() => this.openModal(id), 'Failed to open the player form.'),
             onDelete: (id) => this.deletePlayer(id),
             onMakeCaptain: (id) => this.setCaptain(id),
             onMakeViceCaptain: (id) => this.setViceCaptain(id),
         });
+    }
+
+    /**
+     * Run a user-initiated operation, surfacing any failure to the user instead of
+     * leaving it as an unhandled rejection.
+     * @param {Function} operation - Async operation to run.
+     * @param {string} fallbackMessage - Message shown when the error has none.
+     * @returns {Promise<boolean>} True when the operation succeeded.
+     */
+    async _runUserAction(operation, fallbackMessage) {
+        try {
+            await operation();
+            return true;
+        } catch (error) {
+            handleAppError(error, { userMessage: error?.message || fallbackMessage, ui: this.ui });
+            return false;
+        }
     }
 
     async openModal(playerId = null) {
@@ -137,7 +155,7 @@ export class FPLTeamManager {
     }
 
     async handleFormSubmit(e) {
-        e.preventDefault();
+        e?.preventDefault?.();
         if (!this.ui.playerForm || !this.ui.playerForm.checkValidity()) {
             this.ui.playerForm?.reportValidity();
             return;
@@ -165,13 +183,19 @@ export class FPLTeamManager {
             return;
         }
 
-        if (isEditing) {
-            this.updatePlayer(this.ui.currentEditingId, playerData);
-        } else {
-            this.addPlayer(playerData);
-        }
+        const saved = isEditing
+            ? await this._runUserAction(
+                () => this.updatePlayer(this.ui.currentEditingId, playerData),
+                'Failed to update the player. Your change was not saved.'
+            )
+            : await this._runUserAction(
+                () => this.addPlayer(playerData),
+                'Failed to add the player. Your change was not saved.'
+            );
 
-        this.closeModal();
+        if (saved) {
+            this.closeModal();
+        }
     }
 
     async addPlayer(playerData) {
@@ -199,48 +223,44 @@ export class FPLTeamManager {
             return;
         }
 
-        let root = await this._getRootData();
-        root = await this.playerService.deletePlayer(root, playerId);
-        await this._ensureWeekDerivedFields(root, root.currentWeek);
-        await this._saveRootData(root);
-        await this.updateDisplay();
+        await this._runUserAction(async () => {
+            let root = await this._getRootData();
+            root = await this.playerService.deletePlayer(root, playerId);
+            await this._ensureWeekDerivedFields(root, root.currentWeek);
+            await this._saveRootData(root);
+            await this.updateDisplay();
+        }, 'Failed to delete the player.');
     }
 
     async toggleHave(playerId) {
         if (await this.isCurrentWeekReadOnly()) return;
-        let root = await this._getRootData();
-        try {
+        await this._runUserAction(async () => {
+            let root = await this._getRootData();
             root = await this.playerService.toggleHave(root, playerId);
             await this._ensureWeekDerivedFields(root, root.currentWeek);
             await this._saveRootData(root);
             await this.updateDisplay();
-        } catch (error) {
-            this.ui.showAlert(error.message);
-        }
+        }, 'Failed to update team membership.');
     }
 
     async setCaptain(playerId) {
         if (await this.isCurrentWeekReadOnly()) return;
-        let root = await this._getRootData();
-        try {
+        await this._runUserAction(async () => {
+            let root = await this._getRootData();
             root = this.captaincyService.setCaptain(root, playerId);
             await this._saveRootData(root);
             await this.updateDisplay();
-        } catch (error) {
-            this.ui.showAlert(error.message);
-        }
+        }, 'Failed to update the captain.');
     }
 
     async setViceCaptain(playerId) {
         if (await this.isCurrentWeekReadOnly()) return;
-        let root = await this._getRootData();
-        try {
+        await this._runUserAction(async () => {
+            let root = await this._getRootData();
             root = this.captaincyService.setViceCaptain(root, playerId);
             await this._saveRootData(root);
             await this.updateDisplay();
-        } catch (error) {
-            this.ui.showAlert(error.message);
-        }
+        }, 'Failed to update the vice-captain.');
     }
 
     async updateDisplay() {
@@ -292,8 +312,10 @@ export class FPLTeamManager {
         const canRevokeObjectUrl = urlApi && typeof urlApi.revokeObjectURL === 'function';
 
         if (!canCreateObjectUrl || !canRevokeObjectUrl) {
-            console.warn('URL.createObjectURL is not available; skipping export.');
-            return;
+            throw new AppError('Exporting is not supported in this browser.', {
+                code: 'EXPORT_UNSUPPORTED',
+                recoverable: true
+            });
         }
 
         const url = urlApi.createObjectURL(dataBlob);
@@ -316,7 +338,6 @@ export class FPLTeamManager {
                 root = await this.storage.getRootData();
             } catch (error) {
                 throw new AppError('Failed to load root data from storage service', { code: 'STORAGE_ROOT_LOAD_FAILURE', context: { originalError: error } });
-                root = null;
             }
         } else {
             const rawData = await this.storage.getItem(this.storageKey);
@@ -329,10 +350,7 @@ export class FPLTeamManager {
             try {
                 root = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
             } catch (error) {
-                throw new AppError('Failed to parse root data', { code: 'STORAGE_PARSE_FAILURE', recoverable: true, context: { originalError: error } });
-                const defaults = createDefaultRoot();
-                await this._setRootData(defaults);
-                return defaults;
+                throw new AppError('Stored data is corrupted and could not be read.', { code: 'STORAGE_PARSE_FAILURE', recoverable: true, context: { originalError: error } });
             }
         }
 
