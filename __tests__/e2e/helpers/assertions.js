@@ -59,7 +59,7 @@ export async function expectCaptainStatus(page, playerName, status) {
  * @param {number} expectedWeek - Expected week number
  */
 export async function expectCurrentWeek(page, expectedWeek) {
-  const indicator = page.locator('[data-testid="current-week"], .current-week-indicator');
+  const indicator = page.locator('[data-testid="week-label"], #week-label');
   await expect(indicator).toContainText(`Week ${expectedWeek}`);
 }
 
@@ -68,7 +68,7 @@ export async function expectCurrentWeek(page, expectedWeek) {
  * @param {import('@playwright/test').Page} page - Playwright page object
  */
 export async function expectReadOnlyMode(page) {
-  const indicator = page.locator('[data-testid="readonly-indicator"], .readonly-badge, .read-only');
+  const indicator = page.locator('[data-testid="week-readonly-badge"], #week-readonly-badge');
   await expect(indicator).toBeVisible();
 }
 
@@ -77,7 +77,7 @@ export async function expectReadOnlyMode(page) {
  * @param {import('@playwright/test').Page} page - Playwright page object
  */
 export async function expectEditMode(page) {
-  const indicator = page.locator('[data-testid="readonly-indicator"], .readonly-badge, .read-only');
+  const indicator = page.locator('[data-testid="week-readonly-badge"], #week-readonly-badge');
   await expect(indicator).not.toBeVisible();
 }
 
@@ -87,7 +87,7 @@ export async function expectEditMode(page) {
  * @param {string} expectedBackend - Expected backend name
  */
 export async function expectStorageBackend(page, expectedBackend) {
-  const indicator = page.locator('[data-testid="storage-backend"], .storage-indicator');
+  const indicator = page.locator('[data-testid="storage-indicator"], #storage-indicator');
   await expect(indicator).toContainText(expectedBackend);
 }
 

@@ -5,7 +5,7 @@
 
 import { test, expect } from '@playwright/test';
 import { resetAppWithBackend } from '../helpers/storage-helpers.js';
-import { addPlayer, createNewWeek, navigateToWeek, getCurrentWeekNumber, isReadOnlyMode, setCaptainStatus } from '../helpers/ui-helpers.js';
+import { addPlayer, createNewWeek, navigateToWeek, getCurrentWeekNumber, isReadOnlyMode, setCaptainStatus, togglePlayerOwned } from '../helpers/ui-helpers.js';
 import { expectCurrentWeek, expectReadOnlyMode, expectEditMode, expectPlayerCount, expectPlayerExists } from '../helpers/assertions.js';
 import { buildMinimalSquad, getPlayerByPosition } from '../fixtures/test-data.js';
 
@@ -121,21 +121,22 @@ for (const backend of BACKENDS) {
         await addPlayer(page, player);
       }
       
-      // Set captain in week 1
+      // Set captain in week 1 (ensure player is in team first)
+      await togglePlayerOwned(page, players[0].name);
       await setCaptainStatus(page, players[0].name, 'captain');
       
       // Create week 2
       await createNewWeek(page);
       
-      // Set different captain in week 2
+      // Set different captain in week 2 (ensure player is in team first)
+      await togglePlayerOwned(page, players[1].name);
       await setCaptainStatus(page, players[1].name, 'captain');
       
       // Navigate back to week 1
       await navigateToWeek(page, 1);
       
-      // Verify week 1 still has original captain
-      const row = page.locator('.player-row, [data-testid="player-row"]', { hasText: players[0].name });
-      await expect(row.locator('.captain-badge, [data-testid="captain-badge"], .is-captain')).toBeVisible();
+      // Verify week 1 still has original captain (via captain info section)
+      await expect(page.locator('#captain-info, [data-testid="captain-info"]')).toContainText(players[0].name);
     });
 
     test('can navigate between weeks', async ({ page }) => {

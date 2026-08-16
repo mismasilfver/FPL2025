@@ -179,7 +179,7 @@ export async function createNewWeek(page) {
  */
 export async function navigateToWeek(page, weekNumber) {
   // Check if we need to go forward or backward
-  const currentWeek = await getCurrentWeekNumber(page);
+  let currentWeek = await getCurrentWeekNumber(page);
   
   while (currentWeek < weekNumber) {
     await page.click('[data-testid="next-week-btn"], #next-week-btn');

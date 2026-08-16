@@ -17,7 +17,7 @@ export async function setStorageBackend(page, backend) {
   }, { key: STORAGE_BACKEND_KEY, value: backend });
   
   // Navigate to full URL instead of reload to ensure proper origin
-  await page.goto('http://localhost:3000/');
+  await page.goto('http://localhost:3000');
   await page.waitForLoadState('networkidle');
   await waitForStorageReady(page);
 }
@@ -80,7 +80,7 @@ export async function waitForStorageReady(page, timeout = 5000) {
  */
 export async function resetAppWithBackend(page, backend) {
   // First navigate to ensure we have a valid page context
-  await page.goto('http://localhost:3000/');
+  await page.goto('http://localhost:3000');
   await page.waitForLoadState('networkidle');
   
   // Set the backend preference BEFORE clearing
@@ -92,7 +92,7 @@ export async function resetAppWithBackend(page, backend) {
   await clearStorage(page);
   
   // Navigate again to apply the backend with clean data
-  await page.goto('http://localhost:3000/');
+  await page.goto('http://localhost:3000');
   await page.waitForLoadState('networkidle');
   await waitForStorageReady(page);
 }
