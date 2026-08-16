@@ -34,12 +34,16 @@ export function importFromJSON(file) {
         const jsonData = JSON.parse(e.target.result);
         resolve(jsonData);
       } catch (error) {
-        reject(new Error('Invalid JSON file'));
+        reject(new Error(`Invalid JSON file: ${error.message}`, { cause: error }));
       }
     };
     
     reader.onerror = () => {
-      reject(new Error('Failed to read file'));
+      reject(new Error(`Failed to read file: ${reader.error?.message || 'unknown error'}`, { cause: reader.error }));
+    };
+
+    reader.onabort = () => {
+      reject(new Error('Reading the file was aborted'));
     };
     
     reader.readAsText(file);

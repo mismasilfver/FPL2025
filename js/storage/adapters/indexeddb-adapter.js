@@ -63,7 +63,13 @@ export class IndexedDBAdapter {
       };
       
       request.onerror = (event) => {
-        const error = new Error(`Database error: ${event.target.errorCode}`);
+        const error = new Error(`Database error: ${event.target.error?.message || event.target.errorCode}`);
+        this._rejectDbReady?.(error);
+        reject(error);
+      };
+
+      request.onblocked = () => {
+        const error = new Error('Database upgrade blocked by another open connection');
         this._rejectDbReady?.(error);
         reject(error);
       };
@@ -104,6 +110,7 @@ export class IndexedDBAdapter {
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onerror = (e) => reject(new Error(`Transaction error: ${e.target.error}`));
+      tx.onabort = () => reject(new Error(`Transaction aborted while seeding database: ${tx.error?.message || 'unknown error'}`));
     });
   }
 
@@ -172,6 +179,11 @@ export class IndexedDBAdapter {
 
   async saveToStorage(weekToSave, { players, captain, viceCaptain }, currentWeek) {
     await this.initialized;
+
+    if (!this.db) {
+      throw new Error('IndexedDB connection is not open');
+    }
+
     weekToSave = Number(weekToSave);
     currentWeek = Number(currentWeek);
     
@@ -215,6 +227,7 @@ export class IndexedDBAdapter {
       
       tx.oncomplete = () => resolve();
       tx.onerror = (e) => reject(new Error(`Transaction error: ${e.target.error}`));
+      tx.onabort = () => reject(new Error(`Transaction aborted while saving week: ${tx.error?.message || 'unknown error'}`));
     });
   }
 
@@ -233,6 +246,10 @@ export class IndexedDBAdapter {
 
   async setRootData(root) {
     await this.initialized;
+
+    if (!this.db) {
+      throw new Error('IndexedDB connection is not open');
+    }
 
     if (!root || typeof root !== 'object') {
       throw new TypeError('Root payload must be an object for IndexedDB storage');
@@ -278,14 +295,15 @@ export class IndexedDBAdapter {
 
         tx.oncomplete = () => resolve(normalizedRoot);
         tx.onerror = (e) => reject(new Error(`Failed to persist root payload: ${e.target.error}`));
+        tx.onabort = () => reject(new Error(`Transaction aborted while persisting root payload: ${tx.error?.message || 'unknown error'}`));
     });
   }
 
   async close() {
     try {
       await this.initialized;
-    } catch (e) {
-      // Ignore initialization errors during close
+    } catch (error) {
+      console.warn('[storage] IndexedDB failed to initialize; closing anyway.', error);
     }
     if (this.db) {
       this.db.close();

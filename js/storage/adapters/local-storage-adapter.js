@@ -27,6 +27,7 @@ export class LocalStorageAdapter {
     try {
       return JSON.parse(raw);
     } catch (error) {
+      console.warn('[storage] Stored data is not valid JSON. Resetting to defaults.', error);
       const root = createDefaultRoot();
       this.storage.setItem(this.storageKey, JSON.stringify(root));
       return root;

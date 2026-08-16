@@ -1,10 +1,61 @@
+import { AppError } from './utils/app-error.js';
+
 const DEBUG = false;
+
+const DEFAULT_ALERT_TIMEOUT_MS = 6000;
 
 export default class UIManager {
     constructor() {
         this._boundGlobal = false;
         this._keydownBound = false;
         this.currentEditingId = null;
+        this.alertContainer = null;
+        this._alertTimeoutId = null;
+    }
+
+    /**
+     * Display a non-blocking message in the persistent alert container.
+     * @param {string} message - Text to show to the user.
+     * @param {object} [options]
+     * @param {number|null} [options.timeout=6000] - Auto-hide delay; pass null to keep visible.
+     * @param {'error'|'notice'} [options.variant='error'] - Visual variant.
+     */
+    showAlert(message, { timeout = DEFAULT_ALERT_TIMEOUT_MS, variant = 'error' } = {}) {
+        const container = this._resolveAlertContainer();
+
+        if (!container) {
+            console.error('[FPL Alert]', message);
+            return;
+        }
+
+        container.textContent = message;
+        container.classList.toggle('error', variant === 'error');
+        container.style.display = 'block';
+
+        if (this._alertTimeoutId) {
+            clearTimeout(this._alertTimeoutId);
+            this._alertTimeoutId = null;
+        }
+
+        if (timeout) {
+            this._alertTimeoutId = setTimeout(() => this.hideAlert(), timeout);
+        }
+    }
+
+    hideAlert() {
+        const container = this._resolveAlertContainer();
+        if (!container) return;
+        container.textContent = '';
+        container.style.display = 'none';
+        container.classList.remove('error');
+    }
+
+    _resolveAlertContainer() {
+        if (this.alertContainer?.isConnected) return this.alertContainer;
+
+        const doc = this.document || (typeof document !== 'undefined' ? document : null);
+        this.alertContainer = doc?.querySelector('[data-testid="app-alert"]') || null;
+        return this.alertContainer;
     }
 
     _logButtonClick(button, payload = {}) {
@@ -107,6 +158,7 @@ export default class UIManager {
 
     async initElements(doc = document) {
         this.document = doc;
+        this.alertContainer = doc.querySelector('[data-testid="app-alert"]');
         
         // Cache DOM elements
         this.addPlayerBtn = doc.querySelector('[data-testid="add-player-button"]');
@@ -133,7 +185,10 @@ export default class UIManager {
 
     openModal(player = null) {
         if (!this.modal) this.buildModalFromTemplate();
-        if (!this.modal) return console.error('Modal could not be created.');
+        if (!this.modal) {
+            this.showAlert('The player form could not be opened. Please reload the page.');
+            throw new AppError('Modal could not be created', { code: 'UI_MODAL_UNAVAILABLE' });
+        }
 
         if (player) {
             this.modalTitle.textContent = 'Edit Player';

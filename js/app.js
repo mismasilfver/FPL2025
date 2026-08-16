@@ -4,6 +4,7 @@
  */
 
 import { initializeApp } from './app-init.js';
+import { handleAppError } from './utils/error-handler.js';
 
 // Initialize the application when the DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
@@ -12,13 +13,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initializeApp();
     console.log('FPL application initialized successfully');
   } catch (error) {
-    console.error('Failed to initialize FPL application:', error);
-    // Show error in UI if possible
-    const alertContainer = document.querySelector('.app-alert');
-    if (alertContainer) {
-      alertContainer.textContent = `Error initializing application: ${error.message}`;
-      alertContainer.style.display = 'block';
-      alertContainer.classList.add('error');
-    }
+    handleAppError(error, {
+      userMessage: `Error initializing application: ${error.message}`
+    });
   }
 });
