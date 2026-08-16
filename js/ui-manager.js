@@ -1,3 +1,5 @@
+import { createElement, createActionButton, replaceCellContent } from './utils/dom-builders.js';
+
 const DEBUG = false;
 
 export default class UIManager {
@@ -344,86 +346,63 @@ export default class UIManager {
         if (statusCell) {
             statusCell.textContent = '';
             if (player.status) {
-                const statusDiv = doc.createElement('div');
-                statusDiv.className = `status-circle status-${player.status}`;
-                statusDiv.title = this.getStatusText(player.status);
-                statusCell.appendChild(statusDiv);
+                statusCell.appendChild(createElement(doc, 'div', {
+                    className: `status-circle status-${player.status}`,
+                    title: this.getStatusText(player.status)
+                }));
             }
         }
 
         const haveCell = row.querySelector('.col-have');
         if (haveCell) {
             haveCell.setAttribute('data-testid', `have-cell-${player.id}`);
-            haveCell.innerHTML = '';
-            if (player.have) {
-                const span = doc.createElement('span');
-                span.className = 'have-indicator remove-from-team';
-                span.setAttribute('data-testid', `remove-from-team-${player.id}`);
-                span.setAttribute('data-action', 'toggle-have');
-                span.setAttribute('data-player-id', player.id);
-                if (isReadOnly) {
-                    span.classList.add('disabled');
-                    span.style.cursor = 'not-allowed';
-                    span.title = 'This week is read-only';
-                } else {
-                    span.style.cursor = 'pointer';
-                    span.title = 'Click to remove from team';
-                }
-                span.textContent = '✓';
-                haveCell.appendChild(span);
-            } else {
-                const button = doc.createElement('button');
-                button.className = 'btn btn-secondary add-to-team';
-                button.disabled = isReadOnly;
-                button.setAttribute('data-testid', `add-to-team-${player.id}`);
-                button.setAttribute('data-action', 'toggle-have');
-                button.setAttribute('data-player-id', player.id);
-                button.title = 'Add to team';
-                button.textContent = '+';
-                haveCell.appendChild(button);
-            }
+            replaceCellContent(haveCell, player.have
+                ? this.buildRemoveFromTeamIndicator(doc, player, isReadOnly)
+                : createActionButton(doc, {
+                    className: 'btn btn-secondary add-to-team',
+                    action: 'toggle-have',
+                    playerId: player.id,
+                    testId: `add-to-team-${player.id}`,
+                    title: 'Add to team',
+                    text: '+',
+                    disabled: isReadOnly
+                }));
         }
 
         const captainCell = row.querySelector('.col-captain');
         if (captainCell) {
             captainCell.setAttribute('data-testid', `captain-cell-${player.id}`);
-            captainCell.innerHTML = '';
-            if (isCaptain) {
-                const span = doc.createElement('span');
-                span.className = 'captain-badge';
-                span.setAttribute('data-testid', `captain-badge-${player.id}`);
-                span.textContent = 'C';
-                captainCell.appendChild(span);
-            } else {
-                const button = doc.createElement('button');
-                button.className = 'btn btn-secondary make-captain';
-                button.disabled = isReadOnly;
-                button.setAttribute('data-action', 'make-captain');
-                button.setAttribute('data-player-id', player.id);
-                button.textContent = 'C';
-                captainCell.appendChild(button);
-            }
+            replaceCellContent(captainCell, isCaptain
+                ? createElement(doc, 'span', {
+                    className: 'captain-badge',
+                    testId: `captain-badge-${player.id}`,
+                    text: 'C'
+                })
+                : createActionButton(doc, {
+                    className: 'btn btn-secondary make-captain',
+                    action: 'make-captain',
+                    playerId: player.id,
+                    text: 'C',
+                    disabled: isReadOnly
+                }));
         }
 
         const viceCell = row.querySelector('.col-vice');
         if (viceCell) {
             viceCell.setAttribute('data-testid', `vice-captain-cell-${player.id}`);
-            viceCell.innerHTML = '';
-            if (isViceCaptain) {
-                const span = doc.createElement('span');
-                span.className = 'vice-captain-badge';
-                span.setAttribute('data-testid', `vice-captain-badge-${player.id}`);
-                span.textContent = 'VC';
-                viceCell.appendChild(span);
-            } else {
-                const button = doc.createElement('button');
-                button.className = 'btn btn-secondary make-vice-captain';
-                button.disabled = isReadOnly;
-                button.setAttribute('data-action', 'make-vice');
-                button.setAttribute('data-player-id', player.id);
-                button.textContent = 'VC';
-                viceCell.appendChild(button);
-            }
+            replaceCellContent(viceCell, isViceCaptain
+                ? createElement(doc, 'span', {
+                    className: 'vice-captain-badge',
+                    testId: `vice-captain-badge-${player.id}`,
+                    text: 'VC'
+                })
+                : createActionButton(doc, {
+                    className: 'btn btn-secondary make-vice-captain',
+                    action: 'make-vice',
+                    playerId: player.id,
+                    text: 'VC',
+                    disabled: isReadOnly
+                }));
         }
 
         const notesCell = row.querySelector('.col-notes');
@@ -433,36 +412,46 @@ export default class UIManager {
             notesCell.setAttribute('data-player-id', player.id);
             notesCell.setAttribute('data-full-notes', player.notes || '');
             notesCell.title = 'Click to expand notes';
-            const notesSpan = doc.createElement('span');
-            notesSpan.className = 'notes-text';
-            notesSpan.textContent = this.truncateText(player.notes || '', 20);
-            notesCell.innerHTML = '';
-            notesCell.appendChild(notesSpan);
+            replaceCellContent(notesCell, createElement(doc, 'span', {
+                className: 'notes-text',
+                text: this.truncateText(player.notes || '', 20)
+            }));
         }
 
         const actionsCell = row.querySelector('.col-actions');
         if (actionsCell) {
             actionsCell.innerHTML = '';
-            const editBtn = doc.createElement('button');
-            editBtn.className = 'btn btn-edit edit-player';
-            editBtn.disabled = isReadOnly;
-            editBtn.setAttribute('data-testid', `edit-player-${player.id}`);
-            editBtn.setAttribute('data-action', 'edit');
-            editBtn.setAttribute('data-player-id', player.id);
-            editBtn.textContent = 'Edit';
-            actionsCell.appendChild(editBtn);
-            
-            const deleteBtn = doc.createElement('button');
-            deleteBtn.className = 'btn btn-danger delete-player';
-            deleteBtn.disabled = isReadOnly;
-            deleteBtn.setAttribute('data-testid', `delete-player-${player.id}`);
-            deleteBtn.setAttribute('data-action', 'delete');
-            deleteBtn.setAttribute('data-player-id', player.id);
-            deleteBtn.textContent = 'Delete';
-            actionsCell.appendChild(deleteBtn);
+            [
+                { className: 'btn btn-edit edit-player', action: 'edit', text: 'Edit' },
+                { className: 'btn btn-danger delete-player', action: 'delete', text: 'Delete' }
+            ].forEach(({ className, action, text }) => {
+                actionsCell.appendChild(createActionButton(doc, {
+                    className,
+                    action,
+                    playerId: player.id,
+                    testId: `${action}-player-${player.id}`,
+                    text,
+                    disabled: isReadOnly
+                }));
+            });
         }
 
         return row;
+    }
+
+    buildRemoveFromTeamIndicator(doc, player, isReadOnly) {
+        const indicator = createElement(doc, 'span', {
+            className: 'have-indicator remove-from-team',
+            testId: `remove-from-team-${player.id}`,
+            text: '✓',
+            title: isReadOnly ? 'This week is read-only' : 'Click to remove from team',
+            attributes: { 'data-action': 'toggle-have', 'data-player-id': player.id }
+        });
+
+        if (isReadOnly) indicator.classList.add('disabled');
+        indicator.style.cursor = isReadOnly ? 'not-allowed' : 'pointer';
+
+        return indicator;
     }
 
     renderPlayers(players, { isReadOnly, captainId, viceCaptainId }) {
