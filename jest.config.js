@@ -39,8 +39,6 @@ module.exports = {
     '/__tests__/fixtures/',
     'test-utils.js',
     'test-helpers.js',
-    'alert-test-helpers.js',
-    'alert-test-utils.js',
   ],
   
   // Module name mapper for handling module paths
