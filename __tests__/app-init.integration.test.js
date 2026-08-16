@@ -1,37 +1,34 @@
-jest.mock('../js/storage-module.js', () => {
-  const makeService = () => ({
-    initialize: jest.fn().mockResolvedValue(),
-    setRootData: jest.fn(),
-    getRootData: jest.fn().mockResolvedValue({
-      currentWeek: 1,
-      weeks: {
-        1: { players: [], captain: null, viceCaptain: null, isReadOnly: false }
-      }
-    })
-  });
+const storageModule = require('../js/storage-module.js');
 
-  const createStorageService = jest.fn().mockImplementation(makeService);
-  const createDefaultRoot = jest.fn(() => ({
-    version: '2.0',
+const makeStorageService = () => ({
+  initialize: jest.fn().mockResolvedValue(),
+  setRootData: jest.fn(),
+  getRootData: jest.fn().mockResolvedValue({
     currentWeek: 1,
     weeks: {
       1: { players: [], captain: null, viceCaptain: null, isReadOnly: false }
     }
-  }));
-
-  return {
-    __esModule: true,
-    createStorageService,
-    createDefaultRoot
-  };
+  })
 });
+
+const makeDefaultRoot = () => ({
+  version: '2.0',
+  currentWeek: 1,
+  weeks: {
+    1: { players: [], captain: null, viceCaptain: null, isReadOnly: false }
+  }
+});
+
+let createStorageServiceSpy;
+let createDefaultRootSpy;
+let createStorageService;
+let createDefaultRoot;
 
 jest.mock('../js/fpl-async-patch.js', () => ({
   patchFPLTeamManagerAsync: jest.fn()
 }));
 
 const { initializeApp } = require('../js/app-init.js');
-const { createStorageService } = require('../js/storage-module.js');
 const { FPLTeamManager: MockFPLTeamManager } = require('../script.js');
 const { patchFPLTeamManagerAsync } = require('../js/fpl-async-patch.js');
 
@@ -94,13 +91,30 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+  if (createStorageServiceSpy) {
+    createStorageServiceSpy.mockRestore();
+  }
+  if (createDefaultRootSpy) {
+    createDefaultRootSpy.mockRestore();
+  }
+
+  createStorageServiceSpy = jest
+    .spyOn(storageModule, 'createStorageService')
+    .mockImplementation(makeStorageService);
+  createDefaultRootSpy = jest
+    .spyOn(storageModule, 'createDefaultRoot')
+    .mockImplementation(makeDefaultRoot);
+
+  createStorageService = storageModule.createStorageService;
+  createDefaultRoot = storageModule.createDefaultRoot;
+
   Object.keys(storageState).forEach((key) => delete storageState[key]);
   mockStorage.getItem.mockClear();
   mockStorage.setItem.mockClear();
   mockStorage.removeItem.mockClear();
   mockStorage.clear.mockClear();
 
-  createStorageService.mockClear();
+  createStorageServiceSpy.mockClear();
   MockFPLTeamManager.mockClear();
   patchFPLTeamManagerAsync.mockClear();
 
