@@ -109,6 +109,18 @@ npm run start:server     # production-like server
 # In another terminal serve the front-end (e.g. python3 -m http.server)
 ```
 
+### Storage API security
+
+The `/api/storage/*` routes have **no authentication**: anyone who can reach them can read, overwrite, and delete your team data. The server is therefore locked to the local machine by default.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `4000` | Port the API listens on |
+| `HOST` | `127.0.0.1` | Interface to bind. Only change this if you accept that the unauthenticated API becomes reachable from the network |
+| `ALLOWED_ORIGINS` | _(empty)_ | Comma separated extra origins allowed by CORS. Any `http(s)` origin on `localhost`/`127.0.0.1` is always allowed |
+
+Browser requests from non-loopback origins are rejected, so a random website you visit cannot talk to your local API. Add authentication before exposing the server beyond `127.0.0.1`.
+
 ## Testing
 
 This project includes a comprehensive test suite to ensure functionality works correctly.

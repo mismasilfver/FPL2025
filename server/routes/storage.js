@@ -1,8 +1,16 @@
 const express = require('express');
 
 const database = require('../database');
+const { isPlainObject } = require('../security');
 
 const router = express.Router();
+
+function validatePayload(value, name) {
+  if (!isPlainObject(value)) {
+    throw new TypeError(`${name} must be a plain object`);
+  }
+  return value;
+}
 
 function validateWeekNumber(value) {
   const weekNumber = Number(value);
@@ -23,7 +31,7 @@ router.get('/root', (_req, res, next) => {
 
 router.put('/root', (req, res, next) => {
   try {
-    const payload = req.body;
+    const payload = validatePayload(req.body, 'root payload');
     const updated = database.setRootData(payload);
     res.json(updated);
   } catch (error) {
@@ -64,12 +72,15 @@ router.get('/weeks/:weekNumber', (req, res, next) => {
 
 router.post('/weeks', (req, res, next) => {
   try {
-    const { weekNumber, payload } = req.body || {};
+    const body = validatePayload(req.body, 'request body');
+    const { weekNumber, payload } = body;
     const normalizedWeekNumber = validateWeekNumber(weekNumber);
 
     const created = database.saveWeek(
       normalizedWeekNumber,
-      payload || database.createDefaultWeek(normalizedWeekNumber)
+      payload === undefined || payload === null
+        ? database.createDefaultWeek(normalizedWeekNumber)
+        : validatePayload(payload, 'week payload')
     );
     res.status(201).json(created);
   } catch (error) {
@@ -84,7 +95,7 @@ router.post('/weeks', (req, res, next) => {
 router.put('/weeks/:weekNumber', (req, res, next) => {
   try {
     const weekNumber = validateWeekNumber(req.params.weekNumber);
-    const payload = req.body;
+    const payload = validatePayload(req.body, 'week payload');
     const updated = database.saveWeek(weekNumber, payload);
     res.json(updated);
   } catch (error) {
@@ -118,7 +129,13 @@ router.delete('/weeks/:weekNumber', (req, res, next) => {
 
 router.use((error, _req, res, _next) => {
   console.error('[storage-api] Error:', error);
-  res.status(500).json({ message: 'Internal server error', details: error.message });
+  const body = { message: 'Internal server error' };
+  // Internal error messages can leak schema and filesystem details, so they
+  // are only echoed back outside production.
+  if (process.env.NODE_ENV !== 'production') {
+    body.details = error.message;
+  }
+  res.status(500).json(body);
 });
 
 module.exports = router;
