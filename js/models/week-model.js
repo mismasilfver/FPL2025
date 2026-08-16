@@ -91,14 +91,15 @@ export class WeekModel {
     /**
      * Creates a deep clone of a week object.
      * @param {object} weekData - The week object to clone.
-     * @returns {object | null} A deep copy of the week object or null if input is invalid.
+     * @returns {object | null} A deep copy of the week object, or null when input is falsy.
+     * @throws {TypeError} When the value cannot be serialized (e.g. circular references).
      */
     static clone(weekData) {
         if (!weekData) return null;
         try {
             return JSON.parse(JSON.stringify(weekData));
-        } catch (e) {
-            return null;
+        } catch (error) {
+            throw new TypeError(`Week data could not be cloned: ${error.message}`, { cause: error });
         }
     }
 
