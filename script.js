@@ -174,22 +174,42 @@ export class FPLTeamManager {
         this.closeModal();
     }
 
-    async addPlayer(playerData) {
-        if (await this.isCurrentWeekReadOnly()) return;
+    /**
+     * Applies a service mutation to the stored root payload, then persists it and
+     * refreshes the UI. Does nothing while the current week is read-only.
+     *
+     * @param {Function} mutate Receives the root payload and returns the mutated one
+     * @param {Object} [options]
+     * @param {boolean} [options.recomputeDerived] Recompute the current week's derived fields
+     * @param {boolean} [options.requireWritableWeek] Skip the mutation on read-only weeks
+     */
+    async _mutateRoot(mutate, { recomputeDerived = true, requireWritableWeek = true } = {}) {
+        if (requireWritableWeek && await this.isCurrentWeekReadOnly()) return;
+
         let root = await this._getRootData();
-        root = await this.playerService.addPlayer(root, playerData);
-        await this._ensureWeekDerivedFields(root, root.currentWeek);
+        root = await mutate(root);
+
+        if (recomputeDerived) {
+            await this._ensureWeekDerivedFields(root, root.currentWeek);
+        }
         await this._saveRootData(root);
         await this.updateDisplay();
     }
 
+    async _mutateRootWithAlert(mutate, options) {
+        try {
+            await this._mutateRoot(mutate, options);
+        } catch (error) {
+            this.ui.showAlert(error.message);
+        }
+    }
+
+    async addPlayer(playerData) {
+        await this._mutateRoot((root) => this.playerService.addPlayer(root, playerData));
+    }
+
     async updatePlayer(playerId, playerData) {
-        if (await this.isCurrentWeekReadOnly()) return;
-        let root = await this._getRootData();
-        root = await this.playerService.updatePlayer(root, playerId, playerData);
-        await this._ensureWeekDerivedFields(root, root.currentWeek);
-        await this._saveRootData(root);
-        await this.updateDisplay();
+        await this._mutateRoot((root) => this.playerService.updatePlayer(root, playerId, playerData));
     }
 
     async deletePlayer(playerId) {
@@ -199,48 +219,25 @@ export class FPLTeamManager {
             return;
         }
 
-        let root = await this._getRootData();
-        root = await this.playerService.deletePlayer(root, playerId);
-        await this._ensureWeekDerivedFields(root, root.currentWeek);
-        await this._saveRootData(root);
-        await this.updateDisplay();
+        await this._mutateRoot((root) => this.playerService.deletePlayer(root, playerId));
     }
 
     async toggleHave(playerId) {
-        if (await this.isCurrentWeekReadOnly()) return;
-        let root = await this._getRootData();
-        try {
-            root = await this.playerService.toggleHave(root, playerId);
-            await this._ensureWeekDerivedFields(root, root.currentWeek);
-            await this._saveRootData(root);
-            await this.updateDisplay();
-        } catch (error) {
-            this.ui.showAlert(error.message);
-        }
+        await this._mutateRootWithAlert((root) => this.playerService.toggleHave(root, playerId));
     }
 
     async setCaptain(playerId) {
-        if (await this.isCurrentWeekReadOnly()) return;
-        let root = await this._getRootData();
-        try {
-            root = this.captaincyService.setCaptain(root, playerId);
-            await this._saveRootData(root);
-            await this.updateDisplay();
-        } catch (error) {
-            this.ui.showAlert(error.message);
-        }
+        await this._mutateRootWithAlert(
+            (root) => this.captaincyService.setCaptain(root, playerId),
+            { recomputeDerived: false }
+        );
     }
 
     async setViceCaptain(playerId) {
-        if (await this.isCurrentWeekReadOnly()) return;
-        let root = await this._getRootData();
-        try {
-            root = this.captaincyService.setViceCaptain(root, playerId);
-            await this._saveRootData(root);
-            await this.updateDisplay();
-        } catch (error) {
-            this.ui.showAlert(error.message);
-        }
+        await this._mutateRootWithAlert(
+            (root) => this.captaincyService.setViceCaptain(root, playerId),
+            { recomputeDerived: false }
+        );
     }
 
     async updateDisplay() {
@@ -369,32 +366,27 @@ export class FPLTeamManager {
         return this.weekService._ensureWeekDerivedFields(root, weekNumber);
     }
 
+    /**
+     * Week changes are allowed on read-only weeks and never touch derived fields.
+     */
+    async _changeWeek(mutate) {
+        return this._mutateRoot(mutate, { recomputeDerived: false, requireWritableWeek: false });
+    }
+
     async createNewWeek() {
-        let root = await this._getRootData();
-        root = this.weekService.createNewWeek(root);
-        await this._saveRootData(root);
-        await this.updateDisplay();
+        await this._changeWeek((root) => this.weekService.createNewWeek(root));
     }
 
     async goToWeek(weekNumber) {
-        let root = await this._getRootData();
-        root = this.weekService.goToWeek(root, weekNumber);
-        await this._saveRootData(root);
-        await this.updateDisplay();
+        await this._changeWeek((root) => this.weekService.goToWeek(root, weekNumber));
     }
 
     async nextWeek() {
-        let root = await this._getRootData();
-        root = this.weekService.nextWeek(root);
-        await this._saveRootData(root);
-        await this.updateDisplay();
+        await this._changeWeek((root) => this.weekService.nextWeek(root));
     }
 
     async prevWeek() {
-        let root = await this._getRootData();
-        root = this.weekService.prevWeek(root);
-        await this._saveRootData(root);
-        await this.updateDisplay();
+        await this._changeWeek((root) => this.weekService.prevWeek(root));
     }
 
     async getWeekCount() {
