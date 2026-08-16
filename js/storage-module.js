@@ -19,7 +19,7 @@ import StorageService from './storage/storage-service.js';
 import { IndexedDBAdapter } from './storage/adapters/indexeddb-adapter.js';
 import { LocalStorageAdapter } from './storage/adapters/local-storage-adapter.js';
 import { SQLiteAdapter } from './storage/adapters/sqlite-adapter.js';
-import { WeekModel } from './models/week-model.js';
+import { createDefaultRoot as buildDefaultRoot } from './storage/root-data.js';
 
 const DEFAULT_STORAGE_KEY = 'fpl-team-data';
 const DEFAULT_SQLITE_BASE_URL = '/api/storage';
@@ -39,13 +39,7 @@ const DEFAULT_ADAPTER_FACTORIES = {
 const DEFAULT_SERVICE_FACTORY = (adapter) => new StorageService(adapter);
 
 export function createDefaultRoot() {
-  return {
-    version: '2.0',
-    currentWeek: 1,
-    weeks: {
-      1: WeekModel.createDefault(1)
-    }
-  };
+  return buildDefaultRoot();
 }
 
 export function createStorageService(options = {}) {

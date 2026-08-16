@@ -1,6 +1,8 @@
 import { WeekModel } from '../../models/week-model.js';
+import { ROOT_VERSION, normalizeRootMetadata, normalizeRootWeeks } from '../root-data.js';
+import { BaseStorageAdapter } from './base-storage-adapter.js';
 
-export class IndexedDBAdapter {
+export class IndexedDBAdapter extends BaseStorageAdapter {
   constructor(options = {}) {
     const {
       dbName = 'fpl2025',
@@ -8,9 +10,9 @@ export class IndexedDBAdapter {
       storageKey = 'fpl-team-data'
     } = options;
 
+    super({ storageKey });
     this.dbName = dbName;
     this.dbVersion = dbVersion;
-    this.storageKey = storageKey;
     this._seedPromise = null;
     this._resolveDbReady = null;
     this._rejectDbReady = null;
@@ -21,15 +23,21 @@ export class IndexedDBAdapter {
     this.initialized = this.initDB();
   }
 
-  async _getStoreItemDirect(storeName, key) {
+  /**
+   * Runs a read-only IndexedDB request and resolves with its result.
+   *
+   * `awaitInitialized` is skipped by seeding, which runs as part of initialization
+   * and would otherwise deadlock on itself.
+   */
+  async _readRequest(storeName, buildRequest, errorMessage, { awaitInitialized = true } = {}) {
+    if (awaitInitialized) await this.initialized;
     await this.dbReady;
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(storeName, 'readonly');
-      const store = tx.objectStore(storeName);
-      const request = store.get(key);
+      const store = this.db.transaction(storeName, 'readonly').objectStore(storeName);
+      const request = buildRequest(store);
 
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(new Error(`Error getting ${key} from ${storeName}`));
+      request.onerror = () => reject(new Error(errorMessage));
     });
   }
 
@@ -79,14 +87,14 @@ export class IndexedDBAdapter {
 
   async _seedDatabaseIfNeeded() {
     await this.dbReady;
-    const rootData = await this._getStoreItemDirect('root', 'singleton');
+    const rootData = await this._getStoreItem('root', 'singleton', { awaitInitialized: false });
     if (rootData) return;
     
     const tx = this.db.transaction(['root', 'weeks'], 'readwrite');
     
     tx.objectStore('root').put({
       id: 'singleton',
-      version: '2.0',
+      version: ROOT_VERSION,
       currentWeek: 1
     });
     
@@ -107,50 +115,37 @@ export class IndexedDBAdapter {
     });
   }
 
-  async _getStoreItem(storeName, key) {
-    await this.initialized;
-    await this.dbReady;
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(storeName, 'readonly');
-      const store = tx.objectStore(storeName);
-      const request = store.get(key);
-      
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(new Error(`Error getting ${key} from ${storeName}`));
-    });
+  async _getStoreItem(storeName, key, options) {
+    return this._readRequest(
+      storeName,
+      (store) => store.get(key),
+      `Error getting ${key} from ${storeName}`,
+      options
+    );
   }
 
-  async _getAllStoreItems(storeName) {
-    await this.initialized;
-    await this.dbReady;
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(storeName, 'readonly');
-      const store = tx.objectStore(storeName);
-      const request = store.getAll();
-      
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(new Error(`Error getting all from ${storeName}`));
-    });
+  async _getAllStoreItems(storeName, options) {
+    return this._readRequest(
+      storeName,
+      (store) => store.getAll(),
+      `Error getting all from ${storeName}`,
+      options
+    );
   }
 
-  async _getByIndex(storeName, indexName, key) {
-    await this.initialized;
-    await this.dbReady;
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(storeName, 'readonly');
-      const store = tx.objectStore(storeName);
-      const index = store.index(indexName);
-      const request = index.getAll(key);
-      
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(new Error(`Error getting by index ${indexName} from ${storeName}`));
-    });
+  async _getByIndex(storeName, indexName, key, options) {
+    return this._readRequest(
+      storeName,
+      (store) => store.index(indexName).getAll(key),
+      `Error getting by index ${indexName} from ${storeName}`,
+      options
+    );
   }
 
   async loadFromStorage() {
     await this.initialized;
     
-    const root = await this._getStoreItem('root', 'singleton') || { version: '2.0', currentWeek: 1 };
+    const root = await this._getStoreItem('root', 'singleton') || { version: ROOT_VERSION, currentWeek: 1 };
     const weekRows = await this._getAllStoreItems('weeks');
     const weeks = {};
     
@@ -193,7 +188,7 @@ export class IndexedDBAdapter {
       
       tx.objectStore('root').put({
         id: 'singleton',
-        version: '2.0',
+        version: ROOT_VERSION,
         currentWeek
       });
       
@@ -221,14 +216,9 @@ export class IndexedDBAdapter {
   async getRootData() {
     const root = await this.loadFromStorage();
     if (!root || typeof root !== 'object') {
-      return { version: '2.0', currentWeek: 1, weeks: {} };
+      return { version: ROOT_VERSION, currentWeek: 1, weeks: {} };
     }
-    root.weeks = root.weeks || {};
-    root.currentWeek = Number.isInteger(root.currentWeek) && root.currentWeek > 0
-      ? root.currentWeek
-      : 1;
-    root.version = root.version || '2.0';
-    return root;
+    return Object.assign(root, normalizeRootMetadata(root), { weeks: root.weeks || {} });
   }
 
   async setRootData(root) {
@@ -238,16 +228,11 @@ export class IndexedDBAdapter {
       throw new TypeError('Root payload must be an object for IndexedDB storage');
     }
 
-    const normalizedRoot = { ...root };
-    normalizedRoot.version = root.version || '2.0';
-    normalizedRoot.currentWeek = Number.isInteger(root.currentWeek) && root.currentWeek > 0 ? root.currentWeek : 1;
-    normalizedRoot.weeks = Object.entries(root.weeks || {}).reduce((acc, [key, value]) => {
-        const weekNumber = Number(key);
-        if (Number.isInteger(weekNumber) && weekNumber > 0) {
-            acc[weekNumber] = WeekModel.normalize(value, weekNumber);
-        }
-        return acc;
-    }, {});
+    const normalizedRoot = {
+      ...root,
+      ...normalizeRootMetadata(root),
+      weeks: normalizeRootWeeks(root.weeks)
+    };
 
     return new Promise((resolve, reject) => {
         const tx = this.db.transaction(['root', 'weeks', 'teamMembers'], 'readwrite');
@@ -291,18 +276,5 @@ export class IndexedDBAdapter {
       this.db.close();
       this.db = null;
     }
-  }
-
-  // Legacy KV facade support
-  async getItem(key) {
-    if (key !== this.storageKey) return null;
-    const root = await this.getRootData();
-    return JSON.stringify(root);
-  }
-
-  async setItem(key, value) {
-    if (key !== this.storageKey) return;
-    const payload = typeof value === 'string' ? JSON.parse(value) : value;
-    return this.setRootData(payload);
   }
 }
