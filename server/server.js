@@ -17,6 +17,9 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
+// Serve static files from the root directory
+app.use(express.static(path.resolve(__dirname, '..')));
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
