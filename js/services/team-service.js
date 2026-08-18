@@ -104,6 +104,55 @@ class TeamService {
   getFplEntryId(root) {
     return root.settings?.fplEntryId || this.getPrimaryTeam(root)?.fplEntryId || null;
   }
+
+  /**
+   * Validate that a team selection follows FPL rules.
+   * @param {object} team - Team with weeks and players
+   * @returns {{valid: boolean, errors: Array<string>}}
+   */
+  validateFplRules(team) {
+    const errors = [];
+    if (!team || !team.weeks || !team.currentWeek) {
+      return { valid: false, errors: ['Invalid team'] };
+    }
+
+    const week = team.weeks[team.currentWeek];
+    if (!week) {
+      return { valid: false, errors: ['Current week not found'] };
+    }
+
+    const inTeam = (week.players || []).filter((p) => p.have);
+    const totalCost = inTeam.reduce((sum, p) => sum + (Number(p.price) || 0), 0);
+
+    if (inTeam.length > 15) {
+      errors.push('Team can have at most 15 players');
+    }
+
+    const budgetLimit = 100;
+    if (totalCost > budgetLimit) {
+      errors.push(`Team cost £${totalCost}m exceeds £${budgetLimit}m budget`);
+    }
+
+    const positionCounts = inTeam.reduce((counts, p) => {
+      counts[p.position] = (counts[p.position] || 0) + 1;
+      return counts;
+    }, {});
+
+    const limits = {
+      goalkeeper: 2,
+      defence: 5,
+      midfield: 5,
+      forward: 3,
+    };
+
+    for (const [position, count] of Object.entries(positionCounts)) {
+      if (limits[position] && count > limits[position]) {
+        errors.push(`Too many ${position} players (max ${limits[position]})`);
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
 }
 
 export default TeamService;
