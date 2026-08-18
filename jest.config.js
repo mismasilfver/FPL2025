@@ -37,6 +37,7 @@ module.exports = {
   testPathIgnorePatterns: [
     '/node_modules/',
     '/__tests__/fixtures/',
+    '/__tests__/e2e/',
     'test-utils.js',
     'test-helpers.js',
     'alert-test-helpers.js',
