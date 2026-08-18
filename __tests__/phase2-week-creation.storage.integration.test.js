@@ -68,7 +68,7 @@ describe('Phase 2: Week creation persists correct v2 structures', () => {
     expect(raw).toBeTruthy();
     const data = JSON.parse(raw);
 
-    expect(data.version).toBe('2.0');
+    expect(data.version).toBe('3.0');
     expect(data.currentWeek).toBe(2);
 
     const w1 = data.weeks['1'] || data.weeks[1];

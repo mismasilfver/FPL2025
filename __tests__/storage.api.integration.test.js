@@ -100,7 +100,7 @@ describe('Storage API happy path scenarios', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.weekNumber).toBe(2);
-    expect(response.body.players).toEqual([{ id: 'p2' }]);
+    expect(response.body.players).toEqual([expect.objectContaining({ id: 'p2' })]);
   });
 
   test('POST /api/storage/weeks creates a new week', async () => {

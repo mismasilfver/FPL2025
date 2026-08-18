@@ -157,8 +157,8 @@ describe('Storage backend contract harness', () => {
     try {
       const root = await service.getRootData();
       expect(root).toBeDefined();
-      const version = root.version ?? '2.0';
-      expect(version).toBe('2.0');
+      const version = root.version ?? '3.0';
+      expect(version).toBe('3.0');
       expect(root.currentWeek).toBeGreaterThan(0);
       expect(root.weeks).toBeDefined();
 

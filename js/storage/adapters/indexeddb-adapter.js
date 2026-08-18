@@ -86,7 +86,7 @@ export class IndexedDBAdapter {
     
     tx.objectStore('root').put({
       id: 'singleton',
-      version: '2.0',
+      version: '3.0',
       currentWeek: 1
     });
     
@@ -150,7 +150,7 @@ export class IndexedDBAdapter {
   async loadFromStorage() {
     await this.initialized;
     
-    const root = await this._getStoreItem('root', 'singleton') || { version: '2.0', currentWeek: 1 };
+    const root = await this._getStoreItem('root', 'singleton') || { version: '3.0', currentWeek: 1 };
     const weekRows = await this._getAllStoreItems('weeks');
     const weeks = {};
     
@@ -193,7 +193,7 @@ export class IndexedDBAdapter {
       
       tx.objectStore('root').put({
         id: 'singleton',
-        version: '2.0',
+        version: '3.0',
         currentWeek
       });
       
@@ -221,13 +221,13 @@ export class IndexedDBAdapter {
   async getRootData() {
     const root = await this.loadFromStorage();
     if (!root || typeof root !== 'object') {
-      return { version: '2.0', currentWeek: 1, weeks: {} };
+      return { version: '3.0', currentWeek: 1, weeks: {} };
     }
     root.weeks = root.weeks || {};
     root.currentWeek = Number.isInteger(root.currentWeek) && root.currentWeek > 0
       ? root.currentWeek
       : 1;
-    root.version = root.version || '2.0';
+    root.version = root.version || '3.0';
     return root;
   }
 
@@ -239,7 +239,7 @@ export class IndexedDBAdapter {
     }
 
     const normalizedRoot = { ...root };
-    normalizedRoot.version = root.version || '2.0';
+    normalizedRoot.version = root.version || '3.0';
     normalizedRoot.currentWeek = Number.isInteger(root.currentWeek) && root.currentWeek > 0 ? root.currentWeek : 1;
     normalizedRoot.weeks = Object.entries(root.weeks || {}).reduce((acc, [key, value]) => {
         const weekNumber = Number(key);
