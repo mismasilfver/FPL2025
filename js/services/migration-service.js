@@ -27,12 +27,13 @@ export class MigrationService {
    */
   migrateV1ToV2(v1Data) {
     const legacyWeek = Number(v1Data.week) || 1;
+    const players = this._ensureFplFields(v1Data.players || []);
     const migrated = {
-      version: '2.0',
+      version: '3.0',
       currentWeek: legacyWeek,
       weeks: {
         [legacyWeek]: {
-          players: Array.isArray(v1Data.players) ? v1Data.players : [],
+          players,
           captain: v1Data.captain || null,
           viceCaptain: v1Data.viceCaptain || null,
           isReadOnly: false
@@ -49,9 +50,13 @@ export class MigrationService {
    */
   needsFieldPopulation(week) {
     if (!week || typeof week !== 'object') return false;
-    return !Array.isArray(week.teamMembers) || 
-           !week.teamStats || 
-           typeof week.totalTeamCost === 'undefined';
+    if (!Array.isArray(week.teamMembers) ||
+        !week.teamStats ||
+        typeof week.totalTeamCost === 'undefined') {
+      return true;
+    }
+    const players = week.players || [];
+    return players.some((p) => typeof p.fplId === 'undefined');
   }
 
   /**
@@ -59,6 +64,18 @@ export class MigrationService {
    * @param {Array} players - Players array
    * @returns {object} Computed snapshot with teamMembers, teamStats, totalTeamCost
    */
+  _ensureFplFields(players) {
+    return (players || []).map((player) => ({
+      ...player,
+      fplId: player.fplId ?? '',
+      nowCostTenths: Number(player.nowCostTenths) || 0,
+      totalPoints: Number(player.totalPoints) || 0,
+      eventPoints: Number(player.eventPoints) || 0,
+      form: Number(player.form) || 0,
+      availability: player.availability ?? 'unknown',
+    }));
+  }
+
   _computeTeamSnapshot(players) {
     const teamMembers = (players || [])
       .filter(p => p.have)
@@ -94,23 +111,31 @@ export class MigrationService {
     if (!week || !this.needsFieldPopulation(week)) {
       // Still check version
       if (!root.version) {
-        root.version = '2.0';
+        root.version = '3.0';
+        return { ...root, _mutated: true };
+      }
+      if (root.version === '2.0') {
+        root.version = '3.0';
         return { ...root, _mutated: true };
       }
       return { ...root, _mutated: false };
     }
 
-    const snapshot = this._computeTeamSnapshot(week.players || []);
-    
+    const players = this._ensureFplFields(week.players || []);
+    const snapshot = this._computeTeamSnapshot(players);
+
     root.weeks[wn] = {
       ...week,
+      players,
       teamMembers: snapshot.teamMembers,
       teamStats: snapshot.teamStats,
       totalTeamCost: snapshot.totalTeamCost
     };
 
     if (!root.version) {
-      root.version = '2.0';
+      root.version = '3.0';
+    } else if (root.version === '2.0') {
+      root.version = '3.0';
     }
 
     return { ...root, _mutated: true };
@@ -125,7 +150,7 @@ export class MigrationService {
     // Handle null/undefined
     if (!data || typeof data !== 'object') {
       return {
-        version: '2.0',
+        version: '3.0',
         currentWeek: 1,
         weeks: {
           1: WeekModel.createDefault(1)
