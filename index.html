@@ -33,6 +33,8 @@
             <div class="team-summary">
                 <span id="team-count">In Team: 0/15</span>
                 <span id="total-value">Total Value: £0.0m</span>
+                <span id="total-points-display">Total Points: 0</span>
+                <span id="gw-points-display">GW Points: 0</span>
             </div>
             <div class="week-controls" data-testid="week-controls">
                 <button id="prev-week-btn" class="btn btn-secondary" data-testid="prev-week-btn" aria-label="Previous week">◀ Prev</button>
@@ -55,6 +57,22 @@
                         <li role="option" data-backend="indexeddb">IndexedDB</li>
                         <li role="option" data-backend="sqlite">SQLite</li>
                     </ul>
+                </div>
+            </div>
+
+            <div class="fpl-controls" data-testid="fpl-controls">
+                <div class="team-selector" data-testid="team-selector">
+                    <label for="team-select">Team:</label>
+                    <select id="team-select" data-testid="team-select">
+                        <option value="default">Primary Team</option>
+                    </select>
+                    <button id="add-team-btn" class="btn btn-secondary" data-testid="add-team-btn" type="button">+ Team</button>
+                </div>
+                <div class="fpl-settings" data-testid="fpl-settings">
+                    <label for="fpl-entry-id">FPL ID:</label>
+                    <input type="text" id="fpl-entry-id" data-testid="fpl-entry-id" placeholder="Enter FPL entry ID" size="12">
+                    <button id="save-fpl-id-btn" class="btn btn-secondary" data-testid="save-fpl-id-btn" type="button">Save</button>
+                    <button id="sync-btn" class="btn btn-primary" data-testid="sync-btn" type="button">SYNC</button>
                 </div>
             </div>
         </header>
@@ -103,6 +121,8 @@
                         <th data-testid="column-position">Position</th>
                         <th data-testid="column-team">Team</th>
                         <th data-testid="column-price">Price (£m)</th>
+                        <th data-testid="column-total-points">Total Pts</th>
+                        <th data-testid="column-gw-points">GW Pts</th>
                         <th data-testid="column-status">Status</th>
                         <th data-testid="column-have">Have</th>
                         <th data-testid="column-captain">Captain</th>
@@ -124,6 +144,8 @@
                 <td class="col-position"></td>
                 <td class="col-team"></td>
                 <td class="col-price"></td>
+                <td class="col-total-points"></td>
+                <td class="col-gw-points"></td>
                 <td class="col-status"></td>
                 <td class="col-have"></td>
                 <td class="col-captain"></td>
