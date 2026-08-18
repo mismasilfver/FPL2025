@@ -63,7 +63,7 @@ describe('MigrationService', () => {
 
       const migrated = service.migrateV1ToV2(v1Data);
 
-      expect(migrated.version).toBe('2.0');
+      expect(migrated.version).toBe('3.0');
       expect(migrated.currentWeek).toBe(3);
       expect(migrated.weeks[3]).toBeDefined();
       expect(migrated.weeks[3].players).toHaveLength(2);
@@ -193,7 +193,7 @@ describe('MigrationService', () => {
 
     it('should not mark as mutated if no changes needed', () => {
       const root = {
-        version: '2.0',
+        version: '3.0',
         currentWeek: 1,
         weeks: {
           1: {
@@ -229,8 +229,36 @@ describe('MigrationService', () => {
 
       const result = service.populateMissingFields(root, 1);
 
-      expect(result.version).toBe('2.0');
+      expect(result.version).toBe('3.0');
       expect(result._mutated).toBe(true);
+    });
+
+    it('should add missing FPL metadata fields to existing players', () => {
+      const root = {
+        version: '2.0',
+        currentWeek: 1,
+        weeks: {
+          1: {
+            players: [{ id: 'p1', name: 'Player 1', have: true, price: 10 }],
+            captain: null,
+            viceCaptain: null,
+            teamMembers: [],
+            teamStats: { totalValue: 0, playerCount: 0 },
+            totalTeamCost: 0,
+            isReadOnly: false
+          }
+        }
+      };
+
+      const result = service.populateMissingFields(root, 1);
+      const player = result.weeks[1].players[0];
+
+      expect(player.fplId).toBe('');
+      expect(player.nowCostTenths).toBe(0);
+      expect(player.totalPoints).toBe(0);
+      expect(player.eventPoints).toBe(0);
+      expect(player.form).toBe(0);
+      expect(player.availability).toBe('unknown');
     });
   });
 
@@ -245,7 +273,7 @@ describe('MigrationService', () => {
 
       const result = service.migrateIfNeeded(v1Data);
 
-      expect(result.version).toBe('2.0');
+      expect(result.version).toBe('3.0');
       expect(result.weeks).toBeDefined();
     });
 
@@ -264,14 +292,14 @@ describe('MigrationService', () => {
 
       const result = service.migrateIfNeeded(v2Data);
 
-      expect(result.version).toBe('2.0');
+      expect(result.version).toBe('3.0');
       expect(result.weeks[1].teamMembers).toBeDefined();
       expect(result.weeks[1].teamStats).toBeDefined();
     });
 
     it('should return data unchanged if no migration needed', () => {
       const completeData = {
-        version: '2.0',
+        version: '3.0',
         currentWeek: 1,
         weeks: {
           1: {
