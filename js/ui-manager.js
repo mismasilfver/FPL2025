@@ -22,7 +22,8 @@ export default class UIManager {
         const {
             onAddPlayer, onModalClose, onFormSubmit, onPositionFilterChange,
             onHaveFilterChange, onPrevWeek, onNextWeek, onCreateWeek, onExportWeek,
-            onEscapeKey, onToggleHave, onEdit, onDelete, onMakeCaptain, onMakeViceCaptain
+            onEscapeKey, onToggleHave, onEdit, onDelete, onMakeCaptain, onMakeViceCaptain,
+            onSaveFplId, onSync, onAddTeam, onTeamChange
         } = handlers;
 
         if (!this._boundGlobal) {
@@ -53,6 +54,26 @@ export default class UIManager {
             this.exportWeekBtn?.addEventListener('click', () => {
                 this._logButtonClick('export-week');
                 onExportWeek?.();
+            });
+
+            this.saveFplIdBtn?.addEventListener('click', () => {
+                this._logButtonClick('save-fpl-id');
+                onSaveFplId?.(this.fplEntryIdInput?.value || '');
+            });
+
+            this.syncBtn?.addEventListener('click', () => {
+                this._logButtonClick('sync');
+                onSync?.();
+            });
+
+            this.addTeamBtn?.addEventListener('click', () => {
+                this._logButtonClick('add-team');
+                onAddTeam?.();
+            });
+
+            this.teamSelect?.addEventListener('change', () => {
+                this._logButtonClick('team-change');
+                onTeamChange?.(this.teamSelect?.value);
             });
 
             if (this.playersTbody) {
@@ -123,8 +144,15 @@ export default class UIManager {
         this.exportWeekBtn = doc.getElementById('export-week-btn');
         this.teamCount = doc.getElementById('team-count');
         this.totalValue = doc.getElementById('total-value');
+        this.totalPointsDisplay = doc.getElementById('total-points-display');
+        this.gwPointsDisplay = doc.getElementById('gw-points-display');
         this.captainInfo = doc.getElementById('captain-info');
         this.viceCaptainInfo = doc.getElementById('vice-captain-info');
+        this.fplEntryIdInput = doc.getElementById('fpl-entry-id');
+        this.saveFplIdBtn = doc.getElementById('save-fpl-id-btn');
+        this.syncBtn = doc.getElementById('sync-btn');
+        this.teamSelect = doc.getElementById('team-select');
+        this.addTeamBtn = doc.getElementById('add-team-btn');
         
         
         if (DEBUG) console.log('initElements - prevWeekBtn found:', !!this.prevWeekBtn);
@@ -256,12 +284,30 @@ export default class UIManager {
         return text.substring(0, maxLength) + '...';
     }
 
-    renderSummary(players) {
+    renderSummary(players, { totalPoints = 0, gwPoints = 0 } = {}) {
         const teamPlayers = (players || []).filter(p => p.have);
         const teamCount = teamPlayers.length;
         const totalValue = teamPlayers.reduce((sum, p) => sum + (Number(p.price) || 0), 0);
         if (this.teamCount) this.teamCount.textContent = `In Team: ${teamCount}/15`;
         if (this.totalValue) this.totalValue.textContent = `Total Value: £${totalValue.toFixed(1)}m`;
+        if (this.totalPointsDisplay) this.totalPointsDisplay.textContent = `Total Points: ${totalPoints}`;
+        if (this.gwPointsDisplay) this.gwPointsDisplay.textContent = `GW Points: ${gwPoints}`;
+    }
+
+    renderFplEntryId(entryId) {
+        if (this.fplEntryIdInput) this.fplEntryIdInput.value = entryId || '';
+    }
+
+    renderTeamSelector(teams, currentTeam) {
+        if (!this.teamSelect || !teams) return;
+        this.teamSelect.innerHTML = '';
+        Object.values(teams).forEach((team) => {
+            const option = this.document.createElement('option');
+            option.value = team.id;
+            option.textContent = team.name;
+            if (team.id === currentTeam) option.selected = true;
+            this.teamSelect.appendChild(option);
+        });
     }
 
     renderCaptaincyInfo(players, captainId, viceCaptainId) {
@@ -339,6 +385,12 @@ export default class UIManager {
 
         const priceCell = row.querySelector('.col-price');
         if (priceCell) priceCell.textContent = `£${Number(player.price).toFixed(1)}m`;
+
+        const totalPointsCell = row.querySelector('.col-total-points');
+        if (totalPointsCell) totalPointsCell.textContent = Number(player.totalPoints) || 0;
+
+        const gwPointsCell = row.querySelector('.col-gw-points');
+        if (gwPointsCell) gwPointsCell.textContent = Number(player.eventPoints) || 0;
 
         const statusCell = row.querySelector('.col-status');
         if (statusCell) {
