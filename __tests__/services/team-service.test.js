@@ -106,4 +106,52 @@ describe('TeamService', () => {
       expect(updatedRoot.teams.default.fplEntryId).toBe('12345');
     });
   });
+
+  describe('validateFplRules', () => {
+    it('should pass for an empty team', () => {
+      const team = rootData.teams.default;
+      const result = service.validateFplRules(team);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should fail when team has more than 15 players', () => {
+      const team = rootData.teams.default;
+      team.weeks[1].players = Array.from({ length: 16 }, (_, i) => ({
+        id: `p${i}`,
+        name: `Player ${i}`,
+        position: 'midfield',
+        team: 'A',
+        price: 5,
+        have: true,
+      }));
+      const result = service.validateFplRules(team);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Team can have at most 15 players');
+    });
+
+    it('should fail when team exceeds budget', () => {
+      const team = rootData.teams.default;
+      team.weeks[1].players = [
+        { id: 'p1', name: 'P1', position: 'midfield', team: 'A', price: 120, have: true },
+      ];
+      const result = service.validateFplRules(team);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Team cost £120m exceeds £100m budget');
+    });
+
+    it('should fail with too many players in one position', () => {
+      const team = rootData.teams.default;
+      team.weeks[1].players = Array.from({ length: 6 }, (_, i) => ({
+        id: `d${i}`,
+        name: `Defender ${i}`,
+        position: 'defence',
+        team: 'A',
+        price: 5,
+        have: true,
+      }));
+      const result = service.validateFplRules(team);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Too many defence players (max 5)');
+    });
+  });
 });
