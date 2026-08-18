@@ -4,6 +4,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 
 const { initializeSchema } = require('./database');
+const { createCorsOptions } = require('./security');
 const storageRouter = require('./routes/storage');
 const fplRouter = require('./routes/fpl');
 
@@ -13,8 +14,12 @@ dotenv.config({ path: envPath, override: true });
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+// The storage API has no authentication, so bind to loopback unless the
+// operator explicitly opts into exposing it on the network.
+const HOST = process.env.HOST || '127.0.0.1';
 
-app.use(cors());
+app.disable('x-powered-by');
+app.use(cors(createCorsOptions()));
 app.use(express.json({ limit: '1mb' }));
 
 // Serve static files from the root directory
@@ -29,8 +34,9 @@ app.use('/api/fpl', fplRouter);
 
 function startServer(port = PORT, options = {}) {
   initializeSchema(options);
-  return app.listen(port, () => {
-    console.log(`SQLite storage server running on http://localhost:${port}`);
+  const host = options.host || HOST;
+  return app.listen(port, host, () => {
+    console.log(`SQLite storage server running on http://${host}:${port}`);
   });
 }
 
