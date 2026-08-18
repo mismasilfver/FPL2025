@@ -191,7 +191,7 @@ describe('Storage Adapter Contract', () => {
       const retrieved = await service.getRootData();
       
       expect(retrieved.currentWeek).toBe(999);
-      expect(retrieved.version).toBe('2.0');
+      expect(retrieved.version).toBe('3.0');
     });
 
     it('setItem followed by getItem returns same value for storageKey', async () => {

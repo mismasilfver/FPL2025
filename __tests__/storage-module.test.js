@@ -71,7 +71,7 @@ describe('Storage Module', () => {
     test('produces expected initial structure', () => {
       const root = createDefaultRoot();
       expect(root).toMatchObject({
-        version: '2.0',
+        version: '3.0',
         currentWeek: 1,
       });
       expect(root.weeks['1']).toBeDefined();
