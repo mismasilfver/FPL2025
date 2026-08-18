@@ -46,10 +46,10 @@ describe('Phase 2: Week creation persists correct v2 structures', () => {
     }
 
     // Create week 2
-    userEvent.click(document.getElementById('create-week-btn'), window);
-    
+    await window.fplManager.createNewWeek();
+
     // Wait for async operations to complete
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 20));
 
     // Now modify week 2 slightly so totals change only for week 2
     if (p1) {
@@ -68,11 +68,13 @@ describe('Phase 2: Week creation persists correct v2 structures', () => {
     expect(raw).toBeTruthy();
     const data = JSON.parse(raw);
 
-    expect(data.version).toBe('3.0');
-    expect(data.currentWeek).toBe(2);
+    expect(data.version).toBe('3.1');
+    expect(data.currentTeam).toBe('default');
+    expect(data.teams.default.currentWeek).toBe(2);
 
-    const w1 = data.weeks['1'] || data.weeks[1];
-    const w2 = data.weeks['2'] || data.weeks[2];
+    const weeks = data.teams.default.weeks;
+    const w1 = weeks['1'] || weeks[1];
+    const w2 = weeks['2'] || weeks[2];
 
     // Minimal teamMembers shape
     const hasMinimalShape = (arr) => Array.isArray(arr) && arr.every(m => {
@@ -115,12 +117,12 @@ describe('Phase 2: Week creation persists correct v2 structures', () => {
     const r1 = currentWeekData.players.find(p => p.name === 'R1');
 
     // Create week 2
-    userEvent.click(document.getElementById('create-week-btn'), window);
+    await window.fplManager.createNewWeek();
 
     // Go back to week 1 and attempt to edit (should be blocked by UI in practice)
-    userEvent.click(document.getElementById('prev-week-btn'), window);
+    await window.fplManager.prevWeek();
     // Wait for async navigation to settle
-    await new Promise(resolve => setTimeout(resolve, 30));
+    await new Promise(resolve => setTimeout(resolve, 20));
     
     // Attempt to update price while on week 1 (read-only) - should be blocked
     if (r1) {
@@ -136,10 +138,11 @@ describe('Phase 2: Week creation persists correct v2 structures', () => {
     expect(raw).toBeTruthy();
     const data = JSON.parse(raw);
     expect(data).toBeTruthy();
-    expect(data.weeks).toBeTruthy();
-    
-    const w1 = data.weeks['1'] || data.weeks[1];
-    const w2 = data.weeks['2'] || data.weeks[2];
+    expect(data.teams).toBeTruthy();
+
+    const weeks = data.teams.default.weeks;
+    const w1 = weeks['1'] || weeks[1];
+    const w2 = weeks['2'] || weeks[2];
 
     expect(w1.totalTeamCost).toBeCloseTo(6, 5);
     expect(w2.totalTeamCost).toBeCloseTo(6, 5); // unchanged since we didn't edit w2
