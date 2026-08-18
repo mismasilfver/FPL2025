@@ -32,6 +32,29 @@ describe('PlayerService', () => {
       expect(players).toHaveLength(1);
       expect(players[0].name).toBe('New Player');
     });
+
+    it('should preserve FPL metadata when adding a player', async () => {
+      const playerData = {
+        name: 'Haaland',
+        fplId: '123',
+        position: 'forward',
+        team: 'Man City',
+        price: 12.5,
+        nowCostTenths: 125,
+        totalPoints: 162,
+        eventPoints: 8,
+        form: 6.5,
+        availability: 'available',
+      };
+      const updatedRoot = await playerService.addPlayer(rootData, playerData);
+      const player = updatedRoot.weeks[1].players[0];
+      expect(player.fplId).toBe('123');
+      expect(player.nowCostTenths).toBe(125);
+      expect(player.totalPoints).toBe(162);
+      expect(player.eventPoints).toBe(8);
+      expect(player.form).toBe(6.5);
+      expect(player.availability).toBe('available');
+    });
   });
 
   describe('updatePlayer', () => {
@@ -41,6 +64,17 @@ describe('PlayerService', () => {
       const updatedRoot = await playerService.updatePlayer(rootData, '1', updatedPlayerData);
       const player = updatedRoot.weeks[1].players[0];
       expect(player.name).toBe('Player 1 Updated');
+    });
+
+    it('should update FPL metadata on existing player', async () => {
+      rootData.weeks[1].players.push({ id: '1', name: 'Player 1', totalPoints: 0 });
+      const updatedPlayerData = { totalPoints: 42, eventPoints: 7, price: 5.0, nowCostTenths: 50 };
+      const updatedRoot = await playerService.updatePlayer(rootData, '1', updatedPlayerData);
+      const player = updatedRoot.weeks[1].players[0];
+      expect(player.totalPoints).toBe(42);
+      expect(player.eventPoints).toBe(7);
+      expect(player.price).toBe(5.0);
+      expect(player.nowCostTenths).toBe(50);
     });
   });
 
