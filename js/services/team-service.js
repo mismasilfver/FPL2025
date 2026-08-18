@@ -18,6 +18,35 @@ function createDefaultTeam(id, name, type = 'whatif') {
 }
 
 /**
+ * Resolve the currently active team from a root object.
+ * Supports legacy single-team roots (no `teams` property) for backward compatibility.
+ * @param {object} root
+ * @returns {object|null}
+ */
+export function getActiveTeam(root) {
+  if (!root) return null;
+  if (root.teams) {
+    const currentTeamId = root.currentTeam || Object.keys(root.teams)[0];
+    return root.teams[currentTeamId] || null;
+  }
+  if (root.weeks) {
+    return root;
+  }
+  return null;
+}
+
+/**
+ * Resolve the currently active week from a root object.
+ * @param {object} root
+ * @returns {object}
+ */
+export function getActiveWeek(root) {
+  const team = getActiveTeam(root);
+  if (!team || !team.weeks || !team.currentWeek) return {};
+  return team.weeks[team.currentWeek] || {};
+}
+
+/**
  * Service for managing multiple teams (one primary + what-if teams).
  */
 class TeamService {
