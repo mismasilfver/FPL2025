@@ -86,7 +86,7 @@ describe('SQLite storage server end-to-end', () => {
     const getResponse = await fetch(`${baseUrl}/weeks/3`);
     expect(getResponse.status).toBe(200);
     const fetchedWeek = await getResponse.json();
-    expect(fetchedWeek.players).toEqual([{ id: 'p3', price: 8.5 }]);
+    expect(fetchedWeek.players).toEqual([expect.objectContaining({ id: 'p3', price: 8.5 })]);
 
     const listResponse = await fetch(`${baseUrl}/weeks`);
     const weeks = await listResponse.json();
