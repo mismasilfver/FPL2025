@@ -47,7 +47,7 @@ export class WeekModel {
         const defaultWeek = this.createDefault(weekNumber);
         const normalized = { ...defaultWeek, ...weekData };
 
-        normalized.players = Array.isArray(weekData.players) ? weekData.players : [];
+        normalized.players = this._normalizePlayers(weekData.players);
         normalized.teamMembers = Array.isArray(weekData.teamMembers) ? weekData.teamMembers : [];
         normalized.captain = weekData.captain ?? null;
         normalized.viceCaptain = weekData.viceCaptain ?? null;
@@ -58,6 +58,24 @@ export class WeekModel {
             : { ...DEFAULT_TEAM_STATS, updatedDate: new Date().toISOString() };
 
         return normalized;
+    }
+
+    /**
+     * Normalize players to ensure FPL metadata defaults are present.
+     * @param {Array<object>|undefined} players - Raw players array
+     * @returns {Array<object>} Normalized players
+     */
+    static _normalizePlayers(players) {
+        if (!Array.isArray(players)) return [];
+        return players.map((player) => ({
+            ...player,
+            fplId: player.fplId ?? '',
+            nowCostTenths: Number(player.nowCostTenths) || 0,
+            totalPoints: Number(player.totalPoints) || 0,
+            eventPoints: Number(player.eventPoints) || 0,
+            form: Number(player.form) || 0,
+            availability: player.availability ?? 'unknown',
+        }));
     }
 
     /**

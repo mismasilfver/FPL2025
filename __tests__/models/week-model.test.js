@@ -50,7 +50,7 @@ describe('WeekModel', () => {
             const normalized = WeekModel.normalize(partialWeek, 2);
             expect(normalized).toEqual(expect.objectContaining({
                 weekNumber: 2,
-                players: [{ id: 1, name: 'Player A' }],
+                players: [expect.objectContaining({ id: 1, name: 'Player A' })],
                 captain: 1,
                 viceCaptain: null,
                 isReadOnly: false,
@@ -73,6 +73,43 @@ describe('WeekModel', () => {
             const normalized = WeekModel.normalize(week, 1);
             expect(normalized.captain).toBeNull();
             expect(normalized.viceCaptain).toBe(0);
+        });
+
+        it('should normalize FPL metadata on players', () => {
+            const week = {
+                players: [
+                    {
+                        id: '1',
+                        name: 'Raya',
+                        fplId: '1',
+                        nowCostTenths: 60,
+                        totalPoints: 162,
+                        eventPoints: 0,
+                        form: 0,
+                        availability: 'available'
+                    }
+                ]
+            };
+            const normalized = WeekModel.normalize(week, 1);
+            const player = normalized.players[0];
+            expect(player.fplId).toBe('1');
+            expect(player.nowCostTenths).toBe(60);
+            expect(player.totalPoints).toBe(162);
+            expect(player.eventPoints).toBe(0);
+            expect(player.form).toBe(0);
+            expect(player.availability).toBe('available');
+        });
+
+        it('should set default FPL metadata on players when missing', () => {
+            const week = { players: [{ id: '1', name: 'Player A' }] };
+            const normalized = WeekModel.normalize(week, 1);
+            const player = normalized.players[0];
+            expect(player.fplId).toBe('');
+            expect(player.nowCostTenths).toBe(0);
+            expect(player.totalPoints).toBe(0);
+            expect(player.eventPoints).toBe(0);
+            expect(player.form).toBe(0);
+            expect(player.availability).toBe('unknown');
         });
     });
 
