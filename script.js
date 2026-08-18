@@ -90,19 +90,19 @@ export class FPLTeamManager {
         let rootData = await this._getRootData();
 
         if (!rootData || typeof rootData !== 'object') {
-            rootData = createDefaultRoot();
+            rootData = this._migrateToTeams(createDefaultRoot());
         }
 
-        const currentWeek = await this.getCurrentWeekNumber();
-        rootData.weeks[currentWeek] = {
-            ...rootData.weeks[currentWeek],
+        const team = this.teamService.getCurrentTeam(rootData) || rootData;
+        const currentWeek = team.currentWeek || 1;
+        team.weeks[currentWeek] = {
+            ...team.weeks[currentWeek],
             players: await this.getPlayers(),
             captain: await this.getCaptainId(),
             viceCaptain: await this.getViceCaptainId(),
         };
 
-        rootData.version = rootData.version || '2.0';
-        rootData.currentWeek = await this.getCurrentWeekNumber();
+        rootData.version = rootData.version || '3.1';
 
         await this._setRootData(rootData);
     }
@@ -137,7 +137,8 @@ export class FPLTeamManager {
             return;
         }
         const root = await this._getRootData();
-        const currentWeek = root.weeks[root.currentWeek];
+        const team = this.teamService.getCurrentTeam(root);
+        const currentWeek = team.weeks[team.currentWeek];
         const player = playerId ? currentWeek.players.find(p => p.id === playerId) : null;
         this.ui.openModal(player);
     }
@@ -164,7 +165,8 @@ export class FPLTeamManager {
         };
 
         const root = await this._getRootData();
-        const currentWeek = root.weeks[root.currentWeek];
+        const team = this.teamService.getCurrentTeam(root);
+        const currentWeek = team.weeks[team.currentWeek];
         const teamSize = currentWeek.players.filter(p => p.have).length;
         const isEditing = !!this.ui.currentEditingId;
         const playerBeingEdited = isEditing ? currentWeek.players.find(p => p.id === this.ui.currentEditingId) : null;
@@ -187,8 +189,9 @@ export class FPLTeamManager {
     async addPlayer(playerData) {
         if (await this.isCurrentWeekReadOnly()) return;
         let root = await this._getRootData();
+        const team = this.teamService.getCurrentTeam(root);
         root = await this.playerService.addPlayer(root, playerData);
-        await this._ensureWeekDerivedFields(root, root.currentWeek);
+        await this._ensureWeekDerivedFields(root, team.currentWeek);
         await this._saveRootData(root);
         await this.updateDisplay();
     }
@@ -196,8 +199,9 @@ export class FPLTeamManager {
     async updatePlayer(playerId, playerData) {
         if (await this.isCurrentWeekReadOnly()) return;
         let root = await this._getRootData();
+        const team = this.teamService.getCurrentTeam(root);
         root = await this.playerService.updatePlayer(root, playerId, playerData);
-        await this._ensureWeekDerivedFields(root, root.currentWeek);
+        await this._ensureWeekDerivedFields(root, team.currentWeek);
         await this._saveRootData(root);
         await this.updateDisplay();
     }
@@ -210,8 +214,9 @@ export class FPLTeamManager {
         }
 
         let root = await this._getRootData();
+        const team = this.teamService.getCurrentTeam(root);
         root = await this.playerService.deletePlayer(root, playerId);
-        await this._ensureWeekDerivedFields(root, root.currentWeek);
+        await this._ensureWeekDerivedFields(root, team.currentWeek);
         await this._saveRootData(root);
         await this.updateDisplay();
     }
@@ -219,9 +224,10 @@ export class FPLTeamManager {
     async toggleHave(playerId) {
         if (await this.isCurrentWeekReadOnly()) return;
         let root = await this._getRootData();
+        const team = this.teamService.getCurrentTeam(root);
         try {
             root = await this.playerService.toggleHave(root, playerId);
-            await this._ensureWeekDerivedFields(root, root.currentWeek);
+            await this._ensureWeekDerivedFields(root, team.currentWeek);
             await this._saveRootData(root);
             await this.updateDisplay();
         } catch (error) {
@@ -257,19 +263,26 @@ export class FPLTeamManager {
         if (DEBUG) console.log('updateDisplay called');
         const root = await this._getRootData();
         if (DEBUG) console.log('Got root data:', root);
-        if (!root.weeks) root.weeks = {};
-        if (!root.currentWeek) root.currentWeek = 1;
-        if (!root.weeks[root.currentWeek]) {
+
+        const team = this.teamService.getCurrentTeam(root);
+        if (!team) {
+            this.ui.showAlert('No active team found.');
+            return;
+        }
+
+        if (!team.weeks) team.weeks = {};
+        if (!team.currentWeek) team.currentWeek = 1;
+        if (!team.weeks[team.currentWeek]) {
             // Initialize missing current week structure (can happen after legacy import)
-            root.weeks[root.currentWeek] = { players: [], captain: null, viceCaptain: null, isReadOnly: false };
-            await this._ensureWeekDerivedFields(root, root.currentWeek);
+            team.weeks[team.currentWeek] = { players: [], captain: null, viceCaptain: null, isReadOnly: false };
+            await this._ensureWeekDerivedFields(root, team.currentWeek);
             await this._saveRootData(root);
         }
-        const currentWeek = root.weeks[root.currentWeek];
+        const currentWeek = team.weeks[team.currentWeek];
         const players = currentWeek.players || [];
         const captainId = currentWeek.captain;
         const viceCaptainId = currentWeek.viceCaptain;
-        const weekCount = Object.keys(root.weeks).length;
+        const weekCount = Object.keys(team.weeks).length;
 
         const filters = {
             position: this.ui.positionFilter?.value || 'all',
@@ -283,12 +296,14 @@ export class FPLTeamManager {
         });
 
         this.ui.renderPlayers(filteredPlayers, { isReadOnly: currentWeek.isReadOnly, captainId, viceCaptainId });
-        const weekPoints = this.pointsService.calculateWeekPoints({ weeks: root.weeks, currentWeek: root.currentWeek }, root.currentWeek);
-        this.ui.renderSummary(players, { totalPoints: 0, gwPoints: weekPoints });
+        const weekPoints = this.pointsService.calculateWeekPoints(team, team.currentWeek);
+        const totalPoints = this.pointsService.calculateTeamTotalPoints(team).totalPoints || 0;
+        this.ui.renderSummary(players, { totalPoints, gwPoints: weekPoints });
         this.ui.renderFplEntryId(root.settings?.fplEntryId || '');
+        this.ui.renderTeamSelector(root.teams, root.currentTeam);
         this.ui.renderCaptaincyInfo(players, captainId, viceCaptainId);
-        if (DEBUG) console.log('About to call renderWeekControls with:', { currentWeek: root.currentWeek, totalWeeks: weekCount, isReadOnly: currentWeek.isReadOnly });
-        this.ui.renderWeekControls({ currentWeek: root.currentWeek, totalWeeks: weekCount, isReadOnly: currentWeek.isReadOnly });
+        if (DEBUG) console.log('About to call renderWeekControls with:', { currentWeek: team.currentWeek, totalWeeks: weekCount, isReadOnly: currentWeek.isReadOnly });
+        this.ui.renderWeekControls({ currentWeek: team.currentWeek, totalWeeks: weekCount, isReadOnly: currentWeek.isReadOnly });
     }
 
     async exportWeekData() {
@@ -328,12 +343,11 @@ export class FPLTeamManager {
                 root = await this.storage.getRootData();
             } catch (error) {
                 throw new AppError('Failed to load root data from storage service', { code: 'STORAGE_ROOT_LOAD_FAILURE', context: { originalError: error } });
-                root = null;
             }
         } else {
             const rawData = await this.storage.getItem(this.storageKey);
             if (!rawData) {
-                const defaults = createDefaultRoot();
+                const defaults = this._migrateToTeams(createDefaultRoot());
                 await this._setRootData(defaults);
                 return defaults;
             }
@@ -342,20 +356,22 @@ export class FPLTeamManager {
                 root = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
             } catch (error) {
                 throw new AppError('Failed to parse root data', { code: 'STORAGE_PARSE_FAILURE', recoverable: true, context: { originalError: error } });
-                const defaults = createDefaultRoot();
-                await this._setRootData(defaults);
-                return defaults;
             }
         }
 
         // Migrate data if needed (v1→v2, missing fields, etc.)
-        const migrated = this.migrationService.migrateIfNeeded(root);
-        
+        let data = this.migrationService.migrateIfNeeded(root);
+
+        // Ensure multi-team shape for v3 roots that are still single-team
+        if (!data.teams) {
+            data = this._migrateToTeams(data);
+        }
+
         // Save if migration produced changes
-        if (migrated !== root || migrated._mutated) {
-            delete migrated._mutated;
-            await this._setRootData(migrated);
-            return migrated;
+        if (data !== root || data._mutated) {
+            delete data._mutated;
+            await this._setRootData(data);
+            return data;
         }
 
         return root;
@@ -506,11 +522,7 @@ export class FPLTeamManager {
                 normalizedMap[normalized.fplId] = normalized;
             }
 
-            let root = await this._getRootData();
-            if (!root.teams) {
-                root = this._migrateToTeams(root);
-            }
-
+            const root = await this._getRootData();
             const team = this.teamService.getCurrentTeam(root);
             const currentWeek = team.weeks[team.currentWeek];
             const players = currentWeek.players || [];
@@ -518,6 +530,10 @@ export class FPLTeamManager {
             const updatedPlayers = this.pointsService.updatePlayerPointsFromFpl(players, normalizedMap);
             currentWeek.players = updatedPlayers;
             team.weeks[team.currentWeek] = currentWeek;
+
+            const weekPoints = this.pointsService.calculateWeekPoints(team, team.currentWeek);
+            team.gameweekPoints = this.pointsService.recordGameweekPoints(team, team.currentWeek, weekPoints).gameweekPoints;
+            team.totalPoints = this.pointsService.calculateTeamTotalPoints(team).totalPoints;
 
             await this._saveRootData(root);
             await this.updateDisplay();
@@ -568,6 +584,7 @@ export class FPLTeamManager {
             version: '3.1',
             settings: { fplEntryId: null },
             currentTeam: 'default',
+            _mutated: true,
             teams: {
                 default: {
                     id: 'default',
