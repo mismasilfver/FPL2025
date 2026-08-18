@@ -5,6 +5,9 @@ import { AppError } from './js/utils/app-error.js';
 import PlayerService from './js/services/player-service.js';
 import WeekService from './js/services/week-service.js';
 import CaptaincyService from './js/services/captaincy-service.js';
+import FplApiClient, { normalizePlayer } from './js/services/fpl-api.js';
+import PointsService from './js/services/points-service.js';
+import TeamService from './js/services/team-service.js';
 import LegacyCompatibilityLayer from './js/services/legacy-compatibility-layer.js';
 import MigrationService from './js/services/migration-service.js';
 
@@ -18,6 +21,9 @@ export class FPLTeamManager {
         this.playerService = new PlayerService(this.storage);
         this.weekService = new WeekService(this.storage);
         this.captaincyService = new CaptaincyService(this.storage);
+        this.fplApiClient = new FplApiClient();
+        this.pointsService = new PointsService();
+        this.teamService = new TeamService();
         this.legacyLayer = new LegacyCompatibilityLayer('fpl-team-data');
         this.migrationService = new MigrationService();
         this.storageKey = 'fpl-team-data';
@@ -118,6 +124,10 @@ export class FPLTeamManager {
             onDelete: (id) => this.deletePlayer(id),
             onMakeCaptain: (id) => this.setCaptain(id),
             onMakeViceCaptain: (id) => this.setViceCaptain(id),
+            onSaveFplId: (entryId) => this.saveFplEntryId(entryId),
+            onSync: () => this.syncFromFpl(),
+            onAddTeam: () => this.addWhatIfTeam(),
+            onTeamChange: (teamId) => this.switchTeam(teamId),
         });
     }
 
@@ -273,7 +283,9 @@ export class FPLTeamManager {
         });
 
         this.ui.renderPlayers(filteredPlayers, { isReadOnly: currentWeek.isReadOnly, captainId, viceCaptainId });
-        this.ui.renderSummary(players);
+        const weekPoints = this.pointsService.calculateWeekPoints({ weeks: root.weeks, currentWeek: root.currentWeek }, root.currentWeek);
+        this.ui.renderSummary(players, { totalPoints: 0, gwPoints: weekPoints });
+        this.ui.renderFplEntryId(root.settings?.fplEntryId || '');
         this.ui.renderCaptaincyInfo(players, captainId, viceCaptainId);
         if (DEBUG) console.log('About to call renderWeekControls with:', { currentWeek: root.currentWeek, totalWeeks: weekCount, isReadOnly: currentWeek.isReadOnly });
         this.ui.renderWeekControls({ currentWeek: root.currentWeek, totalWeeks: weekCount, isReadOnly: currentWeek.isReadOnly });
@@ -470,6 +482,105 @@ export class FPLTeamManager {
 
     _isReadOnlyCurrentWeek() {
         return this.legacyLayer._isReadOnlyCurrentWeek();
+    }
+
+    async saveFplEntryId(entryId) {
+        try {
+            let root = await this._getRootData();
+            root = this.teamService.setFplEntryId(root, entryId);
+            await this._saveRootData(root);
+            this.ui.showAlert(`FPL entry ID saved: ${entryId}`);
+        } catch (error) {
+            this.ui.showAlert(`Failed to save FPL ID: ${error.message}`);
+        }
+    }
+
+    async syncFromFpl() {
+        try {
+            this.ui.showAlert('Syncing with FPL...');
+            const bootstrap = await this.fplApiClient.fetchBootstrap();
+
+            const normalizedMap = {};
+            for (const element of bootstrap.elements) {
+                const normalized = normalizePlayer(element, bootstrap.teams, bootstrap.element_types);
+                normalizedMap[normalized.fplId] = normalized;
+            }
+
+            let root = await this._getRootData();
+            if (!root.teams) {
+                root = this._migrateToTeams(root);
+            }
+
+            const team = this.teamService.getCurrentTeam(root);
+            const currentWeek = team.weeks[team.currentWeek];
+            const players = currentWeek.players || [];
+
+            const updatedPlayers = this.pointsService.updatePlayerPointsFromFpl(players, normalizedMap);
+            currentWeek.players = updatedPlayers;
+            team.weeks[team.currentWeek] = currentWeek;
+
+            await this._saveRootData(root);
+            await this.updateDisplay();
+            this.ui.showAlert('Sync complete');
+        } catch (error) {
+            this.ui.showAlert(`SYNC failed: ${error.message}`);
+        }
+    }
+
+    async addWhatIfTeam() {
+        const name = prompt('Enter a name for the what-if team:');
+        if (!name) return;
+
+        try {
+            let root = await this._getRootData();
+            // Migrate root to multi-team shape if needed
+            if (!root.teams) {
+                root = this._migrateToTeams(root);
+            }
+            root = this.teamService.createTeam(root, name, 'whatif');
+            await this._saveRootData(root);
+            this.ui.renderTeamSelector(root.teams, root.currentTeam);
+            await this.updateDisplay();
+        } catch (error) {
+            this.ui.showAlert(error.message);
+        }
+    }
+
+    async switchTeam(teamId) {
+        try {
+            let root = await this._getRootData();
+            if (!root.teams) {
+                root = this._migrateToTeams(root);
+            }
+            root = this.teamService.switchTeam(root, teamId);
+            await this._saveRootData(root);
+            this.ui.renderTeamSelector(root.teams, root.currentTeam);
+            this.ui.renderFplEntryId(root.settings?.fplEntryId || '');
+            await this.updateDisplay();
+        } catch (error) {
+            this.ui.showAlert(error.message);
+        }
+    }
+
+    _migrateToTeams(root) {
+        return {
+            ...root,
+            version: '3.1',
+            settings: { fplEntryId: null },
+            currentTeam: 'default',
+            teams: {
+                default: {
+                    id: 'default',
+                    name: 'Primary Team',
+                    type: 'primary',
+                    fplEntryId: null,
+                    currentWeek: root.currentWeek,
+                    weeks: root.weeks,
+                    totalPoints: 0,
+                    gameweekPoints: {},
+                },
+            },
+        };
     }
 }
 
