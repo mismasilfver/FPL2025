@@ -4,7 +4,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { resetAppWithBackend, waitForStorageReady } from '../helpers/storage-helpers.js';
+import { clearStorage, waitForStorageReady } from '../helpers/storage-helpers.js';
 
 const STORAGE_KEY = 'fpl-team-data';
 const FPL_BOOTSTRAP_URL = 'https://fantasy.premierleague.com/api/bootstrap-static/';
@@ -92,7 +92,13 @@ function bootstrapFixture(elements) {
 
 test.describe('FPL sync and multi-team workflows', () => {
   test.beforeEach(async ({ page }) => {
-    await resetAppWithBackend(page, 'localstorage');
+    await page.goto('http://localhost:3000');
+    await page.waitForLoadState('networkidle');
+    await clearStorage(page);
+    await page.evaluate(() => localStorage.setItem('fpl-storage-backend', 'localstorage'));
+    await page.goto('http://localhost:3000');
+    await page.waitForLoadState('networkidle');
+    await waitForStorageReady(page);
   });
 
   test('saves FPL entry ID and persists it across reloads', async ({ page }) => {
