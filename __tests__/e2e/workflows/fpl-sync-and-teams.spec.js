@@ -7,7 +7,9 @@ import { test, expect } from '@playwright/test';
 import { clearStorage, waitForStorageReady } from '../helpers/storage-helpers.js';
 
 const STORAGE_KEY = 'fpl-team-data';
-const FPL_BOOTSTRAP_URL = 'https://fantasy.premierleague.com/api/bootstrap-static/';
+// The client fetches this via the app's own server-side proxy (server/routes/fpl.js)
+// rather than fantasy.premierleague.com directly, to avoid a CORS block in real browsers.
+const FPL_BOOTSTRAP_URL = '**/api/fpl/bootstrap-static';
 
 function createPlayer(id, name, fplId, overrides = {}) {
   return {

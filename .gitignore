@@ -9,3 +9,4 @@ data/
 **/coverage
 test-results/
 .devin/config.local.json
+.playwright-mcp/

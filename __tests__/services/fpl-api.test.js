@@ -22,7 +22,7 @@ describe('FplApiClient', () => {
 
       const result = await client.fetchBootstrap();
 
-      expect(fetch).toHaveBeenCalledWith('https://fantasy.premierleague.com/api/bootstrap-static/');
+      expect(fetch).toHaveBeenCalledWith('/api/fpl/bootstrap-static');
       expect(result).toEqual(mockData);
     });
 
@@ -56,7 +56,7 @@ describe('FplApiClient', () => {
 
       const result = await client.fetchEntryPicks(123, 1);
 
-      expect(fetch).toHaveBeenCalledWith('https://fantasy.premierleague.com/api/entry/123/event/1/picks/');
+      expect(fetch).toHaveBeenCalledWith('/api/fpl/entry/123/event/1/picks');
       expect(result).toEqual(mockData);
     });
 
