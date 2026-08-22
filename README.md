@@ -14,9 +14,11 @@ A simple, responsive web application to manage your Fantasy Premier League team.
 - **Responsive Design**: Works seamlessly on desktop and mobile
 - **Storage Adapters**: Data persists between sessions using a pluggable storage layer (localStorage by default, IndexedDB or SQLite optional)
 - **Position Filtering**: Filter players by position
-- **Team Summary**: Track total players (0/15) and total team value
+- **Team Summary**: Track total players (0/15), total team value, total points, and gameweek points
 - **Data Import/Export**: Export any week to JSON and import saved snapshots to keep history portable across devices
 - **Resilient Storage Selection**: Built-in health checks surface warnings and automatically fall back when a backend is unavailable
+- **Multi-Team Support**: Manage one primary team (linked to your real FPL account) plus any number of independent "what-if" teams, switchable from a dropdown
+- **FPL API Integration**: Import your real FPL squad (including captain/vice-captain) by entry ID, and refresh player points/prices from the live FPL data with one click — see [FPL API Integration](#fpl-api-integration) below
 
 ## How to Use
 
@@ -66,20 +68,48 @@ The default adapter writes to `localStorage` under `fpl-team-data` using a weekl
 }
 ```
 
-Related tests: `__tests__/weekNavigation.test.js`, `__tests__/readonlyMode.test.js`.
+Related tests: `__tests__/week-navigation.integration.test.js`, `__tests__/readonly-mode.integration.test.js`, `__tests__/e2e/workflows/week-navigation.spec.js`.
+
+## Multi-Team Support
+
+- **Primary team**: The one team that can be linked to a real FPL account via its entry ID.
+- **What-if teams**: Click `+ Team` to create additional independent teams for experimenting with different squads. Each has its own players, weeks, captain/vice-captain, and points — switching teams via the `Team:` dropdown never mixes data between teams.
+- **Managed by**: `js/services/team-service.js` (team CRUD, active-team resolution, FPL rule validation) and `js/services/team-sync-coordinator.js` (orchestrates FPL sync/import and team switching, including UI refresh and error handling).
+- **Not yet implemented**: budget (£100m) and squad composition (2 GK / 5 DEF / 5 MID / 3 FWD, max 3 players per real-world club) rule validation exists in `TeamService.validateFplRules()` but is **not currently surfaced anywhere in the UI** — a what-if team can be saved in an invalid state with no warning. See [Roadmap](#future-roadmap-ideas).
+
+## FPL API Integration
+
+The app can talk to the public Fantasy Premier League API to pull in real data, entirely on top of the manual player-management workflow above — you can use the app fully offline/manually, or link it to a real FPL account for the primary team.
+
+- **Save your FPL entry ID**: Enter your numeric FPL entry/manager ID (found in the URL when viewing your team on the official FPL site) in the `FPL ID` field and click `Save`.
+- **Import My Squad**: Fetches your actual current squad (all 15 players) and captain/vice-captain for the current gameweek from the FPL API and **replaces** the primary team's active-week player list with it. Use this to pull your real team into the app for the first time, or to re-sync after making transfers on the official site.
+- **SYNC**: Refreshes points, price, form, and availability for players **already in your list** by matching them against the live FPL bootstrap data via their FPL ID. Players added manually (without an FPL ID) are left untouched — SYNC is a metadata refresh, not a squad import (use "Import My Squad" for that).
+- **Server-side proxy required**: `fantasy.premierleague.com` does not send CORS headers, so the app cannot call it directly from browser JavaScript. All FPL requests are proxied through this app's own Express server (`server/routes/fpl.js`, mounted at `/api/fpl/*`), which forwards to the real FPL API server-side and returns the JSON to the browser. This means **SYNC and Import My Squad both require the Express server to be running** (`npm run start:server`) — they will not work if you're only opening `index.html` directly in a browser.
+- **Client**: `js/services/fpl-api.js` (`FplApiClient`) wraps `bootstrap-static` and `entry/{id}/event/{gw}/picks` and normalizes FPL's raw player data into the app's player shape.
+
+### Current limitations of the FPL integration
+
+- **Import only targets the *current* gameweek** (`getCurrentGameweek()` reads the `is_current`/`is_next` flags from FPL's bootstrap data) — there's no way to view or import a specific past gameweek's squad.
+- **No transfer tracking**: importing simply replaces the squad snapshot; the app does not track transfers in/out, transfer costs (-4 point hits), or transfer history.
+- **No FPL chips support** (Wildcard, Free Hit, Bench Boost, Triple Captain). The app's "what-if" teams are a different, app-specific concept and are not connected to real FPL chip usage.
+- **No automatic gameweek rollover tied to FPL's calendar**: the app's week numbering (`Create New Week`) is independent of the real FPL gameweek/deadline schedule, so they can drift out of sync.
+- **No budget/squad-rule validation in the UI** for what-if teams (see [Multi-Team Support](#multi-team-support) above).
+- **No caching of bootstrap data**: every SYNC or Import re-fetches the full ~700-player bootstrap dataset from FPL (via the server proxy) with no local cache or ETag support.
+- **Fully manual, one-shot sync**: there is no background/scheduled sync — you must click SYNC or Import My Squad yourself each time you want fresh data.
+- **No live/provisional bonus points, price-change history, fixture difficulty ratings, or mini-league/rank data.**
 
 ## Storage Architecture
 
-- **Adapter contract**: `js/adapters/database-adapter.contract.js` defines the required async API.
-- **Local adapter**: `js/adapters/local-storage-adapter.js` wraps `window.localStorage` and satisfies the contract.
-- **IndexedDB adapter**: `js/adapters/indexeddb-adapter.js` provides an IndexedDB-backed implementation.
-- **SQLite adapter**: `js/adapters/sqlite-adapter.js` speaks to the local Express/SQLite API for fully offline durability.
-- **Feature flag**: Toggle `window.USE_INDEXED_DB` in `index.html` to switch between adapters at runtime.
+- **Adapter contract**: `js/storage/adapters/database-adapter.contract.js` defines the required async API (`getRootData`/`setRootData`/legacy `getItem`/`setItem`).
+- **Local adapter**: `js/storage/adapters/local-storage-adapter.js` wraps `window.localStorage` and satisfies the contract.
+- **IndexedDB adapter**: `js/storage/adapters/indexeddb-adapter.js` persists the full root payload (including the multi-team `teams`/`currentTeam`/`settings` shape) as a JSON blob, with legacy per-week object stores kept in sync only for backward-compatible single-team roots.
+- **SQLite adapter**: `js/storage/adapters/sqlite-adapter.js` speaks to the local Express/SQLite API (`server/routes/storage.js` + `server/database.js`) for fully offline durability.
+- **Backend selection**: Chosen via the storage dropdown in the header (persisted to `localStorage` under `fpl-storage-backend`) or the `npm run use:*` scripts below, resolved case-insensitively at startup by the inline bootstrap script in `index.html`.
 - **App initializer**: `js/app-init.js` negotiates storage availability, applies async patches, raises diagnostics, and updates the UI indicator.
-- **High-level services**: `js/storage.js`, `js/storage-db.js`, and `js/storage-module.js` orchestrate week persistence on top of the adapter layer.
-- **Adapter contract tests**: `__tests__/database.test.js` runs the same suite against every registered adapter, ensuring consistent behaviour across the low-level key/value layer.
-- **Storage service contract tests** *(new)*: `__tests__/storage-contract.test.js` exercises the high-level storage facade (localStorage, IndexedDB, SQLite) with shared happy-path and defensive scenarios. Run with `npm test -- __tests__/storage-contract.test.js` to verify the three-backend flow end-to-end.
-- **Further reading**: `docs/storage-adapters.md` provides a deeper dive into the adapter contract and how to extend it.
+- **High-level services**: `js/storage-module.js` (backend factory + `createDefaultRoot`) and `js/storage/storage-service.js` (thin facade over whichever adapter is active) orchestrate persistence on top of the adapter layer. `js/services/migration-service.js` upgrades legacy single-week/single-team payloads to the current schema on load.
+- **Adapter contract tests**: `__tests__/storage-adapter.contract.test.js` and `__tests__/database.test.js` run the same suite against every registered adapter, ensuring consistent behaviour across the low-level key/value layer.
+- **Storage service contract tests**: `__tests__/storage-contract.integration.test.js` exercises the high-level storage facade (localStorage, IndexedDB, SQLite) with shared happy-path and defensive scenarios.
+- **Further reading**: `docs/storage-adapters.md` provides a deeper dive into the adapter contract and how to extend it, and `__tests__/fixtures/SCHEMA.md` documents the current multi-team root schema.
 
 ### Switching storage backends
 
@@ -90,24 +120,15 @@ Related tests: `__tests__/weekNavigation.test.js`, `__tests__/readonlyMode.test.
 
 ## Running Locally
 
-To run this project on your local machine:
-
-1.  **Clone the repository or download the files.**
-2.  **Navigate to the project directory** in your terminal.
-3.  **Start a simple web server.** If you have Python 3 installed, you can use its built-in HTTP server:
-    ```bash
-    python3 -m http.server 8080
-    ```
-4.  **Open your browser** and go to `http://localhost:8080`.
-
-Alternatively, you can simply open the `index.html` file directly in your web browser for localStorage/IndexedDB experiments. To exercise the SQLite backend you must run the API server first:
+**Recommended**: run the Express server, which serves the front-end *and* provides the `/api/storage/*` and `/api/fpl/*` routes needed for the SQLite backend and any FPL API feature (SYNC, Import My Squad):
 
 ```bash
 npm install
-npm run start:server     # production-like server
+npm run start:server     # production-like server, http://localhost:3000
 # or npm run dev:server  # nodemon watch mode for local iteration
-# In another terminal serve the front-end (e.g. python3 -m http.server)
 ```
+
+You can also serve the static files with any other simple web server (e.g. `python3 -m http.server 8080`, or open `index.html` directly in a browser) for localStorage/IndexedDB-only experimentation — but the SQLite storage backend and both FPL API features (SYNC, Import My Squad) require the Express server to be running, since `fantasy.premierleague.com` blocks direct browser requests via CORS and the app relies on the server-side proxy at `/api/fpl/*` (see [FPL API Integration](#fpl-api-integration)).
 
 ## Testing
 
@@ -132,36 +153,52 @@ This project includes a comprehensive test suite to ensure functionality works c
 
 ### Test Coverage
 
-The test suite includes:
-- **Player Management Tests**: Adding, editing, and deleting players
-- **Form Validation Tests**: Required field validation and error handling
-- **Captaincy Tests**: Setting and switching captain/vice-captain roles
-- **UI Interaction Tests**: Button clicks and form submissions
-- **Storage Contract Tests**: `__tests__/database.test.js` verifies that every storage adapter (localStorage, IndexedDB, SQLite) adheres to the shared database contract. Run with `npm test -- __tests__/database.test.js` for a focused check.
-- **Storage Service Contract Tests** *(new)*: `__tests__/storage-contract.test.js` validates the factory-created storage services across all backends, including legacy helpers and defensive failure paths. Run with `npm test -- __tests__/storage-contract.test.js`.
-- **SQLite End-to-End Tests**: `__tests__/storage.sqlite.e2e.test.js` spins up the Express server in-memory and exercises the HTTP API. Run with `npm test -- __tests__/storage.sqlite.e2e.test.js`.
-- **App Initialization Tests**: `__tests__/app-init.test.js` verifies storage selection UI, IndexedDB fallback timing, and SQLite health checks.
+Unit/integration tests (Jest + JSDOM, ~305 tests across ~50 suites):
+- **Player, Week, Captaincy Services**: `__tests__/services/player-service.test.js`, `week-service.test.js`, `captaincy-service.test.js` — pure business logic, independent of storage or DOM.
+- **Team & Multi-Team Tests**: `__tests__/services/team-service.test.js` covers team CRUD, active-team resolution, FPL entry ID handling, and `validateFplRules()`.
+- **FPL API Tests**: `__tests__/services/fpl-api.test.js` (bootstrap/entry-picks fetching, player normalization, current-gameweek resolution) and `__tests__/services/team-sync-coordinator.test.js` (SYNC, Import My Squad, and team-switching orchestration with mocked dependencies).
+- **FPL Proxy Tests**: `__tests__/fpl-proxy.api.integration.test.js` exercises the server-side `/api/fpl/*` proxy routes (success, upstream failure, network error, invalid params) with a mocked `fetch`.
+- **Points Tests**: `__tests__/services/points-service.test.js` covers gameweek/season point calculation and captain/vice-captain multipliers.
+- **Storage Contract Tests**: `__tests__/database.test.js` and `__tests__/storage-adapter.contract.test.js` verify every storage adapter (localStorage, IndexedDB, SQLite) adheres to the shared contract.
+- **Storage Service Contract Tests**: `__tests__/storage-contract.integration.test.js` validates the factory-created storage services across all backends, including legacy helpers and defensive failure paths.
+- **IndexedDB Integration**: `__tests__/indexeddb.integration.test.js` covers multi-team root persistence and the legacy-store write-skipping optimization.
+- **SQLite End-to-End Tests**: `__tests__/storage.sqlite.e2e.test.js` and `__tests__/sqlite-storage.service.e2e.test.js` spin up the Express server in-memory and exercise the HTTP API.
+- **App Initialization Tests**: `__tests__/app-init.integration.test.js` verifies storage selection UI, backend fallback timing, and SQLite health checks.
+- **Sync Flow Integration**: `__tests__/sync-flow.integration.test.js` exercises `FPLTeamManager.syncFromFpl()` end-to-end against a mocked FPL bootstrap response.
 
-All tests use Jest with JSDOM for DOM simulation and comprehensive coverage of user interactions.
+End-to-end tests (Playwright, real browser, 102 scenarios across 6 spec files) — see [`__tests__/e2e/README.md`](__tests__/e2e/README.md) for full details, including the FPL sync/import/multi-team workflow (`fpl-sync-and-teams.spec.js`).
+
+All Jest tests use Jest with JSDOM for DOM simulation; E2E tests run against a real Chromium browser via Playwright.
 
 ## Deployment to GitHub Pages
 
+Static hosting (e.g. GitHub Pages) only works for the **localStorage/IndexedDB backends with manual player management** — there is no server to run on GitHub Pages, so the SQLite backend and both FPL API features (SYNC, Import My Squad) will not work there, since they depend on the Express server (`/api/storage/*`, `/api/fpl/*`). To host the full app including FPL integration, deploy the Express server somewhere that can run Node.js (see [Future roadmap ideas](#future-roadmap-ideas)).
+
+For the static-only subset:
 1. Create a new repository on GitHub
-2. Upload these files: `index.html`, `styles.css`, `script.js`, and `README.md`
+2. Upload `index.html`, `styles.css`, `script.js`, `js/`, and `README.md`
 3. Go to repository Settings → Pages
-4. Select "Deploy from a branch" and choose "main" branch
+4. Select "Deploy from a branch" and choose the "main" branch
 5. Your app will be available at `https://yourusername.github.io/repository-name`
 
 ## Files Structure
 
-- `index.html` - Main HTML structure
+- `index.html` - Main HTML structure, including the FPL controls and multi-team selector
 - `styles.css` - Responsive CSS styling
-- `script.js` - JavaScript functionality and data management
-- `README.md` - This documentation
-- `__tests__/` - Test files for Jest
-- `test-utils.js` - Testing utilities and helpers
+- `script.js` - `FPLTeamManager`: top-level app orchestration (player/week/UI wiring, storage read-modify-write)
+- `js/services/` - Business-logic services: `player-service.js`, `week-service.js`, `captaincy-service.js`, `team-service.js`, `points-service.js`, `fpl-api.js`, `team-sync-coordinator.js`, `migration-service.js`, `legacy-compatibility-layer.js`
+- `js/storage/` - Storage abstraction: `storage-service.js` facade and `adapters/` (contract, localStorage, IndexedDB, SQLite)
+- `js/storage-module.js` - Storage backend factory and default-root creation
+- `js/ui-manager.js` - All DOM rendering and event binding
+- `js/app-init.js`, `js/app.js` - App bootstrap and storage negotiation
+- `js/utils/` - `app-error.js` (error hierarchy) and `error-handler.js`
+- `server/` - Express app: `server.js`, `database.js` (SQLite), `routes/storage.js` (`/api/storage/*`), `routes/fpl.js` (`/api/fpl/*` proxy)
+- `__tests__/` - Jest unit/integration tests, plus `__tests__/e2e/` for Playwright tests (see its own [README](__tests__/e2e/README.md))
+- `.devin/skills/code-review/` - A project-specific code review skill/checklist (architecture, security, performance, error handling) for use with AI coding agents
+- `docs/storage-adapters.md` - Deep dive into the storage adapter contract
 - `package.json` - Node.js dependencies and scripts
 - `babel.config.js` - Babel configuration for testing
+- `playwright.config.js` - Playwright E2E test configuration
 
 ## Browser Compatibility
 
@@ -172,16 +209,31 @@ Works on all modern browsers including:
 
 ## Data Storage
 
-- **Default**: Browser `localStorage` (via `LocalStorageKeyValueAdapter`).
-- **IndexedDB option**: Enable `window.USE_INDEXED_DB = true` to use `IndexedDBKeyValueAdapter` for larger datasets and richer querying.
-- **Extensibility**: Additional adapters can be created by implementing the contract defined in `js/adapters/database-adapter.contract.js` and registering them in `__tests__/database.test.js` to gain test coverage.
+- **Default**: Browser `localStorage` (via `js/storage/adapters/local-storage-adapter.js`).
+- **IndexedDB option**: Select "IndexedDB" from the storage dropdown, or run `npm run use:indexeddb`, to persist the full multi-team root as a JSON blob via `js/storage/adapters/indexeddb-adapter.js`.
+- **SQLite option**: Select "SQLite" from the storage dropdown (requires the Express server running) for durable, file-backed storage via `server/database.js`.
+- **Extensibility**: Additional adapters can be created by implementing the contract defined in `js/storage/adapters/database-adapter.contract.js` and registering them in `__tests__/storage-adapter.contract.test.js` and `js/storage-module.js` to gain test coverage.
+- **Multi-device sync**: Not yet implemented — every backend above is local to a single browser/device. See roadmap below.
 
 ## Future roadmap ideas
-- proper database to allow at minimum local persistent storage
-- enable local server accessible from internet 
-- utilize online hosted database to allow multidevice usage
-- authentication to protect data to myself only
 
+### Infrastructure / hosting
+- ~~proper database to allow at minimum local persistent storage~~ ✅ done (SQLite backend via `server/database.js`)
+- enable a server accessible from the internet (currently `localhost` only) so the app — and its FPL integration, which requires the Express server — can be used outside the local machine
+- utilize an online hosted database (e.g. Firebase, Supabase, or a hosted Postgres/SQLite) to allow multi-device usage
+- authentication to protect data (single-user or per-account), likely via Firebase/Supabase auth once hosted online
+
+### FPL API integration gaps
+(see also [Current limitations of the FPL integration](#current-limitations-of-the-fpl-integration) above)
+- Surface `TeamService.validateFplRules()` (budget, squad composition, per-club limits) in the UI for what-if teams — the logic exists and is unit-tested but nothing calls it today
+- Import a specific past gameweek's squad, not just the current one
+- Track transfers in/out (including transfer-cost point hits) instead of only replacing the squad snapshot on import
+- Support real FPL chips (Wildcard, Free Hit, Bench Boost, Triple Captain)
+- Tie the app's week numbering to real FPL gameweek deadlines instead of manual "Create New Week"
+- Cache bootstrap-static responses (ETag or TTL) instead of re-fetching ~700 players on every SYNC/import
+- Optional background/scheduled sync instead of fully manual, user-triggered SYNC
+- Fixture difficulty ratings, live/provisional bonus points, price-change history, and mini-league/rank data
+- E2E coverage for the "Import My Squad" flow (currently only unit-tested; see [`__tests__/e2e/README.md`](__tests__/e2e/README.md))
 
 ## Potential implementation of database and authentication (online)
 - use firebase or supabase for database or SQLite for fully offline db
@@ -195,7 +247,18 @@ Works on all modern browsers including:
 
 ---
 
-**Note**: This is an MVP (Minimum Viable Product) version. All player and team data must be entered manually.
+**Note**: This is an MVP (Minimum Viable Product) version. Player and team data can be entered manually, or imported from a real FPL account via entry ID (see [FPL API Integration](#fpl-api-integration)) — but the FPL integration itself is intentionally minimal (manual, one-shot sync/import; no transfers, chips, or historical gameweek support yet).
+
+### Recent changes (FPL API integration + multi-team support)
+
+- **Multi-team support**: `js/services/team-service.js` adds team CRUD, active-team/active-week resolution helpers, and FPL squad-rule validation (`validateFplRules`, not yet wired to the UI). The storage schema now supports `teams`/`currentTeam`/`settings` alongside the legacy single-team shape, with `js/services/migration-service.js` upgrading old data automatically.
+- **FPL API client**: `js/services/fpl-api.js` (`FplApiClient`) fetches and normalizes FPL bootstrap-static and entry-picks data, including a `getCurrentGameweek()` helper.
+- **SYNC**: Refreshes points/price/form/availability for existing players matched by FPL ID.
+- **Import My Squad**: Fetches a user's real FPL picks and captaincy and replaces the primary team's active-week squad with them — see `js/services/team-sync-coordinator.js` (`TeamSyncCoordinator`).
+- **Server-side FPL proxy**: `server/routes/fpl.js` proxies `bootstrap-static` and `entry/{id}/event/{gw}/picks` server-side, required because the FPL API blocks direct cross-origin browser requests (no CORS headers). This was found and fixed after real-browser testing showed SYNC failing silently in every automated test (Jest/Playwright mocks bypass real CORS enforcement).
+- **Points tracking**: `js/services/points-service.js` calculates gameweek and season points, including captain/vice-captain multipliers, surfaced in new "Total Points"/"GW Points" summary fields and per-player "Total Pts"/"GW Pts" table columns.
+- **Architecture**: Sync/team-switching orchestration extracted from `FPLTeamManager` (`script.js`) into `TeamSyncCoordinator`, following a code review that flagged the growing size of that class.
+- **Code review skill**: Added `.devin/skills/code-review/` — a project-tailored code review checklist (architecture/SOLID, security, performance, error handling, async patterns) adapted for this project's stack.
 
 ### Recent changes (storage + testing)
 
@@ -237,4 +300,4 @@ npm run test:storage:int    # SQLite integration (server-based)
   - `sqlite-api-mock.js` — mock for `/api/storage/root` used in unit tests
   - `create-sqlite-test-server.js` — in-memory server harness for E2E
   - `create-sqlite-disk-test-server.js` — disk-backed server harness for E2E
-- `server/` – Express + SQLite API (storage routes and database module)
+- `server/` – Express app: SQLite storage routes/database module, plus the `routes/fpl.js` server-side FPL API proxy
