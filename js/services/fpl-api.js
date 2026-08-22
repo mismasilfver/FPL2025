@@ -1,7 +1,11 @@
-const FPL_BOOTSTRAP_URL = 'https://fantasy.premierleague.com/api/bootstrap-static/';
+// Requests go through this app's own server-side proxy (see
+// server/routes/fpl.js) rather than fantasy.premierleague.com directly.
+// The FPL API does not send Access-Control-Allow-Origin headers, so a
+// direct browser fetch from the app's origin is blocked by CORS.
+const FPL_BOOTSTRAP_URL = '/api/fpl/bootstrap-static';
 
 function getEntryPicksUrl(entryId, gameweek) {
-  return `https://fantasy.premierleague.com/api/entry/${entryId}/event/${gameweek}/picks/`;
+  return `/api/fpl/entry/${entryId}/event/${gameweek}/picks`;
 }
 
 /**
