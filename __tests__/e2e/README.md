@@ -15,13 +15,15 @@ __tests__/e2e/
 │   ├── player-lifecycle.spec.js    # Player CRUD operations
 │   ├── captaincy.spec.js           # Captain/vice-captain management
 │   ├── week-navigation.spec.js     # Week creation and navigation
-│   └── cross-backend.spec.js       # Cross-backend data integrity
+│   ├── cross-backend.spec.js       # Cross-backend data integrity
+│   └── fpl-sync-and-teams.spec.js  # FPL entry ID, SYNC, multi-team switching
 ├── fixtures/
 │   └── test-data.js                # Test data factories
 ├── helpers/
 │   ├── storage-helpers.js          # Storage backend switching utilities
 │   ├── ui-helpers.js               # Common UI interaction helpers
 │   └── assertions.js               # Custom assertion helpers
+├── TROUBLESHOOTING.md               # Debugging tips for common E2E failures
 └── README.md                       # This documentation
 ```
 
@@ -75,6 +77,16 @@ Tests data integrity and portability across backend switches:
 - Data integrity after multiple switches
 - Backend preference persistence
 - Week data integrity during switches
+
+### 6. FPL Sync and Multi-Team Tests (`fpl-sync-and-teams.spec.js`)
+Tests the FPL API integration and multi-team support against a **mocked** FPL bootstrap response (via `page.route('**/api/fpl/bootstrap-static', ...)`) — no real network calls are made to the FPL API or to `fantasy.premierleague.com` in this spec:
+- Saving an FPL entry ID and persisting it across reloads
+- SYNC updating player points/metadata from the (mocked) FPL bootstrap
+- Captain points doubling after SYNC
+- Switching between teams without mixing player data
+- Creating a new what-if team via the UI
+
+**Not yet covered here**: the "Import My Squad" flow (fetching real picks from `/api/fpl/entry/{id}/event/{gw}/picks` and replacing the active team's squad) currently only has unit-test coverage (`__tests__/services/team-sync-coordinator.test.js`) and was manually verified against the live FPL API — see [Future Enhancements](#future-enhancements) below.
 
 ## Running Tests
 
@@ -141,8 +153,8 @@ Test data is managed through factories in `fixtures/test-data.js`:
 ### Positions
 
 - `goalkeeper`
-- `defender` 
-- `midfielder`
+- `defence` (HTML/data value; `getPlayerByPosition('defender')` also works and maps to this)
+- `midfield` (HTML/data value; `getPlayerByPosition('midfielder')` also works and maps to this)
 - `forward`
 
 ## Helper Functions
@@ -180,6 +192,9 @@ Test data is managed through factories in `fixtures/test-data.js`:
 - `expectCurrentWeek(page, weekNumber)` - Assert current week
 - `expectReadOnlyMode(page)` - Assert week is read-only
 - `expectEditMode(page)` - Assert week is editable
+- `expectStorageBackend(page, backend)` - Assert the active storage backend indicator
+- `expectTotalCost(page, cost, tolerance)` - Assert total team cost within a tolerance
+- `expectNotification(page, text, timeout)` - Assert an alert/notification is shown
 - `expectErrorMessage(page, message)` - Assert error message is shown
 
 ## Configuration
@@ -347,20 +362,23 @@ npx playwright show-trace trace.zip
 
 ## Test Coverage
 
-The current E2E test suite covers:
+The current E2E test suite covers (run `npx playwright test --list` for the live count):
 
-- ✅ Infrastructure and setup validation
-- ✅ Player CRUD operations (3 backends × ~8 tests = 24 scenarios)
-- ✅ Captaincy management (3 backends × ~7 tests = 21 scenarios)  
-- ✅ Week navigation and management (3 backends × ~10 tests = 30 scenarios)
-- ✅ Cross-backend data integrity (~11 scenarios)
+- ✅ Infrastructure and setup validation — 5 scenarios
+- ✅ Player CRUD operations (3 backends) — 24 scenarios
+- ✅ Captaincy management (3 backends) — 21 scenarios
+- ✅ Week navigation and management (3 backends) — 36 scenarios
+- ✅ Cross-backend data integrity — 11 scenarios
+- ✅ FPL sync, entry ID, and multi-team switching (mocked FPL API) — 5 scenarios
 
-**Total**: ~86 test scenarios across all backends
+**Total**: 102 test scenarios across 6 spec files
 
 ## Future Enhancements
 
 Potential areas for additional E2E testing:
 
+- **Import My Squad flow**: no E2E coverage yet for importing real picks via `/api/fpl/entry/{id}/event/{gw}/picks` and replacing the active team's squad (currently unit-tested only, and manually verified against the live FPL API via Playwright MCP)
+- **Budget/squad-rule validation UI**: once `TeamService.validateFplRules()` is surfaced in the UI (see main [README roadmap](../../README.md#future-roadmap-ideas)), add E2E coverage for invalid what-if team states
 - Import/export functionality testing
 - Error boundary and error handling testing
 - Performance testing (load times, responsiveness)
@@ -406,5 +424,5 @@ The E2E tests can be integrated into CI/CD pipelines:
 
 - [Playwright Documentation](https://playwright.dev/)
 - [Playwright Best Practices](https://playwright.dev/docs/best-practices)
-- [FPL Application README](../../../README.md)
-- [Storage Adapters Documentation](../../../docs/storage-adapters.md)
+- [FPL Application README](../../README.md)
+- [Storage Adapters Documentation](../../docs/storage-adapters.md)
