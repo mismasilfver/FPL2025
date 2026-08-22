@@ -34,31 +34,93 @@ export async function getStorageBackend(page) {
 }
 
 /**
- * Clear all application storage data
+ * Build a valid default multi-team root payload for resetting the SQLite backend.
+ * Must match the shape the app itself creates (see js/storage-module.js
+ * createDefaultRoot + FPLTeamManager._migrateToTeams), otherwise the server
+ * persists a malformed root that leaks stale state into later tests.
+ */
+function buildDefaultMultiTeamRoot() {
+  const defaultWeek = {
+    players: [],
+    captain: null,
+    viceCaptain: null,
+    teamMembers: [],
+    teamStats: { totalValue: 0, playerCount: 0, updatedDate: new Date().toISOString() },
+    totalTeamCost: 0,
+    isReadOnly: false,
+    notes: '',
+    weekNumber: 1
+  };
+
+  return {
+    version: '3.1',
+    currentTeam: 'default',
+    settings: { fplEntryId: null },
+    teams: {
+      default: {
+        id: 'default',
+        name: 'Primary Team',
+        type: 'primary',
+        fplEntryId: null,
+        currentWeek: 1,
+        weeks: { 1: defaultWeek },
+        totalPoints: 0,
+        gameweekPoints: {}
+      }
+    }
+  };
+}
+
+/**
+ * Clear all application storage data (localStorage, sessionStorage, IndexedDB,
+ * and the SQLite backend if it is the currently configured backend).
+ *
+ * Note: this reads the backend preference from localStorage BEFORE wiping it,
+ * so callers that need to switch backends must set the new preference AFTER
+ * calling clearStorage (see resetAppWithBackend).
  * @param {import('@playwright/test').Page} page - Playwright page object
  */
 export async function clearStorage(page) {
+  // Capture the currently configured backend before localStorage is wiped.
+  const backend = (await page.evaluate((key) => localStorage.getItem(key), STORAGE_BACKEND_KEY).catch(() => null) || '').toLowerCase();
+
   // Clear localStorage and sessionStorage
   await page.evaluate(() => {
     localStorage.clear();
     sessionStorage.clear();
   });
-  
-  // Clear SQLite backend data if active
-  try {
-    await page.evaluate(async () => {
-      const backend = localStorage.getItem('fpl-storage-backend') || 'localStorage';
-      if (backend === 'sqlite') {
-        // Reset SQLite storage via PUT with empty default data
-        await fetch('/api/storage/root', { 
+
+  // Clear IndexedDB. localStorage.clear() above does NOT touch it, and
+  // browsers persist IndexedDB across pages/tests within the same run,
+  // so without this step data silently accumulates across the whole suite.
+  await page.evaluate(async () => {
+    if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') return;
+    try {
+      const databases = await indexedDB.databases();
+      await Promise.all((databases || []).map((db) => db.name && new Promise((resolve) => {
+        const request = indexedDB.deleteDatabase(db.name);
+        request.onsuccess = () => resolve();
+        request.onerror = () => resolve();
+        request.onblocked = () => resolve();
+      })));
+    } catch (e) {
+      // Best-effort cleanup; ignore failures.
+    }
+  });
+
+  // Reset SQLite backend data if it was the active backend
+  if (backend === 'sqlite') {
+    try {
+      await page.evaluate(async (defaultRoot) => {
+        await fetch('/api/storage/root', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ players: [], weeks: [], meta: { currentWeek: 1 } })
+          body: JSON.stringify(defaultRoot)
         }).catch(() => {});
-      }
-    });
-  } catch (e) {
-    // Ignore errors
+      }, buildDefaultMultiTeamRoot());
+    } catch (e) {
+      // Ignore errors
+    }
   }
 }
 
@@ -82,15 +144,21 @@ export async function resetAppWithBackend(page, backend) {
   // First navigate to ensure we have a valid page context
   await page.goto('http://localhost:3000');
   await page.waitForLoadState('networkidle');
-  
-  // Set the backend preference BEFORE clearing
+
+  // Set the backend preference temporarily so clearStorage() knows whether
+  // to reset the SQLite backend, then clear all storage (localStorage,
+  // sessionStorage, IndexedDB). clearStorage() wipes localStorage, so the
+  // preference must be (re-)written AFTER it, not before.
   await page.evaluate(({ key, value }) => {
     localStorage.setItem(key, value);
   }, { key: STORAGE_BACKEND_KEY, value: backend });
-  
-  // Now clear storage (this will detect SQLite and reset it)
+
   await clearStorage(page);
-  
+
+  await page.evaluate(({ key, value }) => {
+    localStorage.setItem(key, value);
+  }, { key: STORAGE_BACKEND_KEY, value: backend });
+
   // Navigate again to apply the backend with clean data
   await page.goto('http://localhost:3000');
   await page.waitForLoadState('networkidle');

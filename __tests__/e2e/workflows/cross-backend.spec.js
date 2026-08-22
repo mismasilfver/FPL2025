@@ -4,7 +4,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { resetAppWithBackend, clearStorage, verifyPersistence } from '../helpers/storage-helpers.js';
+import { resetAppWithBackend, clearStorage, verifyPersistence, waitForStorageReady } from '../helpers/storage-helpers.js';
 import { addPlayer, getPlayerCount, setCaptainStatus, togglePlayerOwned } from '../helpers/ui-helpers.js';
 import { expectPlayerExists, expectPlayerCount, expectCaptainStatus } from '../helpers/assertions.js';
 import { buildMinimalSquad, getPlayerByPosition } from '../fixtures/test-data.js';
@@ -131,6 +131,8 @@ test.describe('Cross-Backend Data Integrity', () => {
     await addPlayer(page, player1);
     await expectPlayerCount(page, 1);
     await clearStorage(page);
+    await page.reload();
+    await waitForStorageReady(page);
     await expectPlayerCount(page, 0);
 
     // Test IndexedDB (may fallback to localStorage)
@@ -140,6 +142,8 @@ test.describe('Cross-Backend Data Integrity', () => {
     const count2 = await getPlayerCount(page);
     expect(count2).toBeGreaterThanOrEqual(0);
     await clearStorage(page);
+    await page.reload();
+    await waitForStorageReady(page);
     await expectPlayerCount(page, 0);
 
     // Test SQLite (may fallback to localStorage if server unavailable)
@@ -149,6 +153,8 @@ test.describe('Cross-Backend Data Integrity', () => {
     const count3 = await getPlayerCount(page);
     expect(count3).toBeGreaterThanOrEqual(0);
     await clearStorage(page);
+    await page.reload();
+    await waitForStorageReady(page);
     await expectPlayerCount(page, 0);
   });
 
