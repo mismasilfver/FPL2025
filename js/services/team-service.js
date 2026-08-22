@@ -111,9 +111,17 @@ class TeamService {
       throw new Error('Team not found');
     }
 
+    const entryId = this.getFplEntryId(root);
+
     Object.values(root.teams).forEach((team) => {
       team.type = team.id === teamId ? 'primary' : 'whatif';
     });
+
+    // Keep the per-team mirror of fplEntryId in sync with the source of
+    // truth (root.settings.fplEntryId) whenever a new team is promoted.
+    if (entryId != null) {
+      root.teams[teamId].fplEntryId = entryId;
+    }
 
     return root;
   }
@@ -122,6 +130,9 @@ class TeamService {
     if (!root.settings) root.settings = {};
     root.settings.fplEntryId = entryId;
 
+    // Mirror the value onto the primary team for convenience/display
+    // purposes. root.settings.fplEntryId remains the single source of
+    // truth; see getFplEntryId().
     const primary = this.getPrimaryTeam(root);
     if (primary) {
       primary.fplEntryId = entryId;
@@ -131,7 +142,7 @@ class TeamService {
   }
 
   getFplEntryId(root) {
-    return root.settings?.fplEntryId || this.getPrimaryTeam(root)?.fplEntryId || null;
+    return root.settings?.fplEntryId ?? null;
   }
 
   /**
