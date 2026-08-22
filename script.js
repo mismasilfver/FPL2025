@@ -33,6 +33,7 @@ export class FPLTeamManager {
             getRootData: () => this._getRootData(),
             saveRootData: (root) => this._saveRootData(root),
             updateDisplay: () => this.updateDisplay(),
+            ensureWeekDerivedFields: (root, weekNumber) => this._ensureWeekDerivedFields(root, weekNumber),
         });
         this.legacyLayer = new LegacyCompatibilityLayer('fpl-team-data');
         this.migrationService = new MigrationService();
@@ -136,6 +137,7 @@ export class FPLTeamManager {
             onMakeViceCaptain: (id) => this.setViceCaptain(id),
             onSaveFplId: (entryId) => this.saveFplEntryId(entryId),
             onSync: () => this.syncFromFpl(),
+            onImportFplSquad: () => this.importFplSquad(),
             onAddTeam: () => this.addWhatIfTeam(),
             onTeamChange: (teamId) => this.switchTeam(teamId),
         });
@@ -516,6 +518,10 @@ export class FPLTeamManager {
 
     async syncFromFpl() {
         return this.teamSyncCoordinator.syncFromFpl();
+    }
+
+    async importFplSquad() {
+        return this.teamSyncCoordinator.importFplSquad();
     }
 
     async addWhatIfTeam() {
