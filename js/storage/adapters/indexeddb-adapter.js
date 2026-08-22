@@ -270,8 +270,7 @@ export class IndexedDBAdapter {
 
         // Persist the full payload verbatim so any fields beyond the legacy
         // single-team schema (e.g. multi-team `teams`/`currentTeam`/`settings`)
-        // survive the round trip. The legacy per-week stores are still kept
-        // in sync below for backward compatibility with older data/queries.
+        // survive the round trip.
         tx.objectStore('root').put({
             id: 'singleton',
             version: normalizedRoot.version,
@@ -279,25 +278,31 @@ export class IndexedDBAdapter {
             dataJson: JSON.stringify(root)
         });
 
-        const weeksStore = tx.objectStore('weeks');
-        const membersStore = tx.objectStore('teamMembers');
+        // Legacy single-team roots keep the per-week object stores in sync
+        // for backward compatibility. Multi-team roots (root.teams present)
+        // are read back verbatim from `dataJson` by getRootData()/loadFromStorage(),
+        // so writing to `weeks`/`teamMembers` in that case is dead work — skip it.
+        if (!root.teams) {
+            const weeksStore = tx.objectStore('weeks');
+            const membersStore = tx.objectStore('teamMembers');
 
-        weeksStore.clear();
-        membersStore.clear();
+            weeksStore.clear();
+            membersStore.clear();
 
-        for (const [weekNumber, weekData] of Object.entries(normalizedRoot.weeks)) {
-            weeksStore.put({
-                weekNumber: weekData.weekNumber,
-                captain: weekData.captain,
-                viceCaptain: weekData.viceCaptain,
-                totalTeamCost: weekData.totalTeamCost,
-                teamStats: weekData.teamStats,
-                isReadOnly: weekData.isReadOnly,
-                playersJson: JSON.stringify(weekData.players)
-            });
+            for (const [weekNumber, weekData] of Object.entries(normalizedRoot.weeks)) {
+                weeksStore.put({
+                    weekNumber: weekData.weekNumber,
+                    captain: weekData.captain,
+                    viceCaptain: weekData.viceCaptain,
+                    totalTeamCost: weekData.totalTeamCost,
+                    teamStats: weekData.teamStats,
+                    isReadOnly: weekData.isReadOnly,
+                    playersJson: JSON.stringify(weekData.players)
+                });
 
-            for (const member of weekData.teamMembers) {
-                membersStore.put({ ...member, weekNumber: weekData.weekNumber });
+                for (const member of weekData.teamMembers) {
+                    membersStore.put({ ...member, weekNumber: weekData.weekNumber });
+                }
             }
         }
 
