@@ -93,6 +93,15 @@ describe('TeamService', () => {
       expect(primaryTeams).toHaveLength(1);
       expect(primaryTeams[0].id).toBe('another');
     });
+
+    it('should keep the FPL entry id available after promoting a new primary team', () => {
+      service.setFplEntryId(rootData, '12345');
+      const afterCreate = service.createTeam(rootData, 'NewPrimary', 'whatif');
+      const afterSet = service.setPrimaryTeam(afterCreate, 'newprimary');
+
+      expect(service.getFplEntryId(afterSet)).toBe('12345');
+      expect(afterSet.teams.newprimary.fplEntryId).toBe('12345');
+    });
   });
 
   describe('setFplEntryId', () => {
