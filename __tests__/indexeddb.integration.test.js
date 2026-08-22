@@ -73,6 +73,73 @@ describe('IndexedDB storage integration', () => {
     ]);
   });
 
+  test('persists and retrieves multi-team root payload', async () => {
+    const rootPayload = {
+      version: '3.1',
+      currentTeam: 'default',
+      settings: { fplEntryId: '12345' },
+      teams: {
+        default: {
+          id: 'default',
+          name: 'Primary Team',
+          type: 'primary',
+          fplEntryId: '12345',
+          currentWeek: 2,
+          weeks: {
+            1: {
+              players: [],
+              captain: null,
+              viceCaptain: null,
+              teamMembers: [],
+              teamStats: { totalValue: 0, playerCount: 0, updatedDate: new Date().toISOString() },
+              totalTeamCost: 0,
+              isReadOnly: true
+            },
+            2: {
+              players: [{ id: 'p1', have: true, price: 10 }],
+              captain: 'p1',
+              viceCaptain: null,
+              teamMembers: [{ playerId: 'p1', addedAt: 2 }],
+              teamStats: { totalValue: 10, playerCount: 1, updatedDate: new Date().toISOString() },
+              totalTeamCost: 10,
+              isReadOnly: false
+            }
+          },
+          totalPoints: 42,
+          gameweekPoints: { 1: 0, 2: 42 }
+        },
+        wildcard: {
+          id: 'wildcard',
+          name: 'Wildcard',
+          type: 'whatif',
+          fplEntryId: null,
+          currentWeek: 1,
+          weeks: {
+            1: { players: [], captain: null, viceCaptain: null, teamMembers: [], teamStats: { totalValue: 0, playerCount: 0, updatedDate: new Date().toISOString() }, totalTeamCost: 0, isReadOnly: false }
+          },
+          totalPoints: 0,
+          gameweekPoints: {}
+        }
+      }
+    };
+
+    await service.setRootData(rootPayload);
+    const loaded = await service.getRootData();
+
+    expect(loaded.currentTeam).toBe('default');
+    expect(loaded.settings).toEqual({ fplEntryId: '12345' });
+    expect(Object.keys(loaded.teams)).toEqual(expect.arrayContaining(['default', 'wildcard']));
+    expect(loaded.teams.default.currentWeek).toBe(2);
+    expect(loaded.teams.default.totalPoints).toBe(42);
+    expect(loaded.teams.default.gameweekPoints).toEqual({ 1: 0, 2: 42 });
+    expect(loaded.teams.default.weeks['2']).toEqual(expect.objectContaining({
+      captain: 'p1',
+      isReadOnly: false,
+      totalTeamCost: 10
+    }));
+    expect(loaded.teams.wildcard.currentWeek).toBe(1);
+  });
+
   test('legacy facade returns JSON string for getItem', async () => {
     await service.setRootData({
       version: '2.0',
