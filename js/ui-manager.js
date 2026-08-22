@@ -153,6 +153,7 @@ export default class UIManager {
         this.syncBtn = doc.getElementById('sync-btn');
         this.teamSelect = doc.getElementById('team-select');
         this.addTeamBtn = doc.getElementById('add-team-btn');
+        this.appAlert = doc.querySelector('.app-alert');
         
         
         if (DEBUG) console.log('initElements - prevWeekBtn found:', !!this.prevWeekBtn);
@@ -249,6 +250,24 @@ export default class UIManager {
     closeModal() {
         if (this.modal) this.modal.style.display = 'none';
         this.clearForm();
+    }
+
+    showAlert(message, options = {}) {
+        const alertEl = this.appAlert || this.document?.querySelector('.app-alert');
+        if (!alertEl) return;
+
+        alertEl.textContent = message;
+        alertEl.style.display = 'block';
+        alertEl.classList.remove('error');
+
+        const timeout = options.timeout || 5000;
+        if (timeout > 0) {
+            if (this._alertTimeout) clearTimeout(this._alertTimeout);
+            this._alertTimeout = setTimeout(() => {
+                alertEl.style.display = 'none';
+                alertEl.textContent = '';
+            }, timeout);
+        }
     }
 
     populateForm(player) {
