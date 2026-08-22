@@ -8,3 +8,4 @@ data/
 *.db
 **/coverage
 test-results/
+.devin/config.local.json
