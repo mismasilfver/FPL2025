@@ -140,6 +140,79 @@ describe('IndexedDB storage integration', () => {
     expect(loaded.teams.wildcard.currentWeek).toBe(1);
   });
 
+  test('skips legacy weeks/teamMembers stores when saving a multi-team root', async () => {
+    const rootPayload = {
+      version: '3.1',
+      currentTeam: 'default',
+      // Deliberately include a legacy top-level `weeks` field alongside `teams`
+      // to prove the legacy stores are skipped specifically because `teams`
+      // is present, not merely because there was nothing to write.
+      weeks: {
+        1: {
+          players: [],
+          captain: null,
+          viceCaptain: null,
+          teamMembers: [{ playerId: 'legacy-p1', addedAt: 1 }],
+          teamStats: { totalValue: 0, playerCount: 0, updatedDate: new Date().toISOString() },
+          totalTeamCost: 0,
+          isReadOnly: false
+        }
+      },
+      teams: {
+        default: {
+          id: 'default',
+          name: 'Primary Team',
+          type: 'primary',
+          fplEntryId: null,
+          currentWeek: 1,
+          weeks: {
+            1: {
+              players: [],
+              captain: null,
+              viceCaptain: null,
+              teamMembers: [],
+              teamStats: { totalValue: 0, playerCount: 0, updatedDate: new Date().toISOString() },
+              totalTeamCost: 0,
+              isReadOnly: false
+            }
+          },
+          totalPoints: 0,
+          gameweekPoints: {}
+        }
+      }
+    };
+
+    // Clear the legacy stores first so this test isn't polluted by the
+    // adapter's own initial seeding (_seedDatabaseIfNeeded writes a default
+    // week 1 row on first initialize()), giving a clean baseline to prove
+    // setRootData() does not write to these stores for multi-team roots.
+    await new Promise((resolve, reject) => {
+      const tx = service.adapter.db.transaction(['weeks', 'teamMembers'], 'readwrite');
+      tx.objectStore('weeks').clear();
+      tx.objectStore('teamMembers').clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+
+    await service.setRootData(rootPayload);
+
+    const weeksRows = await new Promise((resolve, reject) => {
+      const tx = service.adapter.db.transaction('weeks', 'readonly');
+      const request = tx.objectStore('weeks').getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const teamMembersRows = await new Promise((resolve, reject) => {
+      const tx = service.adapter.db.transaction('teamMembers', 'readonly');
+      const request = tx.objectStore('teamMembers').getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    expect(weeksRows).toEqual([]);
+    expect(teamMembersRows).toEqual([]);
+  });
+
   test('legacy facade returns JSON string for getItem', async () => {
     await service.setRootData({
       version: '2.0',
