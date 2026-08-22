@@ -1,4 +1,4 @@
-import TeamService from '../../js/services/team-service.js';
+import TeamService, { getActiveTeam, getActiveWeek } from '../../js/services/team-service.js';
 import { WeekModel } from '../../js/models/week-model.js';
 
 function createDefaultTeam(id, name = 'Default Team') {
@@ -104,6 +104,50 @@ describe('TeamService', () => {
     it('should store the FPL entry id on the primary team', () => {
       const updatedRoot = service.setFplEntryId(rootData, '12345');
       expect(updatedRoot.teams.default.fplEntryId).toBe('12345');
+    });
+  });
+
+  describe('getActiveTeam', () => {
+    it('should return the team referenced by root.currentTeam', () => {
+      const team = getActiveTeam(rootData);
+      expect(team.id).toBe('default');
+      expect(team.name).toBe('Primary Team');
+    });
+
+    it('should fall back to the first team when currentTeam is missing', () => {
+      const { currentTeam, ...partialRoot } = rootData;
+      const team = getActiveTeam(partialRoot);
+      expect(team.id).toBe('default');
+    });
+
+    it('should return a legacy single-team root when teams are absent', () => {
+      const legacyRoot = { version: '2.0', currentWeek: 1, weeks: { 1: WeekModel.createDefault(1) } };
+      const team = getActiveTeam(legacyRoot);
+      expect(team.weeks).toBeDefined();
+      expect(team.currentWeek).toBe(1);
+    });
+
+    it('should return null for null or empty roots', () => {
+      expect(getActiveTeam(null)).toBeNull();
+      expect(getActiveTeam({})).toBeNull();
+    });
+  });
+
+  describe('getActiveWeek', () => {
+    it('should return the current week of the active team', () => {
+      const week = getActiveWeek(rootData);
+      expect(week).toBe(rootData.teams.default.weeks[1]);
+    });
+
+    it('should return an empty object when the active team has no current week', () => {
+      const root = { version: '3.1', currentTeam: 'default', teams: { default: { id: 'default', currentWeek: 2, weeks: { 1: WeekModel.createDefault(1) } } } };
+      expect(getActiveWeek(root)).toEqual({});
+    });
+
+    it('should work with a legacy single-team root', () => {
+      const legacyRoot = { version: '2.0', currentWeek: 1, weeks: { 1: WeekModel.createDefault(1) } };
+      const week = getActiveWeek(legacyRoot);
+      expect(week).toEqual(legacyRoot.weeks[1]);
     });
   });
 
