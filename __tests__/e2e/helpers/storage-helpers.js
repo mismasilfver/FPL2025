@@ -83,13 +83,13 @@ export async function resetAppWithBackend(page, backend) {
   await page.goto('http://localhost:3000');
   await page.waitForLoadState('networkidle');
   
-  // Clear storage first so we start from a clean slate
-  await clearStorage(page);
-
-  // Set the backend preference AFTER clearing so it is not wiped
+  // Set the backend preference BEFORE clearing
   await page.evaluate(({ key, value }) => {
     localStorage.setItem(key, value);
   }, { key: STORAGE_BACKEND_KEY, value: backend });
+  
+  // Now clear storage (this will detect SQLite and reset it)
+  await clearStorage(page);
   
   // Navigate again to apply the backend with clean data
   await page.goto('http://localhost:3000');
