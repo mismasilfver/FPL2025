@@ -25,7 +25,6 @@ class CaptaincyService {
   }
 
   setCaptain(root, playerId) {
-    const team = getActiveTeam(root);
     const currentWeek = this._getCurrentWeek(root);
     if (!currentWeek) return root;
 
@@ -46,7 +45,6 @@ class CaptaincyService {
   }
 
   setViceCaptain(root, playerId) {
-    const team = getActiveTeam(root);
     const currentWeek = this._getCurrentWeek(root);
     if (!currentWeek) return root;
 
