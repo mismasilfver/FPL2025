@@ -149,11 +149,20 @@ export class IndexedDBAdapter {
 
   async loadFromStorage() {
     await this.initialized;
-    
+
     const root = await this._getStoreItem('root', 'singleton') || { version: '3.0', currentWeek: 1 };
+
+    // Multi-team (or any future) roots are persisted as a full JSON blob on the
+    // root record. If present, it is the source of truth and takes precedence
+    // over the legacy per-week object stores.
+    if (root.dataJson) {
+      const parsed = JSON.parse(root.dataJson);
+      return parsed;
+    }
+
     const weekRows = await this._getAllStoreItems('weeks');
     const weeks = {};
-    
+
     for (const wk of weekRows) {
       const players = JSON.parse(wk.playersJson || '[]');
       
@@ -223,6 +232,13 @@ export class IndexedDBAdapter {
     if (!root || typeof root !== 'object') {
       return { version: '3.0', currentWeek: 1, weeks: {} };
     }
+
+    // Multi-team roots (or any shape beyond the legacy single-team fields)
+    // are returned as-is; they were persisted verbatim as a JSON blob.
+    if (root.teams) {
+      return root;
+    }
+
     root.weeks = root.weeks || {};
     root.currentWeek = Number.isInteger(root.currentWeek) && root.currentWeek > 0
       ? root.currentWeek
@@ -252,7 +268,16 @@ export class IndexedDBAdapter {
     return new Promise((resolve, reject) => {
         const tx = this.db.transaction(['root', 'weeks', 'teamMembers'], 'readwrite');
 
-        tx.objectStore('root').put({ id: 'singleton', version: normalizedRoot.version, currentWeek: normalizedRoot.currentWeek });
+        // Persist the full payload verbatim so any fields beyond the legacy
+        // single-team schema (e.g. multi-team `teams`/`currentTeam`/`settings`)
+        // survive the round trip. The legacy per-week stores are still kept
+        // in sync below for backward compatibility with older data/queries.
+        tx.objectStore('root').put({
+            id: 'singleton',
+            version: normalizedRoot.version,
+            currentWeek: normalizedRoot.currentWeek,
+            dataJson: JSON.stringify(root)
+        });
 
         const weeksStore = tx.objectStore('weeks');
         const membersStore = tx.objectStore('teamMembers');
@@ -276,7 +301,7 @@ export class IndexedDBAdapter {
             }
         }
 
-        tx.oncomplete = () => resolve(normalizedRoot);
+        tx.oncomplete = () => resolve(root);
         tx.onerror = (e) => reject(new Error(`Failed to persist root payload: ${e.target.error}`));
     });
   }
