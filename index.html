@@ -9,8 +9,10 @@
     <script>
         (function() {
             const storage = window.localStorage;
-            const storedPreference = storage ? storage.getItem('fpl-storage-backend') : null;
-            const defaultBackend = window.STORAGE_BACKEND_DEFAULT || 'localstorage';
+            const rawStoredPreference = storage ? storage.getItem('fpl-storage-backend') : null;
+            const storedPreference = typeof rawStoredPreference === 'string' ? rawStoredPreference.toLowerCase() : null;
+            const rawDefaultBackend = window.STORAGE_BACKEND_DEFAULT || 'localstorage';
+            const defaultBackend = typeof rawDefaultBackend === 'string' ? rawDefaultBackend.toLowerCase() : 'localstorage';
             const allowedBackends = new Set(['localstorage', 'indexeddb', 'sqlite']);
             const resolvedBackend = allowedBackends.has(storedPreference)
                 ? storedPreference
