@@ -5,11 +5,13 @@ function createDeps(overrides = {}) {
     teamService: {
       getCurrentTeam: jest.fn(),
       setFplEntryId: jest.fn((root) => root),
+      getFplEntryId: jest.fn(),
       createTeam: jest.fn((root) => root),
       switchTeam: jest.fn((root) => root),
     },
     fplApiClient: {
       fetchBootstrap: jest.fn(),
+      fetchEntryPicks: jest.fn(),
     },
     pointsService: {
       updatePlayerPointsFromFpl: jest.fn((players) => players),
@@ -25,6 +27,7 @@ function createDeps(overrides = {}) {
     getRootData: jest.fn(),
     saveRootData: jest.fn(),
     updateDisplay: jest.fn(),
+    ensureWeekDerivedFields: jest.fn((root) => root),
     ...overrides,
   };
   deps.getFplApiClient = () => deps.fplApiClient;
@@ -174,6 +177,87 @@ describe('TeamSyncCoordinator', () => {
       await coordinator.addWhatIfTeam();
 
       expect(deps.ui.showAlert).toHaveBeenCalledWith('Team already exists');
+      expect(deps.saveRootData).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('importFplSquad', () => {
+    function createBootstrap() {
+      return {
+        events: [{ id: 3, is_current: true, is_next: false }],
+        elements: [
+          { id: 1, web_name: 'Raya', element_type: 1, team: 1, now_cost: 60, total_points: 100, event_points: 6, form: '2.0', status: 'a', chance_of_playing_next_round: null },
+          { id: 2, web_name: 'Haaland', element_type: 4, team: 2, now_cost: 125, total_points: 210, event_points: 13, form: '8.5', status: 'a', chance_of_playing_next_round: null },
+        ],
+        teams: [{ id: 1, name: 'Arsenal' }, { id: 2, name: 'Man City' }],
+        element_types: [{ id: 1, singular_name_short: 'GKP' }, { id: 4, singular_name_short: 'FWD' }],
+      };
+    }
+
+    function createPicks() {
+      return {
+        entry_history: { points: 63 },
+        picks: [
+          { element: 1, position: 1, is_captain: false, is_vice_captain: true },
+          { element: 2, position: 2, is_captain: true, is_vice_captain: false },
+        ],
+      };
+    }
+
+    it('shows an alert and does not fetch when no FPL entry id is set', async () => {
+      const deps = createDeps();
+      deps.getRootData.mockResolvedValue(createRoot());
+      deps.teamService.getFplEntryId.mockReturnValue(null);
+
+      const coordinator = new TeamSyncCoordinator(deps);
+      await coordinator.importFplSquad();
+
+      expect(deps.ui.showAlert).toHaveBeenCalledWith('Set your FPL entry ID first, then import.');
+      expect(deps.fplApiClient.fetchBootstrap).not.toHaveBeenCalled();
+      expect(deps.saveRootData).not.toHaveBeenCalled();
+    });
+
+    it('imports picks into the active team, sets captaincy, and saves', async () => {
+      const deps = createDeps();
+      const root = createRoot();
+      deps.getRootData.mockResolvedValue(root);
+      deps.teamService.getFplEntryId.mockReturnValue('1865916');
+      deps.teamService.getCurrentTeam.mockReturnValue(root.teams.default);
+      deps.fplApiClient.fetchBootstrap.mockResolvedValue(createBootstrap());
+      deps.fplApiClient.fetchEntryPicks.mockResolvedValue(createPicks());
+
+      const coordinator = new TeamSyncCoordinator(deps);
+      await coordinator.importFplSquad();
+
+      expect(deps.fplApiClient.fetchEntryPicks).toHaveBeenCalledWith('1865916', 3);
+
+      const week = root.teams.default.weeks[1];
+      expect(week.players).toHaveLength(2);
+      expect(week.players.map((p) => p.name)).toEqual(expect.arrayContaining(['Raya', 'Haaland']));
+      expect(week.players.every((p) => p.have)).toBe(true);
+
+      const haaland = week.players.find((p) => p.name === 'Haaland');
+      const raya = week.players.find((p) => p.name === 'Raya');
+      expect(week.captain).toBe(haaland.id);
+      expect(week.viceCaptain).toBe(raya.id);
+
+      expect(deps.saveRootData).toHaveBeenCalledWith(root);
+      expect(deps.updateDisplay).toHaveBeenCalled();
+      expect(deps.ui.showAlert).toHaveBeenLastCalledWith('Imported 2 players from your FPL squad');
+    });
+
+    it('shows a failure alert when fetching entry picks fails', async () => {
+      const deps = createDeps();
+      const root = createRoot();
+      deps.getRootData.mockResolvedValue(root);
+      deps.teamService.getFplEntryId.mockReturnValue('1865916');
+      deps.fplApiClient.fetchBootstrap.mockResolvedValue(createBootstrap());
+      deps.fplApiClient.fetchEntryPicks.mockRejectedValue(new Error('Not found'));
+
+      const coordinator = new TeamSyncCoordinator(deps);
+      await coordinator.importFplSquad();
+
+      expect(deps.ui.showAlert).toHaveBeenLastCalledWith('Import failed: Not found');
       expect(deps.saveRootData).not.toHaveBeenCalled();
     });
   });

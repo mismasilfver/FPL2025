@@ -1,4 +1,4 @@
-import { FplApiClient, mapFplPosition, mapFplTeam, normalizePlayer } from '../../js/services/fpl-api.js';
+import { FplApiClient, mapFplPosition, mapFplTeam, normalizePlayer, getCurrentGameweek } from '../../js/services/fpl-api.js';
 
 describe('FplApiClient', () => {
   let client;
@@ -165,5 +165,46 @@ describe('normalizePlayer', () => {
     const player = normalizePlayer(element, teams, []);
 
     expect(player.price).toBe(12.5);
+  });
+});
+
+describe('getCurrentGameweek', () => {
+  it('returns the id of the event marked is_current', () => {
+    const bootstrap = {
+      events: [
+        { id: 1, is_current: false, is_next: false, finished: true },
+        { id: 2, is_current: true, is_next: false, finished: false },
+        { id: 3, is_current: false, is_next: true, finished: false },
+      ],
+    };
+
+    expect(getCurrentGameweek(bootstrap)).toBe(2);
+  });
+
+  it('falls back to is_next when no event is current (e.g. pre-season)', () => {
+    const bootstrap = {
+      events: [
+        { id: 1, is_current: false, is_next: true, finished: false },
+        { id: 2, is_current: false, is_next: false, finished: false },
+      ],
+    };
+
+    expect(getCurrentGameweek(bootstrap)).toBe(1);
+  });
+
+  it('falls back to the last event when neither is_current nor is_next is set', () => {
+    const bootstrap = {
+      events: [
+        { id: 1, is_current: false, is_next: false, finished: true },
+        { id: 2, is_current: false, is_next: false, finished: true },
+      ],
+    };
+
+    expect(getCurrentGameweek(bootstrap)).toBe(2);
+  });
+
+  it('falls back to 1 when there are no events', () => {
+    expect(getCurrentGameweek({ events: [] })).toBe(1);
+    expect(getCurrentGameweek({})).toBe(1);
   });
 });

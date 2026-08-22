@@ -156,4 +156,22 @@ export function normalizePlayer(element, teams, elementTypes = []) {
   };
 }
 
+/**
+ * Determine the current gameweek from FPL bootstrap data.
+ * @param {object} bootstrap - Raw FPL bootstrap data (with an `events` array)
+ * @returns {number} The current gameweek id, falling back sensibly if none is marked current
+ */
+export function getCurrentGameweek(bootstrap) {
+  const events = Array.isArray(bootstrap?.events) ? bootstrap.events : [];
+  if (events.length === 0) return 1;
+
+  const current = events.find((event) => event.is_current);
+  if (current) return current.id;
+
+  const next = events.find((event) => event.is_next);
+  if (next) return next.id;
+
+  return events[events.length - 1].id;
+}
+
 export default FplApiClient;

@@ -23,7 +23,7 @@ export default class UIManager {
             onAddPlayer, onModalClose, onFormSubmit, onPositionFilterChange,
             onHaveFilterChange, onPrevWeek, onNextWeek, onCreateWeek, onExportWeek,
             onEscapeKey, onToggleHave, onEdit, onDelete, onMakeCaptain, onMakeViceCaptain,
-            onSaveFplId, onSync, onAddTeam, onTeamChange
+            onSaveFplId, onSync, onImportFplSquad, onAddTeam, onTeamChange
         } = handlers;
 
         if (!this._boundGlobal) {
@@ -64,6 +64,11 @@ export default class UIManager {
             this.syncBtn?.addEventListener('click', () => {
                 this._logButtonClick('sync');
                 onSync?.();
+            });
+
+            this.importFplSquadBtn?.addEventListener('click', () => {
+                this._logButtonClick('import-fpl-squad');
+                onImportFplSquad?.();
             });
 
             this.addTeamBtn?.addEventListener('click', () => {
@@ -151,6 +156,7 @@ export default class UIManager {
         this.fplEntryIdInput = doc.getElementById('fpl-entry-id');
         this.saveFplIdBtn = doc.getElementById('save-fpl-id-btn');
         this.syncBtn = doc.getElementById('sync-btn');
+        this.importFplSquadBtn = doc.getElementById('import-fpl-squad-btn');
         this.teamSelect = doc.getElementById('team-select');
         this.addTeamBtn = doc.getElementById('add-team-btn');
         this.appAlert = doc.querySelector('.app-alert');
