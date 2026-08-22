@@ -9,7 +9,7 @@ import { addPlayer, setCaptainStatus, togglePlayerOwned } from '../helpers/ui-he
 import { expectCaptainStatus, expectErrorMessage } from '../helpers/assertions.js';
 import { buildMinimalSquad } from '../fixtures/test-data.js';
 
-const BACKENDS = ['localStorage', 'indexeddb', 'sqlite'];
+const BACKENDS = ['localstorage', 'indexeddb', 'sqlite'];
 
 for (const backend of BACKENDS) {
   test.describe(`Captaincy Management - ${backend}`, () => {

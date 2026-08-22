@@ -9,7 +9,7 @@ import { addPlayer, getPlayerCount, deletePlayer, updatePlayer, togglePlayerOwne
 import { expectPlayerExists, expectPlayerCount, expectPlayerNotExists } from '../helpers/assertions.js';
 import { buildMinimalSquad, getPlayerByPosition } from '../fixtures/test-data.js';
 
-const BACKENDS = ['localStorage', 'indexeddb', 'sqlite'];
+const BACKENDS = ['localstorage', 'indexeddb', 'sqlite'];
 
 for (const backend of BACKENDS) {
   test.describe(`Player Lifecycle - ${backend}`, () => {

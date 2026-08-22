@@ -9,7 +9,7 @@ import { addPlayer, createNewWeek, navigateToWeek, getCurrentWeekNumber, isReadO
 import { expectCurrentWeek, expectReadOnlyMode, expectEditMode, expectPlayerCount, expectPlayerExists } from '../helpers/assertions.js';
 import { buildMinimalSquad, getPlayerByPosition } from '../fixtures/test-data.js';
 
-const BACKENDS = ['localStorage', 'indexeddb', 'sqlite'];
+const BACKENDS = ['localstorage', 'indexeddb', 'sqlite'];
 
 for (const backend of BACKENDS) {
   test.describe(`Week Navigation - ${backend}`, () => {
