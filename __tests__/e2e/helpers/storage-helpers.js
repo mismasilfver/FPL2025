@@ -8,7 +8,7 @@ const STORAGE_BACKEND_KEY = 'fpl-storage-backend';
 /**
  * Set the storage backend by manipulating localStorage
  * @param {import('@playwright/test').Page} page - Playwright page object
- * @param {string} backend - Backend name: 'localStorage', 'indexeddb', or 'sqlite'
+ * @param {string} backend - Backend name: 'localstorage', 'indexeddb', or 'sqlite'
  */
 export async function setStorageBackend(page, backend) {
   // Set the backend in localStorage using full URL navigation
@@ -29,7 +29,7 @@ export async function setStorageBackend(page, backend) {
  */
 export async function getStorageBackend(page) {
   return page.evaluate(({ key }) => {
-    return localStorage.getItem(key) || 'localStorage';
+    return localStorage.getItem(key) || 'localstorage';
   }, { key: STORAGE_BACKEND_KEY });
 }
 

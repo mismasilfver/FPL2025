@@ -11,7 +11,7 @@ import { buildMinimalSquad, getPlayerByPosition } from '../fixtures/test-data.js
 
 test.describe('Cross-Backend Data Integrity', () => {
   test.beforeEach(async ({ page }) => {
-    await resetAppWithBackend(page, 'localStorage');
+    await resetAppWithBackend(page, 'localstorage');
   });
 
   test('data persists when switching from localStorage to IndexedDB', async ({ page }) => {
@@ -56,7 +56,7 @@ test.describe('Cross-Backend Data Integrity', () => {
     await expectPlayerCount(page, players.length);
 
     // Switch to localStorage (backends don't share data)
-    await resetAppWithBackend(page, 'localStorage');
+    await resetAppWithBackend(page, 'localstorage');
 
     // Verify app handles switch cleanly with empty state
     await expectPlayerCount(page, 0);
@@ -74,7 +74,7 @@ test.describe('Cross-Backend Data Integrity', () => {
     await expectPlayerCount(page, players.length);
 
     // Switch to localStorage (backends don't share data)
-    await resetAppWithBackend(page, 'localStorage');
+    await resetAppWithBackend(page, 'localstorage');
 
     // Verify app handles switch cleanly with empty state
     await expectPlayerCount(page, 0);
@@ -82,7 +82,7 @@ test.describe('Cross-Backend Data Integrity', () => {
 
   test('can add data after backend switch', async ({ page }) => {
     // Start with localStorage and add data
-    await resetAppWithBackend(page, 'localStorage');
+    await resetAppWithBackend(page, 'localstorage');
     const player1 = getPlayerByPosition('forward');
     await addPlayer(page, player1);
     await expectPlayerCount(page, 1);
@@ -101,7 +101,7 @@ test.describe('Cross-Backend Data Integrity', () => {
 
   test('captain data persists within same backend after switch', async ({ page }) => {
     // Start with localStorage
-    await resetAppWithBackend(page, 'localStorage');
+    await resetAppWithBackend(page, 'localstorage');
 
     // Add players and set captain
     const players = buildMinimalSquad();
@@ -118,7 +118,7 @@ test.describe('Cross-Backend Data Integrity', () => {
 
     // Switch to IndexedDB and back to localStorage
     await resetAppWithBackend(page, 'indexeddb');
-    await resetAppWithBackend(page, 'localStorage');
+    await resetAppWithBackend(page, 'localstorage');
 
     // Verify app state is clean (backends don't share data)
     await expectPlayerCount(page, 0);
@@ -126,7 +126,7 @@ test.describe('Cross-Backend Data Integrity', () => {
 
   test('clearStorage works across all backends', async ({ page }) => {
     // Test localStorage
-    await resetAppWithBackend(page, 'localStorage');
+    await resetAppWithBackend(page, 'localstorage');
     const player1 = getPlayerByPosition('forward');
     await addPlayer(page, player1);
     await expectPlayerCount(page, 1);
@@ -160,7 +160,7 @@ test.describe('Cross-Backend Data Integrity', () => {
 
   test('backend switching does not corrupt application state', async ({ page }) => {
     // Start with localStorage
-    await resetAppWithBackend(page, 'localStorage');
+    await resetAppWithBackend(page, 'localstorage');
     const player1 = getPlayerByPosition('forward');
     await addPlayer(page, player1);
 
@@ -174,7 +174,7 @@ test.describe('Cross-Backend Data Integrity', () => {
     await addPlayer(page, player3);
 
     // Switch back to localStorage
-    await resetAppWithBackend(page, 'localStorage');
+    await resetAppWithBackend(page, 'localstorage');
 
     // Verify app is still functional
     const player4 = getPlayerByPosition('goalkeeper');
@@ -185,7 +185,7 @@ test.describe('Cross-Backend Data Integrity', () => {
 
   test('data integrity maintained after multiple backend switches', async ({ page }) => {
     // Start with localStorage
-    await resetAppWithBackend(page, 'localStorage');
+    await resetAppWithBackend(page, 'localstorage');
     const players = buildMinimalSquad();
     for (const player of players) {
       await addPlayer(page, player);
@@ -205,7 +205,7 @@ test.describe('Cross-Backend Data Integrity', () => {
     const sqliteCount = await getPlayerCount(page);
 
     // Switch back to localStorage and verify original data
-    await resetAppWithBackend(page, 'localStorage');
+    await resetAppWithBackend(page, 'localstorage');
     const finalLocalStorageCount = await getPlayerCount(page);
 
     // Each backend should maintain its own data
@@ -230,7 +230,7 @@ test.describe('Cross-Backend Data Integrity', () => {
 
   test('week data integrity maintained during backend switches', async ({ page }) => {
     // Start with localStorage
-    await resetAppWithBackend(page, 'localStorage');
+    await resetAppWithBackend(page, 'localstorage');
 
     // Add players to week 1
     const players = buildMinimalSquad();
@@ -248,7 +248,7 @@ test.describe('Cross-Backend Data Integrity', () => {
     }
 
     // Switch back to localStorage
-    await resetAppWithBackend(page, 'localStorage');
+    await resetAppWithBackend(page, 'localstorage');
 
     // Verify app can still create weeks and manage data
     const newPlayer = getPlayerByPosition('goalkeeper');

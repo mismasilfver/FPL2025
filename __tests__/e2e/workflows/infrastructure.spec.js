@@ -21,9 +21,9 @@ test.describe('E2E Infrastructure', () => {
   });
 
   test('storage backend can be set to localStorage', async ({ page }) => {
-    await resetAppWithBackend(page, 'localStorage');
+    await resetAppWithBackend(page, 'localstorage');
     const backend = await getStorageBackend(page);
-    expect(backend).toBe('localStorage');
+    expect(backend).toBe('localstorage');
   });
 
   test('storage backend can be set to indexeddb', async ({ page }) => {

@@ -145,7 +145,7 @@ retries: 2, // Retry failed tests twice
 ```javascript
 test.beforeEach(async ({ page }) => {
   // Ensure clean state
-  await resetAppWithBackend(page, 'localStorage');
+  await resetAppWithBackend(page, 'localstorage');
   await clearStorage(page);
 });
 ```
@@ -227,9 +227,9 @@ curl -X PUT http://localhost:3000/api/storage/root -H "Content-Type: application
 **Check helper functions:**
 ```javascript
 // Ensure storage-helpers.js functions are working
-await resetAppWithBackend(page, 'localStorage');
+await resetAppWithBackend(page, 'localstorage');
 const backend = await getStorageBackend(page);
-console.log('Current backend:', backend); // Should be 'localStorage'
+console.log('Current backend:', backend); // Should be 'localstorage'
 ```
 
 ### 7. Browser/Environment Issues

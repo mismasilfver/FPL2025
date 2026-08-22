@@ -200,7 +200,7 @@ Playwright configuration is in `playwright.config.js`:
 Most tests run across all three backends using this pattern:
 
 ```javascript
-const BACKENDS = ['localStorage', 'indexeddb', 'sqlite'];
+const BACKENDS = ['localstorage', 'indexeddb', 'sqlite'];
 
 for (const backend of BACKENDS) {
   test.describe(`Feature Name - ${backend}`, () => {
