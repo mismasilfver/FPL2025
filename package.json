@@ -4,7 +4,9 @@
   "description": "Fantasy Premier League Team Manager",
   "scripts": {
     "test": "jest",
-    "test:all": "jest",
+    "test:unit": "jest",
+    "test:e2e": "playwright test",
+    "test:all": "npm run test:unit && npm run test:e2e",
     "test:fast": "jest -w 4",
     "test:storage": "jest __tests__/storage-module.test.js __tests__/indexeddb.integration.test.js",
     "test:ui": "jest __tests__/app-init.test.js __tests__/playerManagement.test.js __tests__/weekNavigation.clean.test.js",
