@@ -5,9 +5,10 @@ import { AppError } from './js/utils/app-error.js';
 import PlayerService from './js/services/player-service.js';
 import WeekService from './js/services/week-service.js';
 import CaptaincyService from './js/services/captaincy-service.js';
-import FplApiClient, { normalizePlayer } from './js/services/fpl-api.js';
+import FplApiClient from './js/services/fpl-api.js';
 import PointsService from './js/services/points-service.js';
 import TeamService from './js/services/team-service.js';
+import TeamSyncCoordinator from './js/services/team-sync-coordinator.js';
 import LegacyCompatibilityLayer from './js/services/legacy-compatibility-layer.js';
 import MigrationService from './js/services/migration-service.js';
 
@@ -24,6 +25,15 @@ export class FPLTeamManager {
         this.fplApiClient = new FplApiClient();
         this.pointsService = new PointsService();
         this.teamService = new TeamService();
+        this.teamSyncCoordinator = new TeamSyncCoordinator({
+            teamService: this.teamService,
+            getFplApiClient: () => this.fplApiClient,
+            pointsService: this.pointsService,
+            ui: this.ui,
+            getRootData: () => this._getRootData(),
+            saveRootData: (root) => this._saveRootData(root),
+            updateDisplay: () => this.updateDisplay(),
+        });
         this.legacyLayer = new LegacyCompatibilityLayer('fpl-team-data');
         this.migrationService = new MigrationService();
         this.storageKey = 'fpl-team-data';
@@ -501,81 +511,19 @@ export class FPLTeamManager {
     }
 
     async saveFplEntryId(entryId) {
-        try {
-            let root = await this._getRootData();
-            root = this.teamService.setFplEntryId(root, entryId);
-            await this._saveRootData(root);
-            this.ui.showAlert(`FPL entry ID saved: ${entryId}`);
-        } catch (error) {
-            this.ui.showAlert(`Failed to save FPL ID: ${error.message}`);
-        }
+        return this.teamSyncCoordinator.saveFplEntryId(entryId);
     }
 
     async syncFromFpl() {
-        try {
-            this.ui.showAlert('Syncing with FPL...');
-            const bootstrap = await this.fplApiClient.fetchBootstrap();
-
-            const normalizedMap = {};
-            for (const element of bootstrap.elements) {
-                const normalized = normalizePlayer(element, bootstrap.teams, bootstrap.element_types);
-                normalizedMap[normalized.fplId] = normalized;
-            }
-
-            const root = await this._getRootData();
-            const team = this.teamService.getCurrentTeam(root);
-            const currentWeek = team.weeks[team.currentWeek];
-            const players = currentWeek.players || [];
-
-            const updatedPlayers = this.pointsService.updatePlayerPointsFromFpl(players, normalizedMap);
-            currentWeek.players = updatedPlayers;
-            team.weeks[team.currentWeek] = currentWeek;
-
-            const weekPoints = this.pointsService.calculateWeekPoints(team, team.currentWeek);
-            team.gameweekPoints = this.pointsService.recordGameweekPoints(team, team.currentWeek, weekPoints).gameweekPoints;
-            team.totalPoints = this.pointsService.calculateTeamTotalPoints(team).totalPoints;
-
-            await this._saveRootData(root);
-            await this.updateDisplay();
-            this.ui.showAlert('Sync complete');
-        } catch (error) {
-            this.ui.showAlert(`SYNC failed: ${error.message}`);
-        }
+        return this.teamSyncCoordinator.syncFromFpl();
     }
 
     async addWhatIfTeam() {
-        const name = prompt('Enter a name for the what-if team:');
-        if (!name) return;
-
-        try {
-            let root = await this._getRootData();
-            // Migrate root to multi-team shape if needed
-            if (!root.teams) {
-                root = this._migrateToTeams(root);
-            }
-            root = this.teamService.createTeam(root, name, 'whatif');
-            await this._saveRootData(root);
-            this.ui.renderTeamSelector(root.teams, root.currentTeam);
-            await this.updateDisplay();
-        } catch (error) {
-            this.ui.showAlert(error.message);
-        }
+        return this.teamSyncCoordinator.addWhatIfTeam();
     }
 
     async switchTeam(teamId) {
-        try {
-            let root = await this._getRootData();
-            if (!root.teams) {
-                root = this._migrateToTeams(root);
-            }
-            root = this.teamService.switchTeam(root, teamId);
-            await this._saveRootData(root);
-            this.ui.renderTeamSelector(root.teams, root.currentTeam);
-            this.ui.renderFplEntryId(root.settings?.fplEntryId || '');
-            await this.updateDisplay();
-        } catch (error) {
-            this.ui.showAlert(error.message);
-        }
+        return this.teamSyncCoordinator.switchTeam(teamId);
     }
 
     _migrateToTeams(root) {
