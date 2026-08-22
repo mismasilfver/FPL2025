@@ -222,6 +222,10 @@ Works on all modern browsers including:
 - enable a server accessible from the internet (currently `localhost` only) so the app — and its FPL integration, which requires the Express server — can be used outside the local machine
 - utilize an online hosted database (e.g. Firebase, Supabase, or a hosted Postgres/SQLite) to allow multi-device usage
 - authentication to protect data (single-user or per-account), likely via Firebase/Supabase auth once hosted online
+- **Make a decision on storage backend support**: decide whether to keep supporting all three backends (localStorage, IndexedDB, SQLite) long-term, or drop one or more. Most of the storage-related bugs found and fixed this session (backend-switching case sensitivity, IndexedDB dropping the multi-team schema, SQLite E2E reset payload) came from keeping three backends in sync with every schema change — each new backend multiplies the surface area for this class of bug. Worth weighing that maintenance cost against how much value having three interchangeable backends actually provides once the app moves toward a hosted database (see above), which would likely replace at least one of them anyway.
+
+### UX / simplification
+- Hide less-frequently-used controls (e.g. storage backend switcher, what-if team creation, JSON import/export, FPL entry ID/SYNC/Import My Squad) behind a collapsible "Advanced" section or button, so the primary player-management UI stays focused for everyday use
 
 ### FPL API integration gaps
 (see also [Current limitations of the FPL integration](#current-limitations-of-the-fpl-integration) above)
