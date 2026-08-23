@@ -224,10 +224,12 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2 id="modal-title">Add Player</h2>
-                    <span class="close">&times;</span>
+                    <button class="close" type="button" aria-label="Close player form">&times;</button>
                 </div>
-                <form id="player-form">
-                    <div class="form-group" id="form-group-name">
+                <form id="player-form" novalidate>
+                    <div id="player-form-error" class="form-error" role="alert" hidden></div>
+                    <div class="form-grid">
+                    <div class="form-group form-group-full" id="form-group-name">
                         <label for="player-name">Player Name *</label>
                         <input type="text" id="player-name" name="player-name" required data-testid="player-name-input">
                     </div>
@@ -258,20 +260,21 @@
                             <option value="red">Sell/Don't Buy (Red)</option>
                         </select>
                     </div>
-                    <div class="form-group form-group-checkbox" id="form-group-have">
+                    <div class="form-group form-group-checkbox form-group-full" id="form-group-have">
                         <label for="player-have" class="checkbox-label">
-                            <span>In My Team</span>
+                            <span>Add to squad</span>
                             <input type="checkbox" id="player-have" name="player-have" data-testid="player-have-checkbox">
                         </label>
                         <small class="form-help">Maximum 15 players can be in your team</small>
                     </div>
-                    <div class="form-group" id="form-group-notes">
+                    <div class="form-group form-group-full" id="form-group-notes">
                         <label for="player-notes">Notes</label>
                         <textarea id="player-notes" name="player-notes" rows="3" placeholder="Optional notes about this player..." data-testid="player-notes-textarea"></textarea>
                     </div>
+                    </div>
                     <div class="form-actions">
                         <button type="button" id="cancel-btn" class="btn btn-secondary" data-testid="cancel-button">Cancel</button>
-                        <button type="submit" class="btn btn-primary" data-testid="save-player-button">Save Player</button>
+                        <button type="submit" class="btn btn-primary" data-testid="save-player-button">Add player</button>
                     </div>
                 </form>
             </div>
