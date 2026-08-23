@@ -161,6 +161,7 @@ export default class UIManager {
         this.fplEntryIdInput = doc.getElementById('fpl-entry-id');
         this.saveFplIdBtn = doc.getElementById('save-fpl-id-btn');
         this.syncBtn = doc.getElementById('sync-btn');
+        this.lastSyncStatus = doc.getElementById('last-sync-status');
         this.importFplSquadBtn = doc.getElementById('import-fpl-squad-btn');
         this.teamSelect = doc.getElementById('team-select');
         this.addTeamBtn = doc.getElementById('add-team-btn');
@@ -271,6 +272,24 @@ export default class UIManager {
         this.advancedPanel.hidden = isOpen;
         this.advancedToggleBtn.textContent = isOpen ? 'Advanced ▾' : 'Advanced ▴';
         this.advancedToggleBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+    }
+
+    _formatSyncDate(timestamp) {
+        if (!timestamp) return 'Last synced: never';
+        const date = new Date(timestamp);
+        const now = new Date();
+        const isToday = date.getDate() === now.getDate()
+            && date.getMonth() === now.getMonth()
+            && date.getFullYear() === now.getFullYear();
+        const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        if (isToday) return `Last synced: Today, ${time}`;
+        const dateStr = date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+        return `Last synced: ${dateStr}, ${time}`;
+    }
+
+    renderLastSync(timestamp) {
+        if (!this.lastSyncStatus) return;
+        this.lastSyncStatus.textContent = this._formatSyncDate(timestamp);
     }
 
     showAlert(message, options = {}) {

@@ -58,6 +58,9 @@ class TeamSyncCoordinator {
       team.gameweekPoints = this.pointsService.recordGameweekPoints(team, team.currentWeek, weekPoints).gameweekPoints;
       team.totalPoints = this.pointsService.calculateTeamTotalPoints(team).totalPoints;
 
+      root.settings = root.settings || {};
+      root.settings.lastSyncedAt = new Date().toISOString();
+
       await this.saveRootData(root);
       await this.updateDisplay();
       this.ui.showAlert('Sync complete');
