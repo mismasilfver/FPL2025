@@ -162,7 +162,9 @@ export class FPLTeamManager {
 
     async handleFormSubmit(e) {
         e.preventDefault();
+        this.ui.clearFormError();
         if (!this.ui.playerForm || !this.ui.playerForm.checkValidity()) {
+            this.ui.showFormError('Complete all required fields before saving.');
             this.ui.playerForm?.reportValidity();
             return;
         }
@@ -186,7 +188,7 @@ export class FPLTeamManager {
         const wasInTeam = playerBeingEdited ? playerBeingEdited.have : false;
 
         if (playerData.have && !wasInTeam && teamSize >= 15) {
-            this.ui.showAlert('You can only have 15 players in your team.');
+            this.ui.showFormError('Your squad already has the maximum 15 players.');
             return;
         }
 

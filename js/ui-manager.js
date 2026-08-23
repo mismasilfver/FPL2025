@@ -137,6 +137,18 @@ export default class UIManager {
         if (!this._keydownBound) {
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') onEscapeKey?.(e);
+                if (e.key !== 'Tab' || !this.modal || this.modal.style.display !== 'block') return;
+                const focusable = Array.from(this.modal.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)'));
+                if (focusable.length === 0) return;
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
             });
             this._keydownBound = true;
         }
@@ -186,12 +198,16 @@ export default class UIManager {
         if (!this.modal) this.buildModalFromTemplate();
         if (!this.modal) return console.error('Modal could not be created.');
 
+        this.modalTrigger = this.document?.activeElement;
+        this.clearFormError();
         if (player) {
-            this.modalTitle.textContent = 'Edit Player';
+            this.modalTitle.textContent = 'Edit player';
+            if (this.savePlayerBtn) this.savePlayerBtn.textContent = 'Save changes';
             this.populateForm(player);
             this.currentEditingId = player.id;
         } else {
-            this.modalTitle.textContent = 'Add Player';
+            this.modalTitle.textContent = 'Add player';
+            if (this.savePlayerBtn) this.savePlayerBtn.textContent = 'Add player';
             this.clearForm();
             this.currentEditingId = null;
         }
@@ -223,6 +239,8 @@ export default class UIManager {
         this.playerStatus = this.modal.querySelector('[data-testid="player-status-select"]');
         this.playerHave = this.modal.querySelector('[data-testid="player-have-checkbox"]');
         this.playerNotes = this.modal.querySelector('[data-testid="player-notes-textarea"]');
+        this.formError = this.modal.querySelector('#player-form-error');
+        this.savePlayerBtn = this.modal.querySelector('[data-testid="save-player-button"]');
         
         // Bind modal events after creation
         this.bindModalEvents();
@@ -272,6 +290,21 @@ export default class UIManager {
     closeModal() {
         if (this.modal) this.modal.style.display = 'none';
         this.clearForm();
+        this.clearFormError();
+        this.modalTrigger?.focus?.();
+        this.modalTrigger = null;
+    }
+
+    showFormError(message) {
+        if (!this.formError) return;
+        this.formError.textContent = message;
+        this.formError.hidden = false;
+    }
+
+    clearFormError() {
+        if (!this.formError) return;
+        this.formError.textContent = '';
+        this.formError.hidden = true;
     }
 
     toggleAdvancedPanel() {
