@@ -90,31 +90,40 @@
                 <p>Storage and data management</p>
             </div>
             <div class="advanced-content">
-                <div class="storage-controls" data-testid="storage-controls">
-                    <span id="storage-indicator" class="storage-indicator" data-testid="storage-indicator">Storage: localStorage</span>
-                    <div class="storage-toggle">
-                        <button id="toggle-storage-btn" class="btn btn-secondary" data-testid="toggle-storage-btn" type="button" aria-haspopup="listbox" aria-expanded="false">
-                            Change Storage
-                        </button>
-                        <ul id="storage-options" class="storage-options" data-testid="storage-options" role="listbox" aria-label="Storage backend" hidden>
-                            <li role="option" data-backend="localstorage" aria-selected="true">localStorage</li>
-                            <li role="option" data-backend="indexeddb" aria-selected="false">IndexedDB</li>
-                            <li role="option" data-backend="sqlite" aria-selected="false">SQLite</li>
-                        </ul>
+                <div class="advanced-section">
+                    <h3 class="advanced-section-heading">Storage</h3>
+                    <div class="storage-controls" data-testid="storage-controls">
+                        <span id="storage-indicator" class="storage-indicator" data-testid="storage-indicator">Storage: localStorage</span>
+                        <div class="storage-toggle">
+                            <button id="toggle-storage-btn" class="btn btn-secondary" data-testid="toggle-storage-btn" type="button" aria-haspopup="listbox" aria-expanded="false">
+                                Change Storage
+                            </button>
+                            <ul id="storage-options" class="storage-options" data-testid="storage-options" role="listbox" aria-label="Storage backend" hidden>
+                                <li role="option" data-backend="localstorage" aria-selected="true">localStorage</li>
+                                <li role="option" data-backend="indexeddb" aria-selected="false">IndexedDB</li>
+                                <li role="option" data-backend="sqlite" aria-selected="false">SQLite</li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
 
-                <div class="fpl-settings" data-testid="fpl-settings">
-                    <label for="fpl-entry-id">FPL ID:</label>
-                    <input type="text" id="fpl-entry-id" data-testid="fpl-entry-id" placeholder="Enter FPL entry ID" size="12">
-                    <button id="save-fpl-id-btn" class="btn btn-secondary" data-testid="save-fpl-id-btn" type="button">Save</button>
-                    <button id="import-fpl-squad-btn" class="btn btn-secondary" data-testid="import-fpl-squad-btn" type="button">Import My Squad</button>
-                    <button id="sync-btn" class="btn btn-primary" data-testid="sync-btn" type="button">SYNC</button>
+                <div class="advanced-section">
+                    <h3 class="advanced-section-heading">FPL sync</h3>
+                    <div class="fpl-settings" data-testid="fpl-settings">
+                        <label for="fpl-entry-id">FPL ID:</label>
+                        <input type="text" id="fpl-entry-id" data-testid="fpl-entry-id" placeholder="Enter FPL entry ID" size="12">
+                        <button id="save-fpl-id-btn" class="btn btn-secondary" data-testid="save-fpl-id-btn" type="button">Save</button>
+                        <button id="import-fpl-squad-btn" class="btn btn-secondary" data-testid="import-fpl-squad-btn" type="button">Import My Squad</button>
+                        <button id="sync-btn" class="btn btn-primary" data-testid="sync-btn" type="button">SYNC</button>
+                    </div>
                 </div>
 
-                <div class="import-controls" data-testid="import-controls">
-                    <input type="file" id="import-json" accept=".json" data-testid="import-json-input">
-                    <button id="import-button" class="btn btn-secondary" data-testid="import-button">Import JSON</button>
+                <div class="advanced-section">
+                    <h3 class="advanced-section-heading">Import / export</h3>
+                    <div class="import-controls" data-testid="import-controls">
+                        <input type="file" id="import-json" accept=".json" data-testid="import-json-input">
+                        <button id="import-button" class="btn btn-secondary" data-testid="import-button">Import JSON</button>
+                    </div>
                 </div>
             </div>
         </section>
