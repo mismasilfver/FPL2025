@@ -588,6 +588,24 @@ header h1 {
     display: none;
 }
 
+.advanced-heading {
+    margin-bottom: 15px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.advanced-heading h2 {
+    font-size: 18px;
+    color: #2d3748;
+    margin-bottom: 4px;
+}
+
+.advanced-heading p {
+    font-size: 13px;
+    color: #718096;
+    font-weight: 500;
+}
+
 .advanced-content {
     display: flex;
     flex-direction: column;
