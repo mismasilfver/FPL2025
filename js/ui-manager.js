@@ -380,8 +380,8 @@ export default class UIManager {
     renderCaptaincyInfo(players, captainId, viceCaptainId) {
         const captainPlayer = (players || []).find(p => p.id === captainId);
         const viceCaptainPlayer = (players || []).find(p => p.id === viceCaptainId);
-        if (this.captainInfo) this.captainInfo.textContent = `Captain: ${captainPlayer ? captainPlayer.name : 'None selected'}`;
-        if (this.viceCaptainInfo) this.viceCaptainInfo.textContent = `Vice Captain: ${viceCaptainPlayer ? viceCaptainPlayer.name : 'None selected'}`;
+        if (this.captainInfo) this.captainInfo.textContent = captainPlayer ? captainPlayer.name : 'None selected';
+        if (this.viceCaptainInfo) this.viceCaptainInfo.textContent = viceCaptainPlayer ? viceCaptainPlayer.name : 'None selected';
     }
 
     renderWeekControls({ currentWeek, totalWeeks, isReadOnly, savedWeeks = [] }) {
