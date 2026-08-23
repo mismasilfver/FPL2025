@@ -308,7 +308,7 @@ export class FPLTeamManager {
             return positionMatch && haveMatch;
         });
 
-        this.ui.renderPlayers(filteredPlayers, { isReadOnly: currentWeek.isReadOnly, captainId, viceCaptainId });
+        this.ui.renderPlayers(filteredPlayers, { isReadOnly: currentWeek.isReadOnly, captainId, viceCaptainId, filters });
         const weekPoints = this.pointsService.calculateWeekPoints(team, team.currentWeek);
         const totalPoints = this.pointsService.calculateTeamTotalPoints(team).totalPoints || 0;
         this.ui.renderSummary(players, { totalPoints, gwPoints: weekPoints });

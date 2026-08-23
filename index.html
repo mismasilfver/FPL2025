@@ -157,19 +157,25 @@
         <div class="players-table-container">
             <table id="players-table">
                 <thead>
+                    <tr class="column-groups" aria-hidden="true">
+                        <th colspan="3">Player</th>
+                        <th colspan="3">Performance</th>
+                        <th colspan="4">Squad role</th>
+                        <th colspan="2">Actions</th>
+                    </tr>
                     <tr>
                         <th data-testid="column-name">Name</th>
                         <th data-testid="column-position">Position</th>
                         <th data-testid="column-team">Team</th>
-                        <th data-testid="column-price">Price (£m)</th>
-                        <th data-testid="column-total-points">Total Pts</th>
-                        <th data-testid="column-gw-points">GW Pts</th>
+                        <th data-testid="column-price">Price</th>
+                        <th data-testid="column-total-points">Total</th>
+                        <th data-testid="column-gw-points">GW</th>
                         <th data-testid="column-status">Status</th>
-                        <th data-testid="column-have">Have</th>
+                        <th data-testid="column-have">Squad</th>
                         <th data-testid="column-captain">Captain</th>
                         <th data-testid="column-vice">Vice</th>
                         <th data-testid="column-notes">Notes</th>
-                        <th data-testid="column-actions">Actions</th>
+                        <th data-testid="column-actions">Manage</th>
                     </tr>
                 </thead>
                 <tbody id="players-tbody">
@@ -181,18 +187,18 @@
         <!-- Template for player table rows -->
         <template id="player-row-template">
             <tr class="player-row">
-                <td class="col-name"></td>
-                <td class="col-position"></td>
-                <td class="col-team"></td>
-                <td class="col-price"></td>
-                <td class="col-total-points"></td>
-                <td class="col-gw-points"></td>
-                <td class="col-status"></td>
-                <td class="col-have"></td>
-                <td class="col-captain"></td>
-                <td class="col-vice"></td>
-                <td class="col-notes"></td>
-                <td class="col-actions"></td>
+                <td class="col-name" data-label="Player"></td>
+                <td class="col-position" data-label="Position"></td>
+                <td class="col-team" data-label="Team"></td>
+                <td class="col-price" data-label="Price"></td>
+                <td class="col-total-points" data-label="Total points"></td>
+                <td class="col-gw-points" data-label="GW points"></td>
+                <td class="col-status" data-label="Status"></td>
+                <td class="col-have" data-label="Squad"></td>
+                <td class="col-captain" data-label="Captain"></td>
+                <td class="col-vice" data-label="Vice"></td>
+                <td class="col-notes" data-label="Notes"></td>
+                <td class="col-actions" data-label="Manage"></td>
             </tr>
         </template>
 

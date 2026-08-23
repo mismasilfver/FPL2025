@@ -418,16 +418,18 @@ export default class UIManager {
             template.id = 'player-row-template';
             template.innerHTML = `
       <tr class="player-row">
-        <td class="col-name"></td>
-        <td class="col-position"></td>
-        <td class="col-team"></td>
-        <td class="col-price"></td>
-        <td class="col-status"></td>
-        <td class="col-have"></td>
-        <td class="col-captain"></td>
-        <td class="col-vice"></td>
-        <td class="col-notes"></td>
-        <td class="col-actions"></td>
+        <td class="col-name" data-label="Player"></td>
+        <td class="col-position" data-label="Position"></td>
+        <td class="col-team" data-label="Team"></td>
+        <td class="col-price" data-label="Price"></td>
+        <td class="col-total-points" data-label="Total points"></td>
+        <td class="col-gw-points" data-label="GW points"></td>
+        <td class="col-status" data-label="Status"></td>
+        <td class="col-have" data-label="Squad"></td>
+        <td class="col-captain" data-label="Captain"></td>
+        <td class="col-vice" data-label="Vice"></td>
+        <td class="col-notes" data-label="Notes"></td>
+        <td class="col-actions" data-label="Manage"></td>
       </tr>
     `;
             targetDoc.body?.appendChild(template);
@@ -564,12 +566,20 @@ export default class UIManager {
             notesCell.setAttribute('data-testid', `notes-cell-${player.id}`);
             notesCell.setAttribute('data-player-id', player.id);
             notesCell.setAttribute('data-full-notes', player.notes || '');
-            notesCell.title = 'Click to expand notes';
+            const notesButton = doc.createElement('button');
+            notesButton.type = 'button';
+            notesButton.className = 'notes-toggle';
+            notesButton.setAttribute('aria-expanded', 'false');
+            notesButton.setAttribute('aria-controls', `notes-detail-${player.id}`);
+            notesButton.textContent = player.notes ? 'View notes' : 'No notes';
+            notesButton.disabled = !player.notes;
             const notesSpan = doc.createElement('span');
+            notesSpan.id = `notes-detail-${player.id}`;
             notesSpan.className = 'notes-text';
-            notesSpan.textContent = this.truncateText(player.notes || '', 20);
+            notesSpan.hidden = true;
+            notesSpan.textContent = player.notes || '';
             notesCell.innerHTML = '';
-            notesCell.appendChild(notesSpan);
+            notesCell.append(notesButton, notesSpan);
         }
 
         const actionsCell = row.querySelector('.col-actions');
@@ -597,12 +607,19 @@ export default class UIManager {
         return row;
     }
 
-    renderPlayers(players, { isReadOnly, captainId, viceCaptainId }) {
+    renderPlayers(players, { isReadOnly, captainId, viceCaptainId, filters = {} }) {
         if (!this.playersTbody) return;
 
         this.playersTbody.innerHTML = '';
         if (!players || players.length === 0) {
-            if(this.emptyState) this.emptyState.style.display = 'block';
+            if (this.emptyState) {
+                const message = filters.position && filters.position !== 'all'
+                    ? `No ${filters.position} players match this view.`
+                    : filters.have ? 'No squad players match this view.' : 'No players added yet. Click "Add Player" to start building your team!';
+                const messageElement = this.emptyState.querySelector('p');
+                if (messageElement) messageElement.textContent = message;
+                this.emptyState.style.display = 'block';
+            }
             if(this.playersTable) this.playersTable.parentElement.style.display = 'none';
         } else {
             if(this.emptyState) this.emptyState.style.display = 'none';
@@ -621,19 +638,12 @@ export default class UIManager {
     toggleNotesExpansion(cell) {
         if (!cell) return;
         const notesText = cell.querySelector('.notes-text');
-        const fullNotes = cell.getAttribute('data-full-notes');
-        const isExpanded = cell.classList.contains('expanded');
-
-        if (!notesText) return;
-
-        if (isExpanded) {
-            notesText.textContent = this.truncateText(fullNotes || '', 20);
-            cell.classList.remove('expanded');
-            cell.title = 'Click to expand notes';
-        } else {
-            notesText.textContent = fullNotes || 'No notes';
-            cell.classList.add('expanded');
-            cell.title = 'Click to collapse notes';
-        }
+        const notesButton = cell.querySelector('.notes-toggle');
+        if (!notesText || !notesButton || notesButton.disabled) return;
+        const isExpanded = notesButton.getAttribute('aria-expanded') === 'true';
+        notesButton.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+        notesButton.textContent = isExpanded ? 'View notes' : 'Hide notes';
+        notesText.hidden = isExpanded;
+        cell.classList.toggle('expanded', !isExpanded);
     }
 }
