@@ -579,7 +579,7 @@ header h1 {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
     border-radius: 12px;
-    padding: 15px;
+    padding: 12px 15px;
     margin-bottom: 20px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
@@ -609,12 +609,21 @@ header h1 {
 .advanced-content {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 12px;
 }
 
-.advanced-content > * + * {
+.advanced-section + .advanced-section {
     border-top: 1px solid #e2e8f0;
-    padding-top: 15px;
+    padding-top: 12px;
+}
+
+.advanced-section-heading {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #718096;
+    margin-bottom: 6px;
 }
 
 .advanced-content .storage-controls {
