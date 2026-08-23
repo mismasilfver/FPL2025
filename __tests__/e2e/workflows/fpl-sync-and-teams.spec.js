@@ -5,6 +5,7 @@
 
 import { test, expect } from '@playwright/test';
 import { clearStorage, waitForStorageReady } from '../helpers/storage-helpers.js';
+import { openAdvancedPanel } from '../helpers/ui-helpers.js';
 
 const STORAGE_KEY = 'fpl-team-data';
 // The client fetches this via the app's own server-side proxy (server/routes/fpl.js)
@@ -104,6 +105,7 @@ test.describe('FPL sync and multi-team workflows', () => {
   });
 
   test('saves FPL entry ID and persists it across reloads', async ({ page }) => {
+    await openAdvancedPanel(page);
     await page.fill('[data-testid="fpl-entry-id"]', '12345');
     await page.click('[data-testid="save-fpl-id-btn"]');
 
@@ -112,6 +114,7 @@ test.describe('FPL sync and multi-team workflows', () => {
     await page.reload();
     await page.waitForLoadState('networkidle');
     await waitForStorageReady(page);
+    await openAdvancedPanel(page);
 
     await expect(page.locator('[data-testid="fpl-entry-id"]')).toHaveValue('12345');
   });
@@ -124,6 +127,7 @@ test.describe('FPL sync and multi-team workflows', () => {
       ]),
     });
     await seedRoot(page, root);
+    await openAdvancedPanel(page);
 
     await page.route(FPL_BOOTSTRAP_URL, async (route) => {
       const body = bootstrapFixture([
@@ -156,6 +160,7 @@ test.describe('FPL sync and multi-team workflows', () => {
     team.weeks[1].captain = 'p1';
     const root = createRoot({ default: team });
     await seedRoot(page, root);
+    await openAdvancedPanel(page);
 
     await page.route(FPL_BOOTSTRAP_URL, async (route) => {
       const body = bootstrapFixture([
