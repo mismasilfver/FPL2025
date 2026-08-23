@@ -146,13 +146,24 @@
             </div>
         </section>
 
-        <div class="captaincy-section" data-testid="captaincy-section">
-            <h3>Captaincy</h3>
-            <div class="captaincy-info">
-                <span id="captain-info" data-testid="captain-info">Captain: None selected</span>
-                <span id="vice-captain-info" data-testid="vice-captain-info">Vice Captain: None selected</span>
+        <section class="captaincy-section" data-testid="captaincy-section" aria-labelledby="captaincy-heading">
+            <div class="section-heading">
+                <span class="section-eyebrow">Tactical picks</span>
+                <h2 id="captaincy-heading">Captaincy</h2>
             </div>
-        </div>
+            <div class="captaincy-info">
+                <article class="captaincy-card captaincy-card-captain">
+                    <span class="captaincy-role">Captain</span>
+                    <strong id="captain-info" data-testid="captain-info">None selected</strong>
+                    <span class="captaincy-helper">2× points</span>
+                </article>
+                <article class="captaincy-card captaincy-card-vice">
+                    <span class="captaincy-role">Vice-captain</span>
+                    <strong id="vice-captain-info" data-testid="vice-captain-info">None selected</strong>
+                    <span class="captaincy-helper">Backup</span>
+                </article>
+            </div>
+        </section>
 
         <div class="players-table-container">
             <table id="players-table">
