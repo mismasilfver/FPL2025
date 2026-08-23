@@ -646,6 +646,12 @@ header h1 {
     margin: 0;
 }
 
+.last-sync-status {
+    font-size: 13px;
+    color: #718096;
+    font-weight: 600;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
     .container {

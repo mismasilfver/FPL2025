@@ -312,6 +312,7 @@ export class FPLTeamManager {
         const totalPoints = this.pointsService.calculateTeamTotalPoints(team).totalPoints || 0;
         this.ui.renderSummary(players, { totalPoints, gwPoints: weekPoints });
         this.ui.renderFplEntryId(root.settings?.fplEntryId || '');
+        this.ui.renderLastSync(root.settings?.lastSyncedAt);
         this.ui.renderTeamSelector(root.teams, root.currentTeam);
         this.ui.renderCaptaincyInfo(players, captainId, viceCaptainId);
         if (DEBUG) console.log('About to call renderWeekControls with:', { currentWeek: team.currentWeek, totalWeeks: weekCount, isReadOnly: currentWeek.isReadOnly });
