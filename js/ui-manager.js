@@ -268,8 +268,8 @@ export default class UIManager {
 
     toggleAdvancedPanel() {
         if (!this.advancedPanel || !this.advancedToggleBtn) return;
-        const isOpen = !this.advancedPanel.hidden;
-        this.advancedPanel.hidden = isOpen;
+        const isOpen = this.advancedPanel.classList.contains('open');
+        this.advancedPanel.classList.toggle('open', !isOpen);
         this.advancedToggleBtn.textContent = isOpen ? 'Advanced ▾' : 'Advanced ▴';
         this.advancedToggleBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
     }
