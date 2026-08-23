@@ -81,6 +81,11 @@ export default class UIManager {
                 onTeamChange?.(this.teamSelect?.value);
             });
 
+            this.advancedToggleBtn?.addEventListener('click', () => {
+                this._logButtonClick('advanced-toggle');
+                this.toggleAdvancedPanel();
+            });
+
             if (this.playersTbody) {
                 this.playersTbody.addEventListener('click', (e) => {
                     const target = e.target;
@@ -159,6 +164,8 @@ export default class UIManager {
         this.importFplSquadBtn = doc.getElementById('import-fpl-squad-btn');
         this.teamSelect = doc.getElementById('team-select');
         this.addTeamBtn = doc.getElementById('add-team-btn');
+        this.advancedToggleBtn = doc.getElementById('advanced-toggle-btn');
+        this.advancedPanel = doc.getElementById('advanced-panel');
         this.appAlert = doc.querySelector('.app-alert');
         
         
@@ -256,6 +263,13 @@ export default class UIManager {
     closeModal() {
         if (this.modal) this.modal.style.display = 'none';
         this.clearForm();
+    }
+
+    toggleAdvancedPanel() {
+        if (!this.advancedPanel || !this.advancedToggleBtn) return;
+        const isOpen = !this.advancedPanel.hidden;
+        this.advancedPanel.hidden = isOpen;
+        this.advancedToggleBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
     }
 
     showAlert(message, options = {}) {

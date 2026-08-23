@@ -225,3 +225,29 @@ export async function getTotalCost(page) {
   const match = text?.match(/[\d.]+/);
   return match ? parseFloat(match[0]) : 0;
 }
+
+/**
+ * Open the Advanced panel if it is currently collapsed
+ * @param {import('@playwright/test').Page} page - Playwright page object
+ */
+export async function openAdvancedPanel(page) {
+  const panel = page.locator('[data-testid="advanced-panel"]');
+  const isOpen = await panel.isVisible().catch(() => false);
+  if (!isOpen) {
+    await page.click('[data-testid="advanced-toggle"]');
+    await panel.waitFor({ state: 'visible' });
+  }
+}
+
+/**
+ * Close the Advanced panel if it is currently open
+ * @param {import('@playwright/test').Page} page - Playwright page object
+ */
+export async function closeAdvancedPanel(page) {
+  const panel = page.locator('[data-testid="advanced-panel"]');
+  const isOpen = await panel.isVisible().catch(() => false);
+  if (isOpen) {
+    await page.click('[data-testid="advanced-toggle"]');
+    await panel.waitFor({ state: 'hidden' });
+  }
+}

@@ -48,19 +48,6 @@
                 <button id="create-week-btn" class="btn btn-primary" data-testid="create-week-btn" style="margin-left:auto;">+ Create New Week</button>
                 <button id="export-week-btn" class="btn btn-secondary" data-testid="export-week-btn" style="display:none;">Export Week Data</button>
             </div>
-            <div class="storage-controls" data-testid="storage-controls">
-                <span id="storage-indicator" class="storage-indicator" data-testid="storage-indicator">Storage: localStorage</span>
-                <div class="storage-toggle">
-                    <button id="toggle-storage-btn" class="btn btn-secondary" data-testid="toggle-storage-btn" type="button" aria-haspopup="listbox" aria-expanded="false">
-                        Change Storage
-                    </button>
-                    <ul id="storage-options" class="storage-options" data-testid="storage-options" role="listbox" aria-label="Storage backend" hidden>
-                        <li role="option" data-backend="localstorage" aria-selected="true">localStorage</li>
-                        <li role="option" data-backend="indexeddb">IndexedDB</li>
-                        <li role="option" data-backend="sqlite">SQLite</li>
-                    </ul>
-                </div>
-            </div>
 
             <div class="fpl-controls" data-testid="fpl-controls">
                 <div class="team-selector" data-testid="team-selector">
@@ -70,13 +57,6 @@
                     </select>
                     <button id="add-team-btn" class="btn btn-secondary" data-testid="add-team-btn" type="button">+ Team</button>
                 </div>
-                <div class="fpl-settings" data-testid="fpl-settings">
-                    <label for="fpl-entry-id">FPL ID:</label>
-                    <input type="text" id="fpl-entry-id" data-testid="fpl-entry-id" placeholder="Enter FPL entry ID" size="12">
-                    <button id="save-fpl-id-btn" class="btn btn-secondary" data-testid="save-fpl-id-btn" type="button">Save</button>
-                    <button id="import-fpl-squad-btn" class="btn btn-secondary" data-testid="import-fpl-squad-btn" type="button">Import My Squad</button>
-                    <button id="sync-btn" class="btn btn-primary" data-testid="sync-btn" type="button">SYNC</button>
-                </div>
             </div>
         </header>
 
@@ -84,11 +64,6 @@
             <button id="add-player-btn" 
                     class="btn btn-primary"
                     data-testid="add-player-button">+ Add Player</button>
-            <!-- Export Week button moved to week controls -->
-            <div class="import-controls">
-                <input type="file" id="import-json" accept=".json" data-testid="import-json-input">
-                <button id="import-button" class="btn btn-secondary" data-testid="import-button">Import JSON</button>
-            </div>
             <div class="position-filter" data-testid="position-filter-container">
                 <label for="position-filter">Filter by Position:</label>
                 <select id="position-filter" data-testid="position-filter-select">
@@ -106,7 +81,39 @@
                            data-testid="have-filter-checkbox"> Show "Have" only
                 </label>
             </div>
+            <button id="advanced-toggle-btn" class="btn btn-secondary" type="button" aria-expanded="false" aria-controls="advanced-panel" data-testid="advanced-toggle">Advanced</button>
         </div>
+
+        <section id="advanced-panel" class="advanced-panel" hidden data-testid="advanced-panel">
+            <div class="advanced-content">
+                <div class="storage-controls" data-testid="storage-controls">
+                    <span id="storage-indicator" class="storage-indicator" data-testid="storage-indicator">Storage: localStorage</span>
+                    <div class="storage-toggle">
+                        <button id="toggle-storage-btn" class="btn btn-secondary" data-testid="toggle-storage-btn" type="button" aria-haspopup="listbox" aria-expanded="false">
+                            Change Storage
+                        </button>
+                        <ul id="storage-options" class="storage-options" data-testid="storage-options" role="listbox" aria-label="Storage backend" hidden>
+                            <li role="option" data-backend="localstorage" aria-selected="true">localStorage</li>
+                            <li role="option" data-backend="indexeddb" aria-selected="false">IndexedDB</li>
+                            <li role="option" data-backend="sqlite" aria-selected="false">SQLite</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="fpl-settings" data-testid="fpl-settings">
+                    <label for="fpl-entry-id">FPL ID:</label>
+                    <input type="text" id="fpl-entry-id" data-testid="fpl-entry-id" placeholder="Enter FPL entry ID" size="12">
+                    <button id="save-fpl-id-btn" class="btn btn-secondary" data-testid="save-fpl-id-btn" type="button">Save</button>
+                    <button id="import-fpl-squad-btn" class="btn btn-secondary" data-testid="import-fpl-squad-btn" type="button">Import My Squad</button>
+                    <button id="sync-btn" class="btn btn-primary" data-testid="sync-btn" type="button">SYNC</button>
+                </div>
+
+                <div class="import-controls" data-testid="import-controls">
+                    <input type="file" id="import-json" accept=".json" data-testid="import-json-input">
+                    <button id="import-button" class="btn btn-secondary" data-testid="import-button">Import JSON</button>
+                </div>
+            </div>
+        </section>
 
         <div class="captaincy-section" data-testid="captaincy-section">
             <h3>Captaincy</h3>
