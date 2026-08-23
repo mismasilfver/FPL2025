@@ -60,7 +60,7 @@ export async function expectCaptainStatus(page, playerName, status) {
  */
 export async function expectCurrentWeek(page, expectedWeek) {
   const indicator = page.locator('[data-testid="week-label"], #week-label');
-  await expect(indicator).toContainText(`Week ${expectedWeek}`);
+  await expect(indicator).toHaveText(String(expectedWeek));
 }
 
 /**

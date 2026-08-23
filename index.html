@@ -31,22 +31,39 @@
     <div class="app-alert" data-testid="app-alert" role="alert" aria-live="polite" style="display:none"></div>
     <div class="container">
         <header>
-            <h1>🏆 My Fantasy Premier League 2025/2026</h1>
-            <div class="team-summary">
-                <span id="team-count">In Team: 0/15</span>
-                <span id="total-value">Total Value: £0.0m</span>
-                <span id="total-points-display">Total Points: 0</span>
-                <span id="gw-points-display">GW Points: 0</span>
-            </div>
-            <div class="week-controls" data-testid="week-controls">
-                <button id="prev-week-btn" class="btn btn-secondary" data-testid="prev-week-btn" aria-label="Previous week">◀ Prev</button>
-                <div class="week-indicator" data-testid="week-indicator">
-                    <span id="week-label" data-testid="week-label">Week 1</span>
-                    <span id="week-readonly-badge" class="readonly-badge" data-testid="week-readonly-badge" style="display:none;" aria-hidden="true">Read-only</span>
+            <h1>🏆 My Fantasy Premier League</h1>
+            <div class="team-summary" aria-label="Squad summary">
+                <div class="summary-card">
+                    <span class="summary-label">Squad</span>
+                    <strong id="team-count" class="summary-value">0 / 15</strong>
                 </div>
-                <button id="next-week-btn" class="btn btn-secondary" data-testid="next-week-btn" aria-label="Next week">Next ▶</button>
-                <button id="create-week-btn" class="btn btn-primary" data-testid="create-week-btn" style="margin-left:auto;">+ Create New Week</button>
-                <button id="export-week-btn" class="btn btn-secondary" data-testid="export-week-btn" style="display:none;">Export Week Data</button>
+                <div class="summary-card">
+                    <span class="summary-label">Squad value</span>
+                    <strong id="total-value" class="summary-value">£0.0m</strong>
+                </div>
+                <div class="summary-card">
+                    <span class="summary-label">Total points</span>
+                    <strong id="total-points-display" class="summary-value">0</strong>
+                </div>
+                <div class="summary-card">
+                    <span class="summary-label">Gameweek points</span>
+                    <strong id="gw-points-display" class="summary-value">0</strong>
+                </div>
+            </div>
+            <div class="week-planner">
+                <div class="week-controls" data-testid="week-controls">
+                    <button id="prev-week-btn" class="btn btn-secondary" data-testid="prev-week-btn" aria-label="Previous gameweek">← Previous</button>
+                    <div class="week-indicator" data-testid="week-indicator">
+                        <span class="week-kicker">Gameweek</span>
+                        <strong id="week-label" data-testid="week-label">1</strong>
+                        <span id="week-state" class="week-state">Planning</span>
+                        <span id="week-readonly-badge" class="readonly-badge" data-testid="week-readonly-badge" style="display:none;" aria-hidden="true">Historical</span>
+                    </div>
+                    <button id="next-week-btn" class="btn btn-secondary" data-testid="next-week-btn" aria-label="Next gameweek">Next →</button>
+                    <button id="create-week-btn" class="btn btn-primary" data-testid="create-week-btn">+ Create New Week</button>
+                    <button id="export-week-btn" class="btn btn-secondary" data-testid="export-week-btn" style="display:none;">Export Week Data</button>
+                </div>
+                <nav id="week-timeline" class="week-timeline" data-testid="week-timeline" aria-label="Saved gameweeks"></nav>
             </div>
 
             <div class="fpl-controls" data-testid="fpl-controls">

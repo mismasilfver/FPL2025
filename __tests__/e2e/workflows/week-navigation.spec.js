@@ -42,6 +42,18 @@ for (const backend of BACKENDS) {
       await expectCurrentWeek(page, 2);
     });
 
+    test('saved gameweek timeline navigates between weeks', async ({ page }) => {
+      await createNewWeek(page);
+
+      const timeline = page.locator('[data-testid="week-timeline"]');
+      await expect(timeline.getByRole('button', { name: 'GW1' })).toBeVisible();
+      await expect(timeline.getByRole('button', { name: 'GW2' })).toHaveAttribute('aria-current', 'step');
+
+      await timeline.getByRole('button', { name: 'GW1' }).click();
+      await expectCurrentWeek(page, 1);
+      await expect(page.locator('#week-state')).toHaveText('Historical');
+    });
+
     test('creating week 2 copies week 1 players', async ({ page }) => {
       // Add players to week 1
       const players = buildMinimalSquad();

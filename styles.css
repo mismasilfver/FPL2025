@@ -123,28 +123,78 @@ header[data-layer="storage-top"] {
 }
 
 /* Week controls */
+.week-planner {
+    margin-top: 16px;
+    padding: 14px;
+    background: var(--color-surface-muted);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+}
+
 .week-controls {
-    display: flex;
-    gap: 10px;
+    display: grid;
+    grid-template-columns: auto minmax(150px, 1fr) auto auto;
+    gap: 12px;
     align-items: center;
-    margin-top: 10px;
 }
 
 .week-indicator {
-    display: flex;
-    gap: 8px;
-    align-items: center;
+    display: grid;
+    justify-items: center;
+    gap: 1px;
+    color: var(--color-text);
+}
+
+.week-kicker {
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+#week-label {
+    font-size: 26px;
+    line-height: 1;
+}
+
+.week-state {
+    color: var(--color-positive);
+    font-size: 12px;
     font-weight: 700;
-    color: #2d3748;
 }
 
 .readonly-badge {
-    background: #fde68a;
-    color: #7c2d12;
+    background: #e2e8f0;
+    color: var(--color-text-muted);
     padding: 2px 8px;
     border-radius: 9999px;
-    font-size: 12px;
-    border: 1px solid #f59e0b;
+    font-size: 11px;
+    border: 1px solid var(--color-border);
+}
+
+.week-timeline {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    margin-top: 12px;
+}
+
+.week-step {
+    position: relative;
+    min-width: 56px;
+    padding: 7px 12px;
+    border: 0;
+    border-top: 2px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.week-step[aria-current="step"] {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
 }
 
 body {
@@ -197,13 +247,31 @@ header h1 {
 }
 
 .team-summary {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #f7fafc;
-    padding: 10px 15px;
-    border-radius: 8px;
-    font-weight: 600;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.summary-card {
+    display: grid;
+    gap: 6px;
+    padding: 13px 14px;
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+}
+
+.summary-label {
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.summary-value {
+    color: var(--color-text);
+    font-size: 22px;
+    line-height: 1;
 }
 
 /* Controls */
@@ -723,9 +791,15 @@ header h1 {
     }
     
     .team-summary {
-        flex-direction: column;
-        gap: 10px;
-        text-align: center;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .week-controls {
+        grid-template-columns: 1fr 1.2fr 1fr;
+    }
+
+    #create-week-btn {
+        grid-column: 1 / -1;
     }
     
     .controls {

@@ -129,6 +129,7 @@ export class FPLTeamManager {
             onPrevWeek: async () => await this.prevWeek(),
             onNextWeek: async () => await this.nextWeek(),
             onCreateWeek: async () => await this.createNewWeek(),
+            onWeekSelect: async (weekNumber) => await this.goToWeek(weekNumber),
             onExportWeek: this.exportWeekData.bind(this),
             onToggleHave: (id) => this.toggleHave(id),
             onEdit: (id) => this.openModal(id),
@@ -316,7 +317,12 @@ export class FPLTeamManager {
         this.ui.renderTeamSelector(root.teams, root.currentTeam);
         this.ui.renderCaptaincyInfo(players, captainId, viceCaptainId);
         if (DEBUG) console.log('About to call renderWeekControls with:', { currentWeek: team.currentWeek, totalWeeks: weekCount, isReadOnly: currentWeek.isReadOnly });
-        this.ui.renderWeekControls({ currentWeek: team.currentWeek, totalWeeks: weekCount, isReadOnly: currentWeek.isReadOnly });
+        this.ui.renderWeekControls({
+            currentWeek: team.currentWeek,
+            totalWeeks: weekCount,
+            isReadOnly: currentWeek.isReadOnly,
+            savedWeeks: Object.keys(team.weeks).map(Number).sort((a, b) => a - b),
+        });
     }
 
     async exportWeekData() {

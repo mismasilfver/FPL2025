@@ -201,7 +201,7 @@ export async function navigateToWeek(page, weekNumber) {
  */
 export async function getCurrentWeekNumber(page) {
   const text = await page.locator('[data-testid="week-label"], #week-label').textContent();
-  const match = text?.match(/Week (\d+)/);
+  const match = text?.match(/(\d+)/);
   return match ? parseInt(match[1], 10) : 1;
 }
 
