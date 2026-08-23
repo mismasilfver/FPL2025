@@ -213,13 +213,23 @@ body {
     transform: translateX(-50%);
     max-width: 90%;
     z-index: 2000;
-    background: #fffbea;
-    color: #7c2d12;
-    border: 1px solid #f6e05e;
-    border-radius: 8px;
+    background: var(--color-surface-raised);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
     padding: 10px 14px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
-    font-weight: 600;
+    box-shadow: 0 8px 24px rgba(4, 10, 24, 0.2);
+    font-weight: 650;
+}
+
+.app-alert.success {
+    border-color: rgba(22, 163, 106, 0.45);
+    color: #087a4c;
+}
+
+.app-alert.error {
+    border-color: rgba(229, 72, 77, 0.5);
+    color: #a92329;
 }
 
 .container {
@@ -567,32 +577,41 @@ header h1 {
 }
 
 /* Status indicators - colored circles */
-.status-circle {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    display: inline-block;
-    margin: 0 auto;
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 4px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface-muted);
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1.2;
 }
 
-.status-yellow {
-    background: #fbbf24;
-    border: 2px solid #f59e0b;
-}
-
+.status-available,
 .status-green {
-    background: #10b981;
-    border: 2px solid #059669;
+    border-color: rgba(22, 163, 106, 0.35);
+    background: rgba(22, 163, 106, 0.1);
+    color: #087a4c;
 }
 
+.status-doubt,
+.status-yellow {
+    border-color: rgba(217, 151, 0, 0.38);
+    background: rgba(245, 197, 66, 0.16);
+    color: #805d00;
+}
+
+.status-injured,
+.status-suspended,
+.status-unavailable,
 .status-red {
-    background: #ef4444;
-    border: 2px solid #dc2626;
-}
-
-.status-none {
-    /* No circle for empty status */
-    display: none;
+    border-color: rgba(229, 72, 77, 0.38);
+    background: rgba(229, 72, 77, 0.1);
+    color: #a92329;
 }
 
 /* Captain indicators */

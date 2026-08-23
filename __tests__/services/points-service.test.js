@@ -82,6 +82,18 @@ describe('PointsService', () => {
       expect(updated[0].totalPoints).toBe(120);
     });
 
+    it('should update player availability and news from FPL data', () => {
+      const players = [
+        { id: '1', fplId: '100', availability: 'unknown', news: '' },
+      ];
+      const fplPlayers = {
+        100: { fplId: '100', availability: 'injured', news: 'Hamstring injury' },
+      };
+      const updated = service.updatePlayerPointsFromFpl(players, fplPlayers);
+      expect(updated[0].availability).toBe('injured');
+      expect(updated[0].news).toBe('Hamstring injury');
+    });
+
     it('should return players unchanged when no FPL data matches', () => {
       const players = [
         { id: '1', fplId: '100', name: 'P1', eventPoints: 0, totalPoints: 0 },

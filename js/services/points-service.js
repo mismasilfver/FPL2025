@@ -61,6 +61,8 @@ class PointsService {
         form: Number(fplData.form) || 0,
         price: (Number(fplData.nowCostTenths) || 0) / 10,
         nowCostTenths: Number(fplData.nowCostTenths) || 0,
+        availability: fplData.availability || player.availability || 'unknown',
+        news: fplData.news || '',
       };
     });
   }

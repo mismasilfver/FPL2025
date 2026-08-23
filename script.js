@@ -209,6 +209,7 @@ export class FPLTeamManager {
         await this._ensureWeekDerivedFields(root, team.currentWeek);
         await this._saveRootData(root);
         await this.updateDisplay();
+        this.ui.showAlert('Player added', { type: 'success' });
     }
 
     async updatePlayer(playerId, playerData) {
@@ -219,6 +220,7 @@ export class FPLTeamManager {
         await this._ensureWeekDerivedFields(root, team.currentWeek);
         await this._saveRootData(root);
         await this.updateDisplay();
+        this.ui.showAlert('Changes saved', { type: 'success' });
     }
 
     async deletePlayer(playerId) {
@@ -234,6 +236,7 @@ export class FPLTeamManager {
         await this._ensureWeekDerivedFields(root, team.currentWeek);
         await this._saveRootData(root);
         await this.updateDisplay();
+        this.ui.showAlert('Player deleted', { type: 'success' });
     }
 
     async toggleHave(playerId) {
@@ -257,6 +260,7 @@ export class FPLTeamManager {
             root = this.captaincyService.setCaptain(root, playerId);
             await this._saveRootData(root);
             await this.updateDisplay();
+            this.ui.showAlert('Captaincy updated', { type: 'success' });
         } catch (error) {
             this.ui.showAlert(error.message);
         }
@@ -269,6 +273,7 @@ export class FPLTeamManager {
             root = this.captaincyService.setViceCaptain(root, playerId);
             await this._saveRootData(root);
             await this.updateDisplay();
+            this.ui.showAlert('Captaincy updated', { type: 'success' });
         } catch (error) {
             this.ui.showAlert(error.message);
         }
