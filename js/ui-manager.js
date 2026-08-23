@@ -339,7 +339,8 @@ export default class UIManager {
 
         alertEl.textContent = message;
         alertEl.style.display = 'block';
-        alertEl.classList.remove('error');
+        alertEl.classList.toggle('error', options.type === 'error');
+        alertEl.classList.toggle('success', options.type === 'success');
 
         const timeout = options.timeout || 5000;
         if (timeout > 0) {
@@ -370,8 +371,20 @@ export default class UIManager {
     }
 
     getStatusText(status) {
-        const statusMap = { yellow: 'Maybe Good', green: 'Very Good', red: "Sell/Don't Buy" };
+        const statusMap = { yellow: 'Maybe good', green: 'Very good', red: "Sell / don't buy" };
         return statusMap[status] || status;
+    }
+
+    getAvailabilityText(availability) {
+        const availabilityMap = {
+            available: 'Available',
+            doubt: 'Doubtful',
+            injured: 'Injured',
+            suspended: 'Suspended',
+            unavailable: 'Unavailable',
+            unknown: 'Unknown',
+        };
+        return availabilityMap[availability] || 'Unknown';
     }
 
     capitalizeFirst(str) {
@@ -510,11 +523,14 @@ export default class UIManager {
         const statusCell = row.querySelector('.col-status');
         if (statusCell) {
             statusCell.textContent = '';
-            if (player.status) {
-                const statusDiv = doc.createElement('div');
-                statusDiv.className = `status-circle status-${player.status}`;
-                statusDiv.title = this.getStatusText(player.status);
-                statusCell.appendChild(statusDiv);
+            const hasAvailability = player.availability && player.availability !== 'unknown';
+            const statusValue = hasAvailability ? player.availability : player.status;
+            if (statusValue) {
+                const statusBadge = doc.createElement('span');
+                statusBadge.className = `status-badge status-${statusValue}`;
+                statusBadge.textContent = hasAvailability ? this.getAvailabilityText(statusValue) : this.getStatusText(statusValue);
+                if (player.news) statusBadge.title = player.news;
+                statusCell.appendChild(statusBadge);
             }
         }
 
