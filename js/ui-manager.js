@@ -21,7 +21,7 @@ export default class UIManager {
         
         const {
             onAddPlayer, onModalClose, onFormSubmit, onPositionFilterChange,
-            onHaveFilterChange, onPrevWeek, onNextWeek, onCreateWeek, onExportWeek,
+            onHaveFilterChange, onPrevWeek, onNextWeek, onCreateWeek, onExportWeek, onWeekSelect,
             onEscapeKey, onToggleHave, onEdit, onDelete, onMakeCaptain, onMakeViceCaptain,
             onSaveFplId, onSync, onImportFplSquad, onAddTeam, onTeamChange
         } = handlers;
@@ -50,6 +50,12 @@ export default class UIManager {
             this.createWeekBtn?.addEventListener('click', () => {
                 this._logButtonClick('create-week');
                 onCreateWeek?.();
+            });
+            this.weekTimeline?.addEventListener('click', (event) => {
+                const weekButton = event.target.closest('[data-week]');
+                if (!weekButton) return;
+                this._logButtonClick('week-select', { week: weekButton.dataset.week });
+                onWeekSelect?.(Number(weekButton.dataset.week));
             });
             this.exportWeekBtn?.addEventListener('click', () => {
                 this._logButtonClick('export-week');
@@ -145,6 +151,8 @@ export default class UIManager {
         this.playersTable = doc.getElementById('players-table');
         this.emptyState = doc.getElementById('empty-state');
         this.weekLabel = doc.getElementById('week-label');
+        this.weekState = doc.getElementById('week-state');
+        this.weekTimeline = doc.getElementById('week-timeline');
         this.weekReadonlyBadge = doc.getElementById('week-readonly-badge');
         this.positionFilter = doc.querySelector('[data-testid="position-filter-select"]');
         this.haveFilter = doc.querySelector('[data-testid="have-filter-checkbox"]');
@@ -347,10 +355,10 @@ export default class UIManager {
         const teamPlayers = (players || []).filter(p => p.have);
         const teamCount = teamPlayers.length;
         const totalValue = teamPlayers.reduce((sum, p) => sum + (Number(p.price) || 0), 0);
-        if (this.teamCount) this.teamCount.textContent = `In Team: ${teamCount}/15`;
-        if (this.totalValue) this.totalValue.textContent = `Total Value: £${totalValue.toFixed(1)}m`;
-        if (this.totalPointsDisplay) this.totalPointsDisplay.textContent = `Total Points: ${totalPoints}`;
-        if (this.gwPointsDisplay) this.gwPointsDisplay.textContent = `GW Points: ${gwPoints}`;
+        if (this.teamCount) this.teamCount.textContent = `${teamCount} / 15`;
+        if (this.totalValue) this.totalValue.textContent = `£${totalValue.toFixed(1)}m`;
+        if (this.totalPointsDisplay) this.totalPointsDisplay.textContent = totalPoints;
+        if (this.gwPointsDisplay) this.gwPointsDisplay.textContent = gwPoints;
     }
 
     renderFplEntryId(entryId) {
@@ -376,8 +384,9 @@ export default class UIManager {
         if (this.viceCaptainInfo) this.viceCaptainInfo.textContent = `Vice Captain: ${viceCaptainPlayer ? viceCaptainPlayer.name : 'None selected'}`;
     }
 
-    renderWeekControls({ currentWeek, totalWeeks, isReadOnly }) {
-        if (this.weekLabel) this.weekLabel.textContent = `Week ${currentWeek}`;
+    renderWeekControls({ currentWeek, totalWeeks, isReadOnly, savedWeeks = [] }) {
+        if (this.weekLabel) this.weekLabel.textContent = currentWeek;
+        if (this.weekState) this.weekState.textContent = isReadOnly ? 'Historical' : 'Planning';
         if (this.weekReadonlyBadge) this.weekReadonlyBadge.style.display = isReadOnly ? 'inline-block' : 'none';
         if (this.addPlayerBtn) this.addPlayerBtn.disabled = !!isReadOnly;
         if (this.prevWeekBtn) {
@@ -385,6 +394,18 @@ export default class UIManager {
             this.prevWeekBtn.disabled = currentWeek <= 1;
         }
         if (this.nextWeekBtn) this.nextWeekBtn.disabled = currentWeek >= totalWeeks;
+        if (this.weekTimeline) {
+            this.weekTimeline.innerHTML = '';
+            savedWeeks.forEach((week) => {
+                const button = this.document.createElement('button');
+                button.type = 'button';
+                button.className = 'week-step';
+                button.dataset.week = week;
+                button.textContent = `GW${week}`;
+                if (Number(week) === Number(currentWeek)) button.setAttribute('aria-current', 'step');
+                this.weekTimeline.appendChild(button);
+            });
+        }
     }
 
     ensurePlayerRowTemplate(doc) {

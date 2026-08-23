@@ -140,8 +140,8 @@ test.describe('FPL sync and multi-team workflows', () => {
     await page.click('[data-testid="sync-btn"]');
 
     await expect(page.locator('[role="alert"]')).toContainText('Sync complete');
-    await expect(page.locator('#total-points-display')).toContainText('Total Points: 19');
-    await expect(page.locator('#gw-points-display')).toContainText('GW Points: 19');
+    await expect(page.locator('#total-points-display')).toHaveText('19');
+    await expect(page.locator('#gw-points-display')).toHaveText('19');
 
     const rayaRow = page.locator('#players-tbody tr.player-row', { hasText: 'Raya' });
     await expect(rayaRow.locator('.col-total-points')).toHaveText('162');
@@ -173,7 +173,7 @@ test.describe('FPL sync and multi-team workflows', () => {
     await page.click('[data-testid="sync-btn"]');
 
     await expect(page.locator('[role="alert"]')).toContainText('Sync complete');
-    await expect(page.locator('#gw-points-display')).toContainText('GW Points: 25');
+    await expect(page.locator('#gw-points-display')).toHaveText('25');
   });
 
   test('switches between teams without mixing players', async ({ page }) => {
