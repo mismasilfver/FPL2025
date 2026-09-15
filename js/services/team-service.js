@@ -191,6 +191,18 @@ class TeamService {
       }
     }
 
+    const clubCounts = inTeam.reduce((counts, p) => {
+      const club = String(p.team || 'Unknown').trim();
+      counts[club] = (counts[club] || 0) + 1;
+      return counts;
+    }, {});
+
+    for (const [club, count] of Object.entries(clubCounts)) {
+      if (count > 3) {
+        errors.push(`Too many ${club} players (max 3 per club)`);
+      }
+    }
+
     return { valid: errors.length === 0, errors };
   }
 }

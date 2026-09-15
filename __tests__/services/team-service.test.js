@@ -206,5 +206,38 @@ describe('TeamService', () => {
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Too many defence players (max 5)');
     });
+
+    it('should fail when more than 3 players are from the same club', () => {
+      const team = rootData.teams.default;
+      team.weeks[1].players = Array.from({ length: 4 }, (_, i) => ({
+        id: `a${i}`,
+        name: `Arsenal Player ${i}`,
+        position: 'midfield',
+        team: 'Arsenal',
+        price: 5,
+        have: true,
+      }));
+      const result = service.validateFplRules(team);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Too many Arsenal players (max 3 per club)');
+    });
+
+    it('should report multiple rule violations at once', () => {
+      const team = rootData.teams.default;
+      team.weeks[1].players = [
+        { id: 'g1', name: 'GK1', position: 'goalkeeper', team: 'A', price: 10, have: true },
+        { id: 'd1', name: 'D1', position: 'defence', team: 'A', price: 15, have: true },
+        { id: 'd2', name: 'D2', position: 'defence', team: 'A', price: 15, have: true },
+        { id: 'd3', name: 'D3', position: 'defence', team: 'A', price: 15, have: true },
+        { id: 'd4', name: 'D4', position: 'defence', team: 'A', price: 15, have: true },
+        { id: 'd5', name: 'D5', position: 'defence', team: 'A', price: 15, have: true },
+        { id: 'd6', name: 'D6', position: 'defence', team: 'A', price: 15, have: true },
+      ];
+      const result = service.validateFplRules(team);
+      expect(result.valid).toBe(false);
+      expect(result.errors.length).toBeGreaterThanOrEqual(2);
+      expect(result.errors).toContain('Too many defence players (max 5)');
+      expect(result.errors).toContain('Too many A players (max 3 per club)');
+    });
   });
 });
