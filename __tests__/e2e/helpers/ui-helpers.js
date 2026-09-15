@@ -37,9 +37,12 @@ export async function addPlayer(page, playerData) {
     await page.fill('[data-testid="player-team-input"], #player-team', playerData.team);
   }
   
-  // Set "have" status if true (checked by default, so only uncheck if false)
+  // Set "have" status explicitly
+  const haveCheckbox = '[data-testid="player-have-checkbox"], #player-have';
   if (playerData.isOwned === false) {
-    await page.uncheck('[data-testid="player-have-checkbox"], #player-have');
+    await page.uncheck(haveCheckbox);
+  } else if (playerData.isOwned === true) {
+    await page.check(haveCheckbox);
   }
   
   // Submit the form
