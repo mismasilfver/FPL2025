@@ -176,6 +176,7 @@ export default class UIManager {
         this.totalValue = doc.getElementById('total-value');
         this.totalPointsDisplay = doc.getElementById('total-points-display');
         this.gwPointsDisplay = doc.getElementById('gw-points-display');
+        this.validationStatus = doc.getElementById('fpl-validation-status');
         this.captainInfo = doc.getElementById('captain-info');
         this.viceCaptainInfo = doc.getElementById('vice-captain-info');
         this.fplEntryIdInput = doc.getElementById('fpl-entry-id');
@@ -405,6 +406,27 @@ export default class UIManager {
         if (this.totalValue) this.totalValue.textContent = `£${totalValue.toFixed(1)}m`;
         if (this.totalPointsDisplay) this.totalPointsDisplay.textContent = totalPoints;
         if (this.gwPointsDisplay) this.gwPointsDisplay.textContent = gwPoints;
+    }
+
+    renderValidation({ valid = true, errors = [] } = {}) {
+        if (!this.validationStatus) return;
+
+        this.validationStatus.style.display = 'block';
+        this.validationStatus.textContent = '';
+
+        if (valid) {
+            this.validationStatus.className = 'validation-status validation-status--valid';
+            this.validationStatus.textContent = 'Squad rules passed';
+            return;
+        }
+
+        this.validationStatus.className = 'validation-status validation-status--invalid';
+        for (const err of errors) {
+            const span = this.document.createElement('span');
+            span.className = 'validation-error';
+            span.textContent = err;
+            this.validationStatus.appendChild(span);
+        }
     }
 
     renderFplEntryId(entryId) {

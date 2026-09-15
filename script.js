@@ -319,6 +319,7 @@ export class FPLTeamManager {
         const weekPoints = this.pointsService.calculateWeekPoints(team, team.currentWeek);
         const totalPoints = this.pointsService.calculateTeamTotalPoints(team).totalPoints || 0;
         this.ui.renderSummary(players, { totalPoints, gwPoints: weekPoints });
+        this.ui.renderValidation(this.teamService.validateFplRules(team));
         this.ui.renderFplEntryId(root.settings?.fplEntryId || '');
         this.ui.renderLastSync(root.settings?.lastSyncedAt);
         this.ui.renderTeamSelector(root.teams, root.currentTeam);
