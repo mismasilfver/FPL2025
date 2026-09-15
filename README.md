@@ -75,7 +75,7 @@ Related tests: `__tests__/week-navigation.integration.test.js`, `__tests__/reado
 - **Primary team**: The one team that can be linked to a real FPL account via its entry ID.
 - **What-if teams**: Click `+ Team` to create additional independent teams for experimenting with different squads. Each has its own players, weeks, captain/vice-captain, and points — switching teams via the `Team:` dropdown never mixes data between teams.
 - **Managed by**: `js/services/team-service.js` (team CRUD, active-team resolution, FPL rule validation) and `js/services/team-sync-coordinator.js` (orchestrates FPL sync/import and team switching, including UI refresh and error handling).
-- **Not yet implemented**: budget (£100m) and squad composition (2 GK / 5 DEF / 5 MID / 3 FWD, max 3 players per real-world club) rule validation exists in `TeamService.validateFplRules()` but is **not currently surfaced anywhere in the UI** — a what-if team can be saved in an invalid state with no warning. See [Roadmap](#future-roadmap-ideas).
+- **Squad rule validation**: `TeamService.validateFplRules()` checks the £100m budget, squad composition (2 GK / 5 DEF / 5 MID / 3 FWD), and maximum three players per real-world club. The dashboard surfaces violations as non-blocking warnings, so what-if teams can still be saved while remaining visibly invalid.
 
 ## FPL API Integration
 
@@ -93,8 +93,8 @@ The app can talk to the public Fantasy Premier League API to pull in real data, 
 - **No transfer tracking**: importing simply replaces the squad snapshot; the app does not track transfers in/out, transfer costs (-4 point hits), or transfer history.
 - **No FPL chips support** (Wildcard, Free Hit, Bench Boost, Triple Captain). The app's "what-if" teams are a different, app-specific concept and are not connected to real FPL chip usage.
 - **No automatic gameweek rollover tied to FPL's calendar**: the app's week numbering (`Create New Week`) is independent of the real FPL gameweek/deadline schedule, so they can drift out of sync.
-- **No budget/squad-rule validation in the UI** for what-if teams (see [Multi-Team Support](#multi-team-support) above).
-- **No caching of bootstrap data**: every SYNC or Import re-fetches the full ~700-player bootstrap dataset from FPL (via the server proxy) with no local cache or ETag support.
+- **Squad-rule warnings are non-blocking**: invalid what-if teams can still be saved after the dashboard reports budget, composition, or per-club violations.
+- **Bootstrap caching is process-local**: successful bootstrap responses are cached in memory for five minutes; the cache resets when the server restarts and does not use persistent storage or ETags.
 - **Fully manual, one-shot sync**: there is no background/scheduled sync — you must click SYNC or Import My Squad yourself each time you want fresh data.
 - **No live/provisional bonus points, price-change history, fixture difficulty ratings, or mini-league/rank data.**
 
@@ -153,11 +153,11 @@ This project includes a comprehensive test suite to ensure functionality works c
 
 ### Test Coverage
 
-Unit/integration tests (Jest + JSDOM, ~305 tests across ~50 suites):
+Unit/integration tests (Jest + JSDOM, 310 passing tests across 49 passing suites, with 1 test and 1 suite skipped):
 - **Player, Week, Captaincy Services**: `__tests__/services/player-service.test.js`, `week-service.test.js`, `captaincy-service.test.js` — pure business logic, independent of storage or DOM.
 - **Team & Multi-Team Tests**: `__tests__/services/team-service.test.js` covers team CRUD, active-team resolution, FPL entry ID handling, and `validateFplRules()`.
 - **FPL API Tests**: `__tests__/services/fpl-api.test.js` (bootstrap/entry-picks fetching, player normalization, current-gameweek resolution) and `__tests__/services/team-sync-coordinator.test.js` (SYNC, Import My Squad, and team-switching orchestration with mocked dependencies).
-- **FPL Proxy Tests**: `__tests__/fpl-proxy.api.integration.test.js` exercises the server-side `/api/fpl/*` proxy routes (success, upstream failure, network error, invalid params) with a mocked `fetch`.
+- **FPL Proxy Tests**: `__tests__/fpl-proxy.api.integration.test.js` exercises the server-side `/api/fpl/*` proxy routes with a mocked `fetch`, including success, upstream failure, network error, invalid parameters, bootstrap cache hits, TTL expiry, and failure retry behavior.
 - **Points Tests**: `__tests__/services/points-service.test.js` covers gameweek/season point calculation and captain/vice-captain multipliers.
 - **Storage Contract Tests**: `__tests__/database.test.js` and `__tests__/storage-adapter.contract.test.js` verify every storage adapter (localStorage, IndexedDB, SQLite) adheres to the shared contract.
 - **Storage Service Contract Tests**: `__tests__/storage-contract.integration.test.js` validates the factory-created storage services across all backends, including legacy helpers and defensive failure paths.
@@ -166,7 +166,7 @@ Unit/integration tests (Jest + JSDOM, ~305 tests across ~50 suites):
 - **App Initialization Tests**: `__tests__/app-init.integration.test.js` verifies storage selection UI, backend fallback timing, and SQLite health checks.
 - **Sync Flow Integration**: `__tests__/sync-flow.integration.test.js` exercises `FPLTeamManager.syncFromFpl()` end-to-end against a mocked FPL bootstrap response.
 
-End-to-end tests (Playwright, real browser, 102 scenarios across 6 spec files) — see [`__tests__/e2e/README.md`](__tests__/e2e/README.md) for full details, including the FPL sync/import/multi-team workflow (`fpl-sync-and-teams.spec.js`).
+End-to-end tests (Playwright, real browser, 111 scenarios) — see [`__tests__/e2e/README.md`](__tests__/e2e/README.md) for full details, including FPL sync, Import My Squad, multi-team, and squad-rule validation workflows.
 
 All Jest tests use Jest with JSDOM for DOM simulation; E2E tests run against a real Chromium browser via Playwright.
 
@@ -229,15 +229,15 @@ Works on all modern browsers including:
 
 ### FPL API integration gaps
 (see also [Current limitations of the FPL integration](#current-limitations-of-the-fpl-integration) above)
-- Surface `TeamService.validateFplRules()` (budget, squad composition, per-club limits) in the UI for what-if teams — the logic exists and is unit-tested but nothing calls it today
+- ~~Surface `TeamService.validateFplRules()` (budget, squad composition, per-club limits) in the UI for what-if teams~~ ✅ done
 - Import a specific past gameweek's squad, not just the current one
 - Track transfers in/out (including transfer-cost point hits) instead of only replacing the squad snapshot on import
 - Support real FPL chips (Wildcard, Free Hit, Bench Boost, Triple Captain)
 - Tie the app's week numbering to real FPL gameweek deadlines instead of manual "Create New Week"
-- Cache bootstrap-static responses (ETag or TTL) instead of re-fetching ~700 players on every SYNC/import
+- ~~Cache bootstrap-static responses instead of re-fetching ~700 players on every SYNC/import~~ ✅ done (five-minute in-memory TTL)
 - Optional background/scheduled sync instead of fully manual, user-triggered SYNC
 - Fixture difficulty ratings, live/provisional bonus points, price-change history, and mini-league/rank data
-- E2E coverage for the "Import My Squad" flow (currently only unit-tested; see [`__tests__/e2e/README.md`](__tests__/e2e/README.md))
+- ~~Add E2E coverage for the "Import My Squad" flow~~ ✅ done
 
 ## Potential implementation of database and authentication (online)
 - use firebase or supabase for database or SQLite for fully offline db
@@ -255,11 +255,11 @@ Works on all modern browsers including:
 
 ### Recent changes (FPL API integration + multi-team support)
 
-- **Multi-team support**: `js/services/team-service.js` adds team CRUD, active-team/active-week resolution helpers, and FPL squad-rule validation (`validateFplRules`, not yet wired to the UI). The storage schema now supports `teams`/`currentTeam`/`settings` alongside the legacy single-team shape, with `js/services/migration-service.js` upgrading old data automatically.
+- **Multi-team support**: `js/services/team-service.js` adds team CRUD, active-team/active-week resolution helpers, and FPL squad-rule validation (`validateFplRules`), with non-blocking validation results shown on the dashboard. The storage schema supports `teams`/`currentTeam`/`settings` alongside the legacy single-team shape, with `js/services/migration-service.js` upgrading old data automatically.
 - **FPL API client**: `js/services/fpl-api.js` (`FplApiClient`) fetches and normalizes FPL bootstrap-static and entry-picks data, including a `getCurrentGameweek()` helper.
 - **SYNC**: Refreshes points/price/form/availability for existing players matched by FPL ID.
 - **Import My Squad**: Fetches a user's real FPL picks and captaincy and replaces the primary team's active-week squad with them — see `js/services/team-sync-coordinator.js` (`TeamSyncCoordinator`).
-- **Server-side FPL proxy**: `server/routes/fpl.js` proxies `bootstrap-static` and `entry/{id}/event/{gw}/picks` server-side, required because the FPL API blocks direct cross-origin browser requests (no CORS headers). This was found and fixed after real-browser testing showed SYNC failing silently in every automated test (Jest/Playwright mocks bypass real CORS enforcement).
+- **Server-side FPL proxy**: `server/routes/fpl.js` proxies `bootstrap-static` and `entry/{id}/event/{gw}/picks` server-side, required because the FPL API blocks direct cross-origin browser requests (no CORS headers). Successful bootstrap responses use a five-minute in-memory TTL cache, while entry-picks responses and failed bootstrap requests remain uncached.
 - **Points tracking**: `js/services/points-service.js` calculates gameweek and season points, including captain/vice-captain multipliers, surfaced in new "Total Points"/"GW Points" summary fields and per-player "Total Pts"/"GW Pts" table columns.
 - **Architecture**: Sync/team-switching orchestration extracted from `FPLTeamManager` (`script.js`) into `TeamSyncCoordinator`, following a code review that flagged the growing size of that class.
 - **Code review skill**: Added `.devin/skills/code-review/` — a project-tailored code review checklist (architecture/SOLID, security, performance, error handling, async patterns) adapted for this project's stack.
