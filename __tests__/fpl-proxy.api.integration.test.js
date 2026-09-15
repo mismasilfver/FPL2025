@@ -5,9 +5,17 @@
 const request = require('supertest');
 
 const { app } = require('../server/server');
+const fplRouter = require('../server/routes/fpl');
 
 describe('FPL proxy API', () => {
   const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    fplRouter.clearBootstrapCache?.();
+    if (fplRouter.bootstrapCache) {
+      fplRouter.bootstrapCache.ttlMs = 300000;
+    }
+  });
 
   afterEach(() => {
     global.fetch = originalFetch;
@@ -48,6 +56,63 @@ describe('FPL proxy API', () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toMatchObject({ error: expect.any(String) });
+    });
+
+    test('caches a successful bootstrap-static response within the TTL', async () => {
+      const mockData = { elements: [{ id: 1 }], teams: [], element_types: [], events: [] };
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue(mockData),
+      });
+
+      const first = await request(app).get('/api/fpl/bootstrap-static');
+      const second = await request(app).get('/api/fpl/bootstrap-static');
+
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+      expect(first.body).toEqual(mockData);
+      expect(second.body).toEqual(mockData);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    test('refetches bootstrap-static after the TTL expires', async () => {
+      const cachedData = { elements: [{ id: 1 }], teams: [], element_types: [], events: [] };
+      const freshData = { elements: [{ id: 2 }], teams: [], element_types: [], events: [] };
+
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: jest.fn().mockResolvedValue(cachedData),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: jest.fn().mockResolvedValue(freshData),
+        });
+
+      await request(app).get('/api/fpl/bootstrap-static');
+      fplRouter.bootstrapCache.ttlMs = -1;
+
+      const response = await request(app).get('/api/fpl/bootstrap-static');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(freshData);
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    test('does not cache a failed upstream bootstrap-static response', async () => {
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({ ok: false, status: 503 })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: jest.fn().mockResolvedValue({ elements: [] }),
+        });
+
+      const first = await request(app).get('/api/fpl/bootstrap-static');
+      const second = await request(app).get('/api/fpl/bootstrap-static');
+
+      expect(first.status).toBe(503);
+      expect(second.status).toBe(200);
+      expect(global.fetch).toHaveBeenCalledTimes(2);
     });
   });
 

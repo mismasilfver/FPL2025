@@ -2,6 +2,30 @@ const express = require("express");
 const router = express.Router();
 
 const FPL_BASE_URL = "https://fantasy.premierleague.com/api";
+const DEFAULT_BOOTSTRAP_TTL_MS = 300000; // 5 minutes
+
+const bootstrapCache = {
+  data: null,
+  fetchedAt: 0,
+  ttlMs: DEFAULT_BOOTSTRAP_TTL_MS,
+};
+
+function isBootstrapCacheValid() {
+  return (
+    bootstrapCache.data !== null &&
+    Date.now() - bootstrapCache.fetchedAt < bootstrapCache.ttlMs
+  );
+}
+
+function setBootstrapCache(data) {
+  bootstrapCache.data = data;
+  bootstrapCache.fetchedAt = Date.now();
+}
+
+function clearBootstrapCache() {
+  bootstrapCache.data = null;
+  bootstrapCache.fetchedAt = 0;
+}
 
 /**
  * Proxy for FPL bootstrap-static endpoint
@@ -12,6 +36,10 @@ const FPL_BASE_URL = "https://fantasy.premierleague.com/api";
  * from the app's own origin are blocked by CORS.
  */
 router.get("/bootstrap-static", async (req, res) => {
+  if (isBootstrapCacheValid()) {
+    return res.json(bootstrapCache.data);
+  }
+
   try {
     const response = await fetch(`${FPL_BASE_URL}/bootstrap-static/`, {
       headers: {
@@ -27,6 +55,7 @@ router.get("/bootstrap-static", async (req, res) => {
     }
 
     const data = await response.json();
+    setBootstrapCache(data);
     res.json(data);
   } catch (error) {
     console.error("Error proxying FPL data:", error);
@@ -74,5 +103,8 @@ router.get("/entry/:entryId/event/:gameweek/picks", async (req, res) => {
       .json({ error: "Internal server error while fetching FPL entry picks" });
   }
 });
+
+router.bootstrapCache = bootstrapCache;
+router.clearBootstrapCache = clearBootstrapCache;
 
 module.exports = router;
